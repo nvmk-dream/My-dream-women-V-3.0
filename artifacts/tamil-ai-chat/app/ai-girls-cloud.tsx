@@ -153,26 +153,39 @@ export default function AIGirlsCloudScreen() {
       }
     }
 
-    // CUT: try to delete originals from device
+    // CUT: delete originals from device after successful upload
     if (action === 'cut' && done > 0) {
       try {
         const writePerm = await MediaLibrary.requestPermissionsAsync(true);
         if (writePerm.granted) {
-          const filenames = pickedAssets.map(a => {
-            const parts = a.uri.split('/');
-            return parts[parts.length - 1];
-          });
-          const uris = pickedAssets.map(a => a.uri);
-          let cursor: string | undefined;
-          const toDelete: string[] = [];
-          do {
-            const res = await MediaLibrary.getAssetsAsync({ mediaType: 'photo', first: 500, after: cursor });
-            for (const ma of res.assets) {
-              if (uris.includes(ma.uri) || filenames.includes(ma.filename)) toDelete.push(ma.id);
+          // Method 1: Use assetId directly (most reliable on Android/HarmonyOS)
+          const assetIds = pickedAssets
+            .filter(a => a.assetId)
+            .map(a => a.assetId as string);
+          if (assetIds.length > 0) {
+            await MediaLibrary.deleteAssetsAsync(assetIds);
+          } else {
+            // Method 2: file:// URI → FileSystem.deleteAsync directly
+            for (const a of pickedAssets) {
+              if (a.uri.startsWith('file://')) {
+                await FileSystem.deleteAsync(a.uri, { idempotent: true }).catch(() => {});
+              }
             }
-            cursor = res.hasNextPage ? res.endCursor : undefined;
-          } while (cursor && toDelete.length < pickedAssets.length);
-          if (toDelete.length > 0) await MediaLibrary.deleteAssetsAsync(toDelete);
+            // Method 3: Fallback — scan MediaLibrary by filename
+            const filenames = new Set(pickedAssets.map(a => a.uri.split('/').pop()).filter(Boolean));
+            if (filenames.size > 0) {
+              const toDelete: string[] = [];
+              let cursor: string | undefined;
+              do {
+                const res = await MediaLibrary.getAssetsAsync({ mediaType: 'photo', first: 500, after: cursor });
+                for (const ma of res.assets) {
+                  if (filenames.has(ma.filename)) toDelete.push(ma.id);
+                }
+                cursor = res.hasNextPage ? res.endCursor : undefined;
+              } while (cursor && toDelete.length < pickedAssets.length);
+              if (toDelete.length > 0) await MediaLibrary.deleteAssetsAsync(toDelete);
+            }
+          }
         }
       } catch { /* deletion failed — upload still succeeded */ }
     }
