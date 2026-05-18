@@ -7,7 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadToCloudinary, listCloudinaryImages, deleteFromCloudinary } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, deleteFromCloudinary } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const THUMB = (width - 6) / 3;
@@ -63,7 +64,10 @@ const CATEGORIES = [
   { key: 'ai',       label: 'AI',        icon: '🤖' },
   { key: 'faceswap', label: 'Face Swap', icon: '🤳' },
   { key: 'group',    label: 'Group',     icon: '👥' },
+  { key: 'app-icon', label: 'App Icon',  icon: '🎯' },
 ];
+
+const APP_ICON_KEY = 'my_girls_app_icons';
 
 export default function CloudStorageScreen() {
   const router = useRouter();
@@ -76,6 +80,8 @@ export default function CloudStorageScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState<CloudImage | null>(null);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [appIcons, setAppIcons] = useState<CloudImage[]>([]);
 
   const loadLocalImages = useCallback(async () => {
     try {
@@ -83,8 +89,62 @@ export default function CloudStorageScreen() {
       const list: CloudImage[] = raw ? JSON.parse(raw) : [];
       setImages(list);
     } catch {}
+    try {
+      const raw2 = await AsyncStorage.getItem(APP_ICON_KEY);
+      const icons: CloudImage[] = raw2 ? JSON.parse(raw2) : [];
+      setAppIcons(icons);
+    } catch {}
     setLoading(false);
     setRefreshing(false);
+  }, []);
+
+  const uploadAppIcon = useCallback(async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setUploadingIcon(true);
+    try {
+      const data = await uploadUriToCloudinary(asset.uri, 'image/jpeg', 'my-girls/app-icon');
+      const newIcon: CloudImage = {
+        url: data.url,
+        public_id: data.public_id,
+        category: 'app-icon',
+        createdAt: Date.now(),
+        width: data.width,
+        height: data.height,
+      };
+      const existing = await AsyncStorage.getItem(APP_ICON_KEY);
+      const list: CloudImage[] = existing ? JSON.parse(existing) : [];
+      list.unshift(newIcon);
+      await AsyncStorage.setItem(APP_ICON_KEY, JSON.stringify(list.slice(0, 10)));
+      setAppIcons(list.slice(0, 10));
+      Alert.alert('✅ Upload ஆச்சு!', 'App Icon Cloudinary-ல் save ஆனது.\nAPK build trigger பண்ணினா புது icon-ஓட APK கிடைக்கும்!');
+    } catch (e: any) {
+      Alert.alert('Upload பிழை', e?.message || 'மீண்டும் try பண்ணுங்க');
+    } finally {
+      setUploadingIcon(false);
+    }
+  }, []);
+
+  const deleteAppIcon = useCallback(async (icon: CloudImage) => {
+    setDeleteConfirm(null);
+    try { await deleteFromCloudinary(icon.public_id); } catch {}
+    const existing = await AsyncStorage.getItem(APP_ICON_KEY);
+    const list: CloudImage[] = existing ? JSON.parse(existing) : [];
+    const updated = list.filter(i => i.public_id !== icon.public_id);
+    await AsyncStorage.setItem(APP_ICON_KEY, JSON.stringify(updated));
+    setAppIcons(updated);
+    setPreview(null);
   }, []);
 
   const syncFromCloud = useCallback(async () => {
@@ -169,7 +229,11 @@ export default function CloudStorageScreen() {
 
   const categoryCounts = CATEGORIES.map(c => ({
     ...c,
-    count: c.key === 'all' ? images.length : images.filter(i => i.category === c.key).length,
+    count: c.key === 'all'
+      ? images.length
+      : c.key === 'app-icon'
+        ? appIcons.length
+        : images.filter(i => i.category === c.key).length,
   }));
 
   return (
@@ -264,7 +328,63 @@ export default function CloudStorageScreen() {
           </View>
         )}
 
-        {loading ? (
+        {activeCategory === 'app-icon' ? (
+          <View style={styles.appIconSection}>
+            <View style={styles.appIconHeader}>
+              <View>
+                <Text style={styles.appIconTitle}>🎯 App Icon Folder</Text>
+                <Text style={styles.appIconSub}>Cloudinary: my-girls/app-icon/</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.appIconUploadBtn, uploadingIcon && { opacity: 0.6 }]}
+                onPress={uploadAppIcon}
+                disabled={uploadingIcon}
+              >
+                {uploadingIcon
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.appIconUploadTxt}>📤 Upload Icon</Text>
+                }
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.appIconInfo}>
+              <Text style={styles.appIconInfoTxt}>
+                📌 Photo select → 1:1 crop → Cloudinary upload{'\n'}
+                🔨 APK build-ல் latest icon auto-fetch ஆகும்
+              </Text>
+            </View>
+
+            {appIcons.length === 0 ? (
+              <View style={styles.appIconEmpty}>
+                <Text style={styles.appIconEmptyIcon}>🎯</Text>
+                <Text style={styles.appIconEmptyTxt}>Icon upload ஆகல</Text>
+                <Text style={styles.appIconEmptyHint}>Upload பண்ணினா APK-ல் உங்கள் icon வரும்!</Text>
+              </View>
+            ) : (
+              <View style={styles.appIconGrid}>
+                {appIcons.map((icon, idx) => (
+                  <View key={icon.public_id} style={styles.appIconItem}>
+                    <Image source={{ uri: icon.url }} style={styles.appIconThumb} resizeMode="cover" />
+                    {idx === 0 && (
+                      <View style={styles.appIconLatestBadge}>
+                        <Text style={styles.appIconLatestTxt}>LATEST</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.appIconDeleteBtn}
+                      onPress={() => setDeleteConfirm(icon)}
+                    >
+                      <Text style={styles.appIconDeleteTxt}>🗑️</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.appIconDate}>
+                      {new Date(icon.createdAt).toLocaleDateString('ta-IN')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : loading ? (
           <ActivityIndicator color="#6C63FF" size="large" style={{ marginTop: 60 }} />
         ) : filtered.length === 0 && images.length > 0 ? (
           <View style={styles.empty}>
@@ -438,4 +558,48 @@ const styles = StyleSheet.create({
   confirmCancelTxt: { color: '#ccc', fontWeight: '700', fontSize: 15 },
   confirmDelete: { flex: 1, backgroundColor: '#c62828', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   confirmDeleteTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+
+  appIconSection: { margin: 14 },
+  appIconHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: '#6C63FF',
+  },
+  appIconTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  appIconSub: { color: '#6C63FF', fontSize: 11, marginTop: 3 },
+  appIconUploadBtn: {
+    backgroundColor: '#6C63FF', borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 10, minWidth: 100, alignItems: 'center',
+  },
+  appIconUploadTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  appIconInfo: {
+    backgroundColor: '#0d2137', borderRadius: 12, padding: 12, marginBottom: 14,
+    borderWidth: 1, borderColor: '#1565C0',
+  },
+  appIconInfoTxt: { color: '#58a6ff', fontSize: 12, lineHeight: 20 },
+  appIconEmpty: { alignItems: 'center', paddingVertical: 50 },
+  appIconEmptyIcon: { fontSize: 56, marginBottom: 12 },
+  appIconEmptyTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  appIconEmptyHint: { color: '#aaa', fontSize: 13, textAlign: 'center' },
+  appIconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  appIconItem: { width: (width - 52) / 3, alignItems: 'center' },
+  appIconThumb: {
+    width: (width - 52) / 3, height: (width - 52) / 3,
+    borderRadius: 16, backgroundColor: '#2a2a4a',
+    borderWidth: 2, borderColor: '#6C63FF',
+  },
+  appIconLatestBadge: {
+    position: 'absolute', top: 6, left: 0, right: 0,
+    alignItems: 'center',
+  },
+  appIconLatestTxt: {
+    backgroundColor: '#00C853', color: '#fff', fontSize: 9,
+    fontWeight: 'bold', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  appIconDeleteBtn: {
+    marginTop: 6, backgroundColor: '#c62828', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  appIconDeleteTxt: { fontSize: 13 },
+  appIconDate: { color: '#888', fontSize: 10, marginTop: 4, textAlign: 'center' },
 });
