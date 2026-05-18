@@ -22,13 +22,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android NDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: 'ndk;26.1.10909125 cmake;3.22.1'
 
-      - name: Install pnpm + EAS CLI
-        run: npm install -g pnpm@10 eas-cli
+      - name: Install pnpm
+        run: npm install -g pnpm@10
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
@@ -47,26 +45,6 @@ jobs:
             fs.writeFileSync(p, JSON.stringify(j, null, 2));
             console.log('versionCode set to', j.expo.android.versionCode);
           "
-
-      - name: Link EAS project to current account
-        working-directory: artifacts/tamil-ai-chat
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          export EXPO_TOKEN=$(echo "$EXPO_TOKEN" | tr -d '[:space:]')
-          echo "Logged in as: $(eas whoami)"
-          # Remove old projectId so EAS links to current account
-          node -e "
-            const fs = require('fs');
-            const j = JSON.parse(fs.readFileSync('app.json','utf8'));
-            if (j.expo.extra && j.expo.extra.eas) delete j.expo.extra.eas.projectId;
-            fs.writeFileSync('app.json', JSON.stringify(j, null, 2));
-            console.log('Cleared old projectId');
-          "
-          # Init/link under current account
-          eas init --non-interactive 2>&1 || true
-          echo "New app.json projectId:"
-          node -e "const j=JSON.parse(require('fs').readFileSync('app.json','utf8'));console.log(j.expo?.extra?.eas?.projectId||'none');"
 
       - name: Fetch custom app icon from Cloudinary
         env:
@@ -88,29 +66,42 @@ jobs:
             echo "Using default icon"
           fi
 
-      - name: Build APK (EAS local)
+      - name: Expo Prebuild (generate Android project)
         working-directory: artifacts/tamil-ai-chat
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+          EXPO_PUBLIC_API_URL: https://my-girls-1-5.onrender.com
         run: |
-          export EXPO_TOKEN=$(echo "$EXPO_TOKEN" | tr -d '[:space:]')
-          eas build --platform android --profile preview --local --non-interactive 2>&1 | tee /tmp/build.log
-          # Find APK — largest file wins
-          APK=$(find /tmp /home/runner/work -name "*.apk" 2>/dev/null \
-            | grep -v "node_modules\|\.git\|public/" \
-            | while read f; do sz=$(stat -c%s "$f" 2>/dev/null||echo 0); echo "$sz $f"; done \
+          npx expo prebuild --platform android --non-interactive --clean 2>&1
+          echo "Android project generated:"
+          ls android/
+
+      - name: Build APK with Gradle
+        working-directory: artifacts/tamil-ai-chat/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee /tmp/gradle.log
+          echo "=== Build output ==="
+          find . -name "*.apk" | grep -v "node_modules\|\.git" | while read f; do
+            sz=$(stat -c%s "$f" 2>/dev/null||echo 0)
+            echo "$sz $f"
+          done | sort -rn
+
+      - name: Locate and validate APK
+        run: |
+          APK=$(find artifacts/tamil-ai-chat/android -name "*.apk" 2>/dev/null \
+            | grep -v "node_modules\|\.git" \
+            | while read f; do echo "$(stat -c%s "$f" 2>/dev/null||echo 0) $f"; done \
             | sort -rn | awk 'NR==1{print $2}')
           echo "APK: $APK"
           SIZE=$(stat -c%s "$APK" 2>/dev/null || echo 0)
           echo "SIZE: $SIZE bytes"
           if [ "$SIZE" -lt 1000000 ]; then
-            echo "❌ Build failed — APK too small"
-            tail -60 /tmp/build.log
+            echo "❌ APK too small or not found"
+            tail -80 /tmp/gradle.log
             exit 1
           fi
+          echo "✅ APK ready: $(ls -lh "$APK")"
           echo "APK_FILE=$APK" >> $GITHUB_ENV
-          ls -lh "$APK"
 
       - name: Publish APK via GitHub Release
         env:
@@ -130,5 +121,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: /tmp/build.log
+          path: |
+            /tmp/gradle.log
+            artifacts/tamil-ai-chat/android/app/build/outputs/logs/
           retention-days: 7
