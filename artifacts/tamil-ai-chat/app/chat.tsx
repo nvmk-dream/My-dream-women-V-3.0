@@ -62,10 +62,11 @@ const { width, height } = Dimensions.get('window');
 const WALLPAPERS = [
   { id: 'default', label: '🟢 WhatsApp', bg: '#ECE5DD', dark: false },
   { id: 'dark',    label: '🌙 Dark',     bg: '#1C1C1E', dark: true  },
-  { id: 'pink',    label: '🌸 Pink',     bg: '#FCE4EC', dark: false },
-  { id: 'blue',    label: '💙 Blue',     bg: '#E3F2FD', dark: false },
-  { id: 'purple',  label: '💜 Purple',   bg: '#F3E5F5', dark: false },
-  { id: 'green',   label: '🌿 Forest',   bg: '#E8F5E9', dark: false },
+  { id: 'pink',    label: '🌸 Pink',     bg: '#F48FB1', dark: false },
+  { id: 'blue',    label: '💙 Blue',     bg: '#90CAF9', dark: false },
+  { id: 'purple',  label: '💜 Purple',   bg: '#CE93D8', dark: false },
+  { id: 'green',   label: '🌿 Forest',   bg: '#A5D6A7', dark: false },
+  { id: 'saffron', label: '🏵️ Tamil',    bg: '#FFE0B2', dark: false },
 ];
 // ── Bubble Styles ─────────────────────────────────────────────────
 const BUBBLE_STYLES_LIST = [
