@@ -298,7 +298,7 @@ export default function EditCharacterScreen() {
             editable={true}
             selectTextOnFocus={false}
             contextMenuHidden={false}
-            scrollEnabled={true}
+            scrollEnabled={false}
             autoCorrect={false}
             autoCapitalize="none"
             spellCheck={false}
