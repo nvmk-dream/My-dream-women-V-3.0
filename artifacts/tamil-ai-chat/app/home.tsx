@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, StatusBar, Dimensions, Image, Modal, FlatList,
+  ScrollView, StatusBar, Dimensions, Image, Modal, FlatList, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,6 +15,8 @@ const COVER_H = 150;
 
 const DEFAULT_COVER = require('../assets/images/icon.png');
 const COVER_KEY = 'home_cover_image';
+const CUSTOM_SERVER_KEY = 'custom_server_url';
+const DEFAULT_RENDER_URL = 'https://my-girls-1-5.onrender.com';
 
 const CATEGORIES = [
   { key: 'pictures',    label: 'Pictures',    emoji: '🖼️',  bg: '#4A90D9', route: '/gallery?album=pictures' },
@@ -39,10 +41,46 @@ export default function HomeScreen() {
   const [showPickModal, setShowPickModal] = useState(false);
   const [cloudPhotos, setCloudPhotos] = useState<CloudPhoto[]>([]);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'unknown'|'ok'|'sleeping'>('unknown');
+  const [wakingServer, setWakingServer] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(COVER_KEY).then(v => { if (v) setCoverUri(v); }).catch(() => {});
+    // Check Render server status on home load
+    checkRenderServer();
   }, []);
+
+  const checkRenderServer = async () => {
+    try {
+      const savedUrl = await AsyncStorage.getItem(CUSTOM_SERVER_KEY).catch(() => null);
+      const serverUrl = savedUrl || DEFAULT_RENDER_URL;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${serverUrl}/api/healthz`, { signal: controller.signal });
+      clearTimeout(timer);
+      setServerStatus(res.ok ? 'ok' : 'sleeping');
+    } catch {
+      setServerStatus('sleeping');
+    }
+  };
+
+  const wakeRenderServer = async () => {
+    setWakingServer(true);
+    setServerStatus('unknown');
+    try {
+      const savedUrl = await AsyncStorage.getItem(CUSTOM_SERVER_KEY).catch(() => null);
+      const serverUrl = savedUrl || DEFAULT_RENDER_URL;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35000);
+      const res = await fetch(`${serverUrl}/api/healthz`, { signal: controller.signal });
+      clearTimeout(timer);
+      setServerStatus(res.ok ? 'ok' : 'sleeping');
+    } catch {
+      setServerStatus('sleeping');
+    } finally {
+      setWakingServer(false);
+    }
+  };
 
   const saveCover = useCallback(async (uri: string) => {
     setCoverUri(uri);
@@ -141,6 +179,21 @@ export default function HomeScreen() {
       )}
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* Render Server Banner */}
+        {serverStatus === 'sleeping' && (
+          <View style={s.serverBanner}>
+            <Text style={s.serverBannerTitle}>⚠️ Server-ஐ connect ஆகல</Text>
+            <Text style={s.serverBannerSub}>Render சரியா run ஆகுதான்னு check பண்ணு.{'
+'}AI Girls chat slow ஆ இருக்கலாம்.</Text>
+            <TouchableOpacity style={s.serverRetryBtn} onPress={wakeRenderServer} disabled={wakingServer}>
+              {wakingServer
+                ? <><ActivityIndicator size="small" color="#fff" /><Text style={s.serverRetryTxt}>  Connecting...</Text></>
+                : <Text style={s.serverRetryTxt}>🔄 Retry</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
         <Text style={s.sectionLabel}>STORAGE</Text>
 
         <View style={s.grid}>
@@ -332,4 +385,21 @@ const s = StyleSheet.create({
     width: THUMB, height: THUMB, margin: 2, borderRadius: 8, overflow: 'hidden',
   },
   cloudThumbImg: { width: '100%', height: '100%' },
+  renderRefreshBtn: {
+    backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16,
+    width: 34, height: 34, justifyContent: 'center', alignItems: 'center',
+  },
+  renderRefreshIcon: { fontSize: 18, color: '#fff' },
+  serverBanner: {
+    backgroundColor: '#1a0a00', borderRadius: 12, borderWidth: 1, borderColor: '#ff5252',
+    padding: 14, marginBottom: 16, alignItems: 'center',
+  },
+  serverBannerTitle: { color: '#ff5252', fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  serverBannerSub: { color: '#ffb3b3', fontSize: 12, textAlign: 'center', lineHeight: 18, marginBottom: 10 },
+  serverRetryBtn: {
+    backgroundColor: '#1565C0', borderRadius: 20,
+    paddingHorizontal: 28, paddingVertical: 9,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  serverRetryTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
