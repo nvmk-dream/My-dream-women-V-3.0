@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Linking, ActivityIndicator, Alert, Image,
+  ScrollView, Linking, ActivityIndicator, Alert, Image, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -16,11 +16,16 @@ const GITHUB_REPO = 'nnvvmm663-sketch/my-dream-girle';
 const WORKFLOW_FILE = 'build-apk.yml';
 const KEYS_STORAGE = 'api_keys_store';
 
+const CUSTOM_SERVER_KEY = 'custom_server_url';
+const DEFAULT_SERVER = 'https://my-girls-1-5.onrender.com';
+
 type BuildStatus = 'idle' | 'triggering' | 'queued' | 'in_progress' | 'success' | 'failure';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const [checking, setChecking] = useState(false);
+  const [customServerUrl, setCustomServerUrl] = useState('');
+  const [savingServer, setSavingServer] = useState(false);
   const [checkMsg, setCheckMsg] = useState('');
   const [appIconUri, setAppIconUri] = useState<string | null>(null);
   const [uploadingAppIcon, setUploadingAppIcon] = useState(false);
@@ -197,6 +202,24 @@ export default function SettingsScreen() {
       setUploadingAppIcon(false);
       setAppIconUri(null);
       Alert.alert('Upload பிழை', e?.message || 'மீண்டும் try பண்ணுங்க');
+    }
+  };
+
+  const saveCustomServer = async () => {
+    setSavingServer(true);
+    try {
+      const url = customServerUrl.trim();
+      if (url && !url.startsWith('http')) {
+        Alert.alert('பிழை', 'URL http:// அல்லது https:// இல் தொடங்கணும்');
+        return;
+      }
+      await AsyncStorage.setItem(CUSTOM_SERVER_KEY, url || DEFAULT_SERVER);
+      Alert.alert('✅ Saved', url ? 'Custom server URL saved!
+Next message-ல் இருந்து use ஆகும்.' : 'Default server reset ஆச்சு!');
+    } catch {
+      Alert.alert('Error', 'Save பண்ண முடியல');
+    } finally {
+      setSavingServer(false);
     }
   };
 
@@ -392,6 +415,37 @@ export default function SettingsScreen() {
         <TouchableOpacity style={s.keysBtn} onPress={() => router.push('/keys')}>
           <Text style={s.keysBtnTxt}>🔑 Keys & Accounts</Text>
         </TouchableOpacity>
+
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardIcon}>🌐</Text>
+            <Text style={s.cardTitle}>Custom Server URL</Text>
+          </View>
+          <Text style={s.cardDesc}>Render server sleep ஆனா இந்த option-ல் வேற server URL set பண்ணலாம். Empty விட்டா default Render server use ஆகும்.</Text>
+          <Text style={{ color: '#8b949e', fontSize: 11, marginBottom: 6 }}>Current default: {DEFAULT_SERVER}</Text>
+          <TextInput
+            style={{ backgroundColor: '#0d1117', color: '#e6edf3', borderRadius: 8, borderWidth: 1, borderColor: '#30363d', padding: 10, fontSize: 13, marginBottom: 10 }}
+            value={customServerUrl}
+            onChangeText={setCustomServerUrl}
+            placeholder='https://your-server.onrender.com'
+            placeholderTextColor='#555'
+            autoCapitalize='none'
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={{ backgroundColor: savingServer ? '#555' : '#238636', borderRadius: 8, paddingVertical: 11, alignItems: 'center' }}
+            onPress={saveCustomServer}
+            disabled={savingServer}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{savingServer ? 'Saving...' : '💾 Save Server URL'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ marginTop: 8, alignItems: 'center', paddingVertical: 8 }}
+            onPress={() => { setCustomServerUrl(''); saveCustomServer(); }}
+          >
+            <Text style={{ color: '#8b949e', fontSize: 12 }}>↩️ Default-க்கு reset பண்ணு</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={s.tipsCard}>
           <Text style={s.tipsTitle}>💡 Tips</Text>
