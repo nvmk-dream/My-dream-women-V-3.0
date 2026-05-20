@@ -52,18 +52,28 @@ jobs:
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
         run: |
-          ICON_URL=$(curl -sf -u "$CLOUDINARY_API_KEY:$CLOUDINARY_API_SECRET" \
-            "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME/resources/image?prefix=my-girls/app-icon/&type=upload&max_results=1" \
-            | node -e "
-              const d=[];process.stdin.on('data',c=>d.push(c));
-              process.stdin.on('end',()=>{try{const r=JSON.parse(d.join(''));if(r.resources&&r.resources.length>0)console.log(r.resources[0].secure_url);}catch(e){}});
-            " 2>/dev/null || true)
-          if [ -n "$ICON_URL" ]; then
-            curl -sL "$ICON_URL" -o artifacts/tamil-ai-chat/assets/images/icon.png
-            curl -sL "$ICON_URL" -o artifacts/tamil-ai-chat/assets/images/adaptive-icon.png
-            echo "✅ Custom icon applied"
+          # Try pinned icon first (my-girls/app-icon/app_icon)
+          PINNED_URL="https://res.cloudinary.com/$CLOUDINARY_CLOUD_NAME/image/upload/my-girls/app-icon/app_icon.png"
+          HTTP_CODE=$(curl -sL -o /tmp/icon_test.png -w "%{http_code}" "$PINNED_URL")
+          if [ "$HTTP_CODE" = "200" ] && [ "$(stat -c%s /tmp/icon_test.png)" -gt 10000 ]; then
+            cp /tmp/icon_test.png artifacts/tamil-ai-chat/assets/images/icon.png
+            cp /tmp/icon_test.png artifacts/tamil-ai-chat/assets/images/adaptive-icon.png
+            echo "✅ Pinned icon applied (app_icon)"
           else
-            echo "Using default icon"
+            # Fallback: API lookup
+            ICON_URL=$(curl -sf -u "$CLOUDINARY_API_KEY:$CLOUDINARY_API_SECRET" \
+              "https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME/resources/image?prefix=my-girls/app-icon/&type=upload&max_results=1" \
+              | node -e "
+                const d=[];process.stdin.on('data',c=>d.push(c));
+                process.stdin.on('end',()=>{try{const r=JSON.parse(d.join(''));if(r.resources&&r.resources.length>0)console.log(r.resources[0].secure_url);}catch(e){}});
+              " 2>/dev/null || true)
+            if [ -n "$ICON_URL" ]; then
+              curl -sL "$ICON_URL" -o artifacts/tamil-ai-chat/assets/images/icon.png
+              curl -sL "$ICON_URL" -o artifacts/tamil-ai-chat/assets/images/adaptive-icon.png
+              echo "✅ Fallback icon applied from API"
+            else
+              echo "Using default icon"
+            fi
           fi
 
       - name: Expo Prebuild
@@ -110,7 +120,6 @@ jobs:
         working-directory: artifacts/tamil-ai-chat/android
         run: |
           chmod +x gradlew
-          # REACT_NATIVE_BUNDLE_SKIP skips Gradle's own bundling step
           ./gradlew assembleDebug \
             -PbundleInDebug=true \
             --no-daemon \
@@ -123,7 +132,7 @@ jobs:
       - name: Locate, validate and copy APK
         run: |
           APK=$(find artifacts/tamil-ai-chat/android -name "*.apk" 2>/dev/null \
-            | grep -v "node_modules\|\.git" \
+            | grep -v "node_modules\.git" \
             | while read f; do echo "$(stat -c%s "$f" 2>/dev/null||echo 0) $f"; done \
             | sort -rn | awk 'NR==1{print $2}')
           echo "APK found: $APK"
