@@ -183,8 +183,7 @@ export default function HomeScreen() {
         {serverStatus === 'sleeping' && (
           <View style={s.serverBanner}>
             <Text style={s.serverBannerTitle}>⚠️ Server-ஐ connect ஆகல</Text>
-            <Text style={s.serverBannerSub}>Render சரியா run ஆகுதான்னு check பண்ணு.{'
-'}AI Girls chat slow ஆ இருக்கலாம்.</Text>
+            <Text style={s.serverBannerSub}>Render சரியா run ஆகுதான்னு check பண்ணு. AI Girls chat slow ஆ இருக்கலாம்.</Text>
             <TouchableOpacity style={s.serverRetryBtn} onPress={wakeRenderServer} disabled={wakingServer}>
               {wakingServer
                 ? <><ActivityIndicator size="small" color="#fff" /><Text style={s.serverRetryTxt}>  Connecting...</Text></>
