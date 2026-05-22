@@ -250,7 +250,7 @@ export async function deleteFromCloudinary(public_id: string): Promise<void> {
 }
 
 // ── HuggingFace Inference API — Text-to-Image ─────────────────
-export const HF_IMAGE_MODEL = 'PenguinKaDushman/PornMaster-pro-V7';
+export const HF_IMAGE_MODEL = 'Lykon/dreamshaper-8';
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
 
 export async function generateImageHuggingFace(
@@ -278,6 +278,14 @@ export async function generateImageHuggingFace(
       let errMsg = `HuggingFace error: ${res.status}`;
       try { const e = await res.json() as any; errMsg = e?.error || errMsg; } catch {}
       throw new Error(errMsg);
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      // Some models return JSON with base64 or image URLs
+      const json = await res.json() as any;
+      const b64 = json.image || json.images?.[0] || json.generated_image || '';
+      if (!b64) throw new Error('HuggingFace: JSON response-ல் image இல்லை');
+      return { b64_json: b64, mimeType: 'image/jpeg' };
     }
     const arrayBuffer = await res.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
