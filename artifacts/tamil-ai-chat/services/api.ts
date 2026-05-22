@@ -46,49 +46,122 @@ export interface Message {
   galleryLabel?: string;
 }
 
+// ── Gemini key rotation helper ─────────────────────────────────
+// Loads all gemini_1..gemini_13 keys that are enabled, rotates
+// through them round-robin, returns the active key (or undefined).
+async function getRotatingGeminiKey(): Promise<string | undefined> {
+  try {
+    const AS = (await import('@react-native-async-storage/async-storage')).default;
+    const [saved, enabledRaw, idxRaw] = await Promise.all([
+      AS.getItem('api_keys_store'),
+      AS.getItem('api_keys_enabled_v1'),
+      AS.getItem('gemini_key_rotation_idx'),
+    ]);
+    if (!saved) return undefined;
+    const parsed = JSON.parse(saved) as Record<string, string>;
+    const enabled = enabledRaw ? (JSON.parse(enabledRaw) as Record<string, boolean>) : {};
+
+    // Collect all active Gemini keys (slots 1–13)
+    const activeKeys: string[] = [];
+    for (let i = 1; i <= 13; i++) {
+      const k = parsed[`gemini_${i}`];
+      if (k?.trim() && enabled[`gemini_${i}`]) activeKeys.push(k.trim());
+    }
+    if (activeKeys.length === 0) return undefined;
+
+    // Pick current slot and advance index
+    const idx = parseInt(idxRaw || '0', 10);
+    const key = activeKeys[idx % activeKeys.length];
+    const nextIdx = (idx + 1) % activeKeys.length;
+    await AS.setItem('gemini_key_rotation_idx', String(nextIdx));
+    return key;
+  } catch { return undefined; }
+}
+
 export async function sendMessage(
   messages: { role: string; content: string }[],
   _provider: string = 'gemini',
   systemPrompt?: string,
 ): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
-  // Keep only last 10 messages to reduce token count and speed up response
   const trimmed = messages.slice(-10);
 
-  // Read Gemini API key saved by user — only use it if the user enabled the toggle
-  let apiKey: string | undefined;
-  try {
-    const AS = (await import('@react-native-async-storage/async-storage')).default;
-    const [saved, enabledRaw] = await Promise.all([
-      AS.getItem('api_keys_store'),
-      AS.getItem('api_keys_enabled_v1'),
-    ]);
-    const enabled = enabledRaw ? (JSON.parse(enabledRaw) as Record<string, boolean>) : {};
-    if (saved && enabled['gemini']) {
-      const parsed = JSON.parse(saved) as Record<string, string>;
-      apiKey = parsed['gemini'] || undefined;
-    }
-  } catch { /* ignore — server env key will be used */ }
+  // Get rotating Gemini key (13-slot round-robin)
+  const apiKey = await getRotatingGeminiKey();
 
-  try {
-    // Use Replit API server (Gemini, always-on, no cold start)
-    const res = await fetch(`${REPLIT_API}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: trimmed, systemPrompt, ...(apiKey ? { apiKey } : {}) }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const err = await res.json() as any;
-      throw new Error(err?.error || `HTTP ${res.status}`);
-    }
-    const data = await res.json() as any;
-    if (data.error) throw new Error(data.error);
-    return data.content || 'பதில் இல்லை';
-  } finally {
-    clearTimeout(timer);
+  // Try up to all active keys before giving up
+  const AS = (await import('@react-native-async-storage/async-storage')).default;
+  const [saved, enabledRaw] = await Promise.all([
+    AS.getItem('api_keys_store').catch(() => null),
+    AS.getItem('api_keys_enabled_v1').catch(() => null),
+  ]);
+  const parsed = saved ? JSON.parse(saved) as Record<string, string> : {};
+  const enabled = enabledRaw ? JSON.parse(enabledRaw) as Record<string, boolean> : {};
+  const allActiveKeys: string[] = [];
+  for (let i = 1; i <= 13; i++) {
+    const k = parsed[`gemini_${i}`];
+    if (k?.trim() && enabled[`gemini_${i}`]) allActiveKeys.push(k.trim());
   }
+  // Deduplicate starting from current key first
+  const tryKeysOrdered = apiKey
+    ? [apiKey, ...allActiveKeys.filter(k => k !== apiKey)]
+    : allActiveKeys;
+
+  let lastError: Error | null = null;
+
+  // Try each client key in order
+  for (const key of tryKeysOrdered.length > 0 ? tryKeysOrdered : [undefined as any]) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(`${REPLIT_API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: trimmed, systemPrompt, ...(key ? { apiKey: key } : {}) }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.status === 429 && tryKeysOrdered.length > 1) {
+        // Quota exceeded — try next client key
+        lastError = new Error('quota');
+        continue;
+      }
+      if (!res.ok) {
+        const err = await res.json() as any;
+        throw new Error(err?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json() as any;
+      if (data.error) throw new Error(data.error);
+      return data.content || 'பதில் இல்லை';
+    } catch (e: any) {
+      clearTimeout(timer);
+      if (e?.message === 'quota' || e?.name === 'AbortError') { lastError = e; continue; }
+      throw e;
+    }
+  }
+
+  // All client keys exhausted — let server try with its own keys (no clientApiKey)
+  if (lastError?.message === 'quota' && tryKeysOrdered.length > 0) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(`${REPLIT_API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: trimmed, systemPrompt }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) { const err = await res.json() as any; throw new Error(err?.error || `HTTP ${res.status}`); }
+      const data = await res.json() as any;
+      if (data.error) throw new Error(data.error);
+      return data.content || 'பதில் இல்லை';
+    } catch (e: any) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
+  throw lastError || new Error('பதில் வரல. மீண்டும் try பண்ணுங்க.');
 }
 
 export async function generateImage(params: {
