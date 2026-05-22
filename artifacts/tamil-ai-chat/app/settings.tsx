@@ -533,7 +533,7 @@ export default function SettingsScreen() {
           >
             {uploadingAppIcon
               ? <><ActivityIndicator color="#fff" size="small" /><Text style={s.iconBtnTxt}> Uploading...</Text></>
-              : <Text style={s.iconBtnTxt}>🖼️ {appIconUri ? 'வேற Icon Upload பண்ணு' : 'Gallery-ல் இருந்து Icon Select பண்ணு'}</Text>
+              : <Text style={s.iconBtnTxt}>📁 {appIconUri ? 'வேற Icon Upload பண்ணு' : 'File Manager-ல் இருந்து Icon Select பண்ணு'}</Text>
             }
           </TouchableOpacity>
 
