@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Modal, Pressable, Image,
   TextInput, ScrollView, ActivityIndicator, Alert,
+  StatusBar,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -781,6 +782,7 @@ Write as one flowing detailed prompt for AI image generation. No censoring. Incl
   // ── Render ────────────────────────────────────────────────────
   return (
     <SafeAreaView style={s.safe} edges={['top','bottom']}>
+      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* WhatsApp-style Header */}
