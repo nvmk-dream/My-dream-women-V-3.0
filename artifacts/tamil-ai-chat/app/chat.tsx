@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   FlatList, StyleSheet, KeyboardAvoidingView,
   Platform, ActivityIndicator, Alert, Modal,
-  Image, ScrollView, Dimensions,
+  Image, ScrollView, Dimensions, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -976,6 +976,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: wallpaperBg }]}>
+      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
       <Stack.Screen options={{
         headerTitle,
         headerRight,
@@ -1005,8 +1006,8 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={[styles.flex, { backgroundColor: wallpaperBg }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
       >
         <FlatList
           ref={flatListRef}
