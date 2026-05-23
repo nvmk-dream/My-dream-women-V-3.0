@@ -4,6 +4,7 @@ import {
   FlatList, StyleSheet, KeyboardAvoidingView,
   Platform, ActivityIndicator, Alert, Modal,
   Image, ScrollView, Dimensions, StatusBar,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -823,10 +824,11 @@ export default function ChatScreen() {
   // ── Copy helper ────────────────────────────────────────────────
   const copyText = (text: string) => {
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        navigator.clipboard.writeText(text).catch(() => {});
-      }
-    } catch {}
+      Clipboard.setString(text);
+      Alert.alert('✅ Copied!', 'Text copy ஆச்சு — paste பண்ணலாம்!');
+    } catch {
+      Alert.alert('பிழை', 'Copy ஆகல, மீண்டும் try பண்ணுங்க.');
+    }
   };
 
   // ── Tamil → English Translation ────────────────────────────────
@@ -959,15 +961,15 @@ export default function ChatScreen() {
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
               <ActivityIndicator color="#075E54" size="small" />
-              <Text style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
             </View>
           ) : item.imageUrl ? (
             <TouchableOpacity onPress={() => setFullViewImg(item.imageUrl!)} onLongPress={() => setSelectedMsg(item)} delayLongPress={400}>
               <Image source={{ uri: item.imageUrl }} style={styles.generatedImg} resizeMode="cover" />
-              <Text style={[styles.msgText, { color: msgTextColor, marginTop: 4 }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, { color: msgTextColor, marginTop: 4 }]}>{item.content}</Text>
             </TouchableOpacity>
           ) : (
-            <Text style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+            <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
           )}
           <Text style={[styles.timeText, { color: timeTextColor }]}>
             {item.timestamp.toLocaleTimeString('ta-IN', { hour: '2-digit', minute: '2-digit' })}
@@ -1100,17 +1102,9 @@ export default function ChatScreen() {
           </View>
         )}
 
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
-            placeholderTextColor="#999"
-            multiline
-            maxLength={1000}
-          />
-          <View style={styles.btnStack}>
+        <View style={styles.inputBarWrapper}>
+          {/* Top row: extra action buttons */}
+          <View style={styles.inputTopRow}>
             <TouchableOpacity
               style={styles.promptImageBtn}
               onPress={() => router.push('/prompt-image')}
@@ -1128,16 +1122,6 @@ export default function ChatScreen() {
               }
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.cameraBtn}
-              onPress={() => setShowGenModal(true)}
-              disabled={generatingPhoto}
-            >
-              {generatingPhoto
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.cameraIcon}>📷</Text>
-              }
-            </TouchableOpacity>
-            <TouchableOpacity
               style={styles.translateBtn}
               onPress={() => handleTranslate(input)}
               disabled={translateLoading}
@@ -1145,6 +1129,28 @@ export default function ChatScreen() {
               {translateLoading
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <Text style={styles.cameraIcon}>🔤</Text>
+              }
+            </TouchableOpacity>
+          </View>
+          {/* Bottom row: text input + send buttons */}
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
+              placeholderTextColor="#999"
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={styles.cameraBtn}
+              onPress={() => setShowGenModal(true)}
+              disabled={generatingPhoto}
+            >
+              {generatingPhoto
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.cameraIcon}>📷</Text>
               }
             </TouchableOpacity>
             <TouchableOpacity
@@ -1701,9 +1707,11 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: 'row', padding: 8, paddingLeft: 14 },
   loadingBubble: { backgroundColor: '#fff', borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingText: { color: '#075E54', fontSize: 13 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, backgroundColor: '#F0F0F0', borderTopWidth: 1, borderTopColor: '#ddd', gap: 8 },
+  inputBarWrapper: { backgroundColor: '#F0F0F0', borderTopWidth: 1, borderTopColor: '#ddd' },
+  inputTopRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2, gap: 8 },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, backgroundColor: '#F0F0F0', gap: 8 },
   input: { flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120, color: '#111', borderWidth: 1, borderColor: '#ddd' },
-  btnStack: { flexDirection: 'column', gap: 6, alignItems: 'center' },
+  btnStack: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   promptImageBtn: { backgroundColor: '#E91E8C', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   promptPickBtn: { backgroundColor: '#7B1FA2', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   cameraBtn: { backgroundColor: '#E53935', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
