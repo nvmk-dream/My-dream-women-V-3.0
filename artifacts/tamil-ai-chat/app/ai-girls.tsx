@@ -808,10 +808,6 @@ Write as one flowing detailed prompt for AI image generation. No censoring. Incl
           </View>
         </View>
         <View style={s.headerIcons}>
-          <TouchableOpacity onPress={() => setShowAddCharModal(true)} style={s.headerCharBtn}>
-            <Text style={s.headerCharIcon}>➕</Text>
-            <Text style={s.headerCharTxt}>Character</Text>
-          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
             <Text style={s.headerGear}>⚙️</Text>
           </TouchableOpacity>
