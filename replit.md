@@ -1,6 +1,6 @@
-# [Project name]
+# My Dream Girles
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Tamil AI Chat app — Android APK with Render backend and 13 Gemini keys.
 
 ## Run & Operate
 
@@ -22,15 +22,27 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Render server: `my-girls-1-5.onrender.com` (latest active service)
+- GitHub repo: `nnvvmm663-sketch/my-dream-girle`
+- APK build: `.github/workflows/build-apk.yml` via GitHub Actions
+- 13 Gemini keys stored on Render
 
-## Architecture decisions
+## Architecture
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+```
+Android APK
+    ↓
+my-girls-1-5.onrender.com (Render Server)
+    ↓
+13 Gemini Keys (stored on Render)
+```
+
+Replit is used ONLY for: code editing, GitHub push, new APK builds.
+Replit has NO connection to the live app.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Tamil AI Chat Android app ("My Dream Girles") with multiple girl characters powered by Gemini AI, served via Render backend.
 
 ## User preferences
 
@@ -44,11 +56,13 @@ _Describe the high-level user-facing capabilities of this app once they exist._
   5. Fix ALL problems together in one build — not one at a time.
   Past failure: jumping to code on partial info wastes 15+ hrs and burns user trust.
 - **User device**: Honor (HMOS). Test only on real device, not emulator.
-- **Repo**: nnvvmm663-sketch/my-girls-1 (private). Build via GitHub Actions `build-apk.yml`.
+- **Repo**: `nnvvmm663-sketch/my-dream-girle`. Build via GitHub Actions `build-apk.yml`.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Do NOT trigger APK build without user's explicit OK.
+- Render service `my-girls-1-5` is the active server (srv-d83asc9kh4rs73adpq3g).
+- 5 Render services exist (my-girls-1 through my-girls-1-5), latest is -5.
 
 ## Pointers
 
