@@ -157,6 +157,7 @@ export default function ChatScreen() {
 
   const [persona, setPersona] = useState<Persona | undefined>(undefined);
   const [avatarUri, setAvatarUri] = useState<string | undefined>(undefined);
+  const [avatarAsBg, setAvatarAsBg] = useState(false);
   const [userPhotoUri, setUserPhotoUri] = useState<string | null>(null);
   const [userName, setUserName]           = useState('');
   const [userBehaviour, setUserBehaviour] = useState('');
@@ -317,11 +318,13 @@ export default function ChatScreen() {
       `chat_wallpaper_${personaId}`,
       `bubble_style_${personaId}`,
       `birthday_${personaId}`,
+      `chat_avatar_theme_${personaId}`,
     ]).then(pairs => {
       if (pairs[0][1] !== null) setDialectMode(pairs[0][1] === 'true');
       if (pairs[1][1] !== null) setMoodMode(pairs[1][1] === 'normal' ? 'normal' : 'presana');
       if (pairs[2][1]) setChatWallpaper(pairs[2][1]);
       if (pairs[3][1]) setBubbleStyle(pairs[3][1]);
+      if (pairs[5][1]) setAvatarAsBg(pairs[5][1] === '1');
       if (pairs[4][1]) {
         setBirthday(pairs[4][1]);
         setBirthdayInput(pairs[4][1]);
@@ -918,6 +921,12 @@ export default function ChatScreen() {
     setSelectedMsg(null);
   };
 
+  // ── Save avatar theme ─────────────────────────────────────────
+  const saveAvatarTheme = async (val: boolean) => {
+    setAvatarAsBg(val);
+    if (personaId) await AsyncStorage.setItem(`chat_avatar_theme_${personaId}`, val ? '1' : '0').catch(() => {});
+  };
+
   // ── Save wallpaper/bubble/birthday ────────────────────────────
   const saveWallpaper = async (id: string) => {
     setChatWallpaper(id);
@@ -1052,6 +1061,9 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: wallpaperBg }]}>
       <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+      {avatarAsBg && avatarUri ? (
+        <Image source={{ uri: avatarUri }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.12 }} blurRadius={6} resizeMode="cover" />
+      ) : null}
       <Stack.Screen options={{
         headerTitle,
         headerRight,
@@ -1585,6 +1597,19 @@ export default function ChatScreen() {
               </View>
               {birthday ? <Text style={styles.bdaySet}>✅ Birthday: {birthday} set!</Text> : null}
 
+              {/* Avatar Theme */}
+              <Text style={styles.styleSheetSection}>👤 Avatar Theme</Text>
+              <Text style={styles.styleSheetSub}>Avatar photo-ஐ chat background-ஆ வை (soft blur effect)</Text>
+              <TouchableOpacity
+                style={[styles.avatarThemeBtn, avatarAsBg && styles.avatarThemeBtnActive]}
+                onPress={() => saveAvatarTheme(!avatarAsBg)}
+              >
+                <Text style={styles.avatarThemeTxt}>
+                  {avatarAsBg ? '✅ Avatar Theme ON — தட்டி OFF பண்ணு' : '🖼️ Avatar-ஐ Background-ஆ Set பண்ணு'}
+                </Text>
+              </TouchableOpacity>
+              {!avatarUri && <Text style={styles.styleSheetSub}>⚠️ முதல்ல header-ல் avatar photo tap பண்ணி add பண்ணுங்க</Text>}
+
               <TouchableOpacity style={styles.styleSheetClose} onPress={() => setShowStyleSheet(false)}>
                 <Text style={styles.styleSheetCloseTxt}>✓ Done</Text>
               </TouchableOpacity>
@@ -1704,9 +1729,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ECE5DD' },
   flex: { flex: 1 },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerAvatarImg: { width: 42, height: 42, borderRadius: 21 },
-  headerAvatar: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
-  headerAvatarText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  headerAvatarImg: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: '#fff' },
+  headerAvatar: { width: 58, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
+  headerAvatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
   headerName: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.3 },
   headerOnline: { color: '#b2dfdb', fontSize: 11 },
   headerDialectBadge: { color: '#FFD54F', fontSize: 13, fontWeight: '600', marginTop: 2 },
@@ -1978,6 +2003,9 @@ const styles = StyleSheet.create({
   styleSheetTitle: { fontSize: 20, fontWeight: 'bold', color: '#111', marginBottom: 16, marginTop: 4 },
   styleSheetSection: { fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 10, marginTop: 4 },
   styleSheetSub: { fontSize: 12, color: '#888', marginBottom: 8, marginTop: -6 },
+  avatarThemeBtn: { backgroundColor: '#e3f2fd', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: '#90CAF9', alignItems: 'center' },
+  avatarThemeBtnActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
+  avatarThemeTxt: { fontSize: 14, color: '#1565C0', fontWeight: '600' },
   styleSheetClose: { backgroundColor: '#075E54', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   styleSheetCloseTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
