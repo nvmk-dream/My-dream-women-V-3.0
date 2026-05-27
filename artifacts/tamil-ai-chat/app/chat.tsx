@@ -643,13 +643,13 @@ export default function ChatScreen() {
       const isKeyError = low.includes('api key') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('INVALID_ARGUMENT');
       if (isQuota) {
         Alert.alert(
-          '🚫 Daily Limit ஆச்சு',
-          'இன்னைக்கு Gemini free quota முடிஞ்சுது.\n\n✅ Solution:\n1. Home → 🔑 Keys → Gemini → உங்க own key add பண்ணி Switch ON பண்ணுங்க\n2. அல்லது நாளைக்கு try பண்ணுங்க\n\nFree key: aistudio.google.com',
+          '⏳ சற்று நேரம் காத்திருங்கள்',
+          'Server busy-ஆக உள்ளது. சில நிமிடங்கள் கழித்து மீண்டும் try பண்ணுங்க.',
         );
       } else if (isKeyError) {
         Alert.alert(
-          '🔑 API Key பிழை',
-          'Gemini API key valid இல்ல.\n\nHome → 🔑 Keys tile → Gemini API → key enter பண்ணி Save பண்ணுங்க.',
+          '⚠️ பிழை',
+          'Server error ஆச்சு. மீண்டும் try பண்ணுங்க.',
         );
       } else {
         Alert.alert('பிழை', errMsg || 'பதில் வரவில்லை. மீண்டும் முயல்க.');
