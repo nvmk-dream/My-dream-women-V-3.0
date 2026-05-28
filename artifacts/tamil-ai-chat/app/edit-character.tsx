@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Alert, ActivityIndicator, Image, Modal, Switch,
+  Animated, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -10,6 +11,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
 import { uploadToCloudinary } from '../services/api';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function EditCharacterScreen() {
   const router = useRouter();
@@ -35,6 +40,9 @@ export default function EditCharacterScreen() {
   const [normalMode, setNormalMode] = useState(false);
   const [presanaBehaviour, setPresanaBehaviour] = useState('');
   const [normalBehaviour, setNormalBehaviour] = useState('');
+
+  // Section B expand state
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -97,8 +105,7 @@ export default function EditCharacterScreen() {
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85, allowsEditing: true, aspect: [1, 1],
-      base64: true,
+      quality: 0.85, allowsEditing: true, aspect: [1, 1], base64: true,
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
@@ -106,8 +113,7 @@ export default function EditCharacterScreen() {
         setUploadingAvatar(true);
         try {
           const mime = asset.mimeType || 'image/jpeg';
-          const folder = 'my-girls/avatars';
-          const cloudUrl = await uploadToCloudinary(asset.base64, mime, folder);
+          const cloudUrl = await uploadToCloudinary(asset.base64, mime, 'my-girls/avatars');
           setAvatarPhotoUri(cloudUrl.url);
         } catch {
           Alert.alert('Upload failed', 'Cloud upload தோல்வி — ☁️ Cloud URL option use பண்ணுங்க');
@@ -121,13 +127,9 @@ export default function EditCharacterScreen() {
   };
 
   const applyCloudUrl = () => {
-    const url = cloudUrlInput.trim();
-    if (!url) { Alert.alert('URL Enter பண்ணுங்க'); return; }
-    setAvatarPhotoUri(url);
-    setCloudUrlInput('');
+    if (cloudUrlInput.trim()) setAvatarPhotoUri(cloudUrlInput.trim());
     setShowCloudUrl(false);
   };
-
 
   const pickModeAvatar = async (mode: 'normal' | 'presana') => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -200,6 +202,7 @@ export default function EditCharacterScreen() {
       }} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
+        {/* ── AVATAR ── */}
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAvatar} style={styles.avatarWrap}>
             {avatarPhotoUri
@@ -257,6 +260,9 @@ export default function EditCharacterScreen() {
           </View>
         </Modal>
 
+        {/* ══════════════════════════════════════════
+            SECTION A — CHARACTER DETAILS (always visible)
+        ══════════════════════════════════════════ */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>NAME</Text>
           <TextInput
@@ -283,19 +289,9 @@ export default function EditCharacterScreen() {
             placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
             placeholderTextColor="#bbb"
           />
-          <Text style={[styles.sectionLabel, { marginTop: 14 }]}>GREETING (FIRST MESSAGE)</Text>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 80 }]}
-            value={greeting}
-            onChangeText={setGreeting}
-            multiline
-            textAlignVertical="top"
-            placeholder="Character-ஓட first message..."
-            placeholderTextColor="#bbb"
-          />
         </View>
 
-        {/* ── Mood Switch ── */}
+        {/* MOOD / BEHAVIOUR — visible */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>MOOD / BEHAVIOUR</Text>
           <View style={styles.moodRow}>
@@ -330,9 +326,11 @@ export default function EditCharacterScreen() {
               <Text style={[styles.moodBadgeTxt, normalMode && { color: '#fff' }]}>😇 Normal</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Presana behaviour — visible */}
           <View style={{ marginTop: 14 }}>
             <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 4 }]}>😈 PRESANA MODE — BEHAVIOUR TEXT</Text>
-            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>இந்த character presana mode-ல எப்படி பேசணும்னு customize பண்ணுங்க. Empty விட்டா default flirty behaviour use ஆகும்.</Text>
+            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>இந்த character presana mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
               value={presanaBehaviour}
@@ -344,9 +342,11 @@ export default function EditCharacterScreen() {
               placeholderTextColor="#bbb"
             />
           </View>
+
+          {/* Normal behaviour — visible */}
           <View style={{ marginTop: 12 }}>
             <Text style={[styles.sectionLabel, { color: '#075E54', marginBottom: 4 }]}>😇 NORMAL MODE — BEHAVIOUR TEXT</Text>
-            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>Normal mode-ல எப்படி பேசணும்னு customize பண்ணுங்க. Empty விட்டா default friendly behaviour use ஆகும்.</Text>
+            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>Normal mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
               value={normalBehaviour}
@@ -358,82 +358,120 @@ export default function EditCharacterScreen() {
               placeholderTextColor="#bbb"
             />
           </View>
+
           <Text style={{ color: '#888', fontSize: 11, marginTop: 8 }}>💡 Save பண்ணா chat-ல உடனே apply ஆகும்.</Text>
         </View>
 
-        {/* ── Dual Mode Avatars ── */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>MODE AVATARS</Text>
-          <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Normal mode-ல் வேற photo, Presana mode-ல் வேற photo. Empty விட்டா main avatar use ஆகும்.</Text>
-          <View style={styles.modeAvatarRow}>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={[styles.sectionLabel, { color: '#075E54', marginBottom: 8 }]}>😇 NORMAL</Text>
-              <TouchableOpacity onPress={() => pickModeAvatar('normal')}>
-                {normalAvatarUri
-                  ? <Image source={{ uri: normalAvatarUri }} style={styles.modeAvatarImg} />
-                  : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#075E54' }]}>
-                      <Text style={{ fontSize: 28 }}>😇</Text>
-                      <Text style={{ fontSize: 10, color: '#075E54', marginTop: 4 }}>Tap to set</Text>
-                    </View>
-                }
-              </TouchableOpacity>
-              {normalAvatarUri && (
-                <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#075E54' }]} onPress={() => setNormalAvatarUri(undefined)}>
-                  <Text style={{ color: '#075E54', fontSize: 12 }}>🗑️ Remove</Text>
-                </TouchableOpacity>
-              )}
+        {/* ══════════════════════════════════════════
+            SECTION B — ⚙️ அமைப்புகள் (tap to expand)
+        ══════════════════════════════════════════ */}
+        <TouchableOpacity
+          style={styles.advancedHeader}
+          onPress={() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setAdvancedOpen(v => !v);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.advancedHeaderTxt}>⚙️ மேல் அமைப்புகள்</Text>
+          <Text style={styles.advancedChevron}>{advancedOpen ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {advancedOpen && (
+          <View style={styles.advancedBody}>
+
+            {/* GREETING */}
+            <View style={styles.card}>
+              <Text style={styles.sectionLabel}>GREETING (FIRST MESSAGE)</Text>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 80 }]}
+                value={greeting}
+                onChangeText={setGreeting}
+                multiline
+                textAlignVertical="top"
+                placeholder="Character-ஓட first message..."
+                placeholderTextColor="#bbb"
+              />
             </View>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
-              <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
-                {presanaAvatarUri
-                  ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
-                  : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
-                      <Text style={{ fontSize: 28 }}>😈</Text>
-                      <Text style={{ fontSize: 10, color: '#E91E63', marginTop: 4 }}>Tap to set</Text>
-                    </View>
-                }
-              </TouchableOpacity>
-              {presanaAvatarUri && (
-                <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
-                  <Text style={{ color: '#E91E63', fontSize: 12 }}>🗑️ Remove</Text>
-                </TouchableOpacity>
-              )}
+
+            {/* SYSTEM PROMPT */}
+            <View style={styles.card}>
+              <Text style={styles.sectionLabel}>SYSTEM PROMPT (CHARACTER BEHAVIOR)</Text>
+              <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>
+                ✏️ Long-press → Cut / Copy / Paste / Select All work ஆகும்
+              </Text>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 200 }]}
+                value={systemPrompt}
+                onChangeText={setSystemPrompt}
+                multiline
+                textAlignVertical="top"
+                editable={true}
+                selectTextOnFocus={false}
+                contextMenuHidden={false}
+                scrollEnabled={false}
+                autoCorrect={false}
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Character behavior prompt..."
+                placeholderTextColor="#bbb"
+              />
             </View>
+
+            {/* MODE AVATARS */}
+            <View style={styles.card}>
+              <Text style={styles.sectionLabel}>MODE AVATARS</Text>
+              <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Normal mode-ல் வேற photo, Presana mode-ல் வேற photo. Empty விட்டா main avatar use ஆகும்.</Text>
+              <View style={styles.modeAvatarRow}>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={[styles.sectionLabel, { color: '#075E54', marginBottom: 8 }]}>😇 NORMAL</Text>
+                  <TouchableOpacity onPress={() => pickModeAvatar('normal')}>
+                    {normalAvatarUri
+                      ? <Image source={{ uri: normalAvatarUri }} style={styles.modeAvatarImg} />
+                      : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#075E54' }]}>
+                          <Text style={{ fontSize: 28 }}>😇</Text>
+                          <Text style={{ fontSize: 10, color: '#075E54', marginTop: 4 }}>Tap to set</Text>
+                        </View>
+                    }
+                  </TouchableOpacity>
+                  {normalAvatarUri && (
+                    <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#075E54' }]} onPress={() => setNormalAvatarUri(undefined)}>
+                      <Text style={{ color: '#075E54', fontSize: 12 }}>🗑️ Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
+                  <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
+                    {presanaAvatarUri
+                      ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
+                      : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
+                          <Text style={{ fontSize: 28 }}>😈</Text>
+                          <Text style={{ fontSize: 10, color: '#E91E63', marginTop: 4 }}>Tap to set</Text>
+                        </View>
+                    }
+                  </TouchableOpacity>
+                  {presanaAvatarUri && (
+                    <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
+                      <Text style={{ color: '#E91E63', fontSize: 12 }}>🗑️ Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* IMAGE GENERATION DETAILS */}
+            <View style={styles.card}>
+              <Text style={styles.sectionLabel}>IMAGE GENERATION DETAILS</Text>
+              <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} />
+              <View style={styles.divider} />
+              <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} />
+              <View style={styles.divider} />
+              <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} />
+            </View>
+
           </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>SYSTEM PROMPT (CHARACTER BEHAVIOR)</Text>
-          <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>
-            ✏️ Long-press → Cut / Copy / Paste / Select All work ஆகும்
-          </Text>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 200 }]}
-            value={systemPrompt}
-            onChangeText={setSystemPrompt}
-            multiline
-            textAlignVertical="top"
-            editable={true}
-            selectTextOnFocus={false}
-            contextMenuHidden={false}
-            scrollEnabled={false}
-            autoCorrect={false}
-            autoCapitalize="none"
-            spellCheck={false}
-            placeholder="Character behavior prompt..."
-            placeholderTextColor="#bbb"
-          />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>IMAGE GENERATION DETAILS</Text>
-          <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} />
-          <View style={styles.divider} />
-          <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} />
-          <View style={styles.divider} />
-          <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} />
-        </View>
+        )}
 
         <Text style={styles.footerNote}>
           This is a built-in character. Your edits are saved locally.
@@ -459,11 +497,7 @@ const styles = StyleSheet.create({
   avatarCircle: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
   avatarImg: { width: 100, height: 100, borderRadius: 50 },
   avatarEmoji: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
-  cameraOverlay: {
-    position: 'absolute', bottom: 2, right: 2,
-    backgroundColor: '#333', borderRadius: 14,
-    width: 28, height: 28, justifyContent: 'center', alignItems: 'center',
-  },
+  cameraOverlay: { position: 'absolute', bottom: 2, right: 2, backgroundColor: '#333', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
   cameraIcon: { fontSize: 14 },
   avatarBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
   uploadBtn: { backgroundColor: '#075E54', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
@@ -487,7 +521,6 @@ const styles = StyleSheet.create({
   footerNote: { fontSize: 12, color: '#888', textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
   saveBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
   moodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   moodInfo: { flex: 1, marginRight: 12 },
   moodTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 3 },
@@ -500,4 +533,8 @@ const styles = StyleSheet.create({
   modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#ddd' },
   modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' },
   modeRemoveBtn: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
+  advancedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, elevation: 2, borderWidth: 1.5, borderColor: '#075E54' },
+  advancedHeaderTxt: { fontSize: 15, fontWeight: '700', color: '#075E54' },
+  advancedChevron: { fontSize: 14, color: '#075E54', fontWeight: '700' },
+  advancedBody: { marginBottom: 4 },
 });
