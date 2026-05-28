@@ -741,27 +741,48 @@ export default function ChatScreen() {
         ? `\n\n**User பத்தி தகவல்:**${userName ? ` User பெயர் "${userName}".` : ''}${userBehaviour ? ` Personality: ${userBehaviour}` : ''}${modeUserBeh ? `\nஇந்த mode-ல் User எப்படி பேசுவாரு: ${modeUserBeh}` : ''}${userBodyDesc ? `\nUser-ஓட தோற்றம்/உருவம்: ${userBodyDesc}` : ''} — இதை மனசுல வச்சு respond பண்ணு.`
         : '';
 
-      // ── Image 2 & 3 context: normal mode photo + presana mode photo in system prompt ──
-      const imageContext = (normalAvatarUri || presanaAvatarUri)
-        ? `
+      // ── Image 1: main character photo + rules (ALWAYS included) ──
+      // ── Image 2: normalAvatarUri (normal mode photo) ──
+      // ── Image 3: presanaAvatarUri (presana mode photo) ──
+      const fd = persona?.faceDesc || '';
+      const bd = persona?.bodyDesc || '';
+      const ad = persona?.attireDesc || '';
 
-**[Character Photo Reference — உன் தோற்றம் இதில் இருக்கு:]:**${normalAvatarUri ? `\nImage 2 (Normal mode): ${normalAvatarUri}` : ''}${presanaAvatarUri ? `\nImage 3 (Presana mode): ${presanaAvatarUri}` : ''}\nUser உன் photos பத்தி கேட்டா இந்த images-ஐ reference-ஆ வச்சு describe பண்ணு.`
-        : '';
-
-      // ── Avatar photo analysis: detect if user asks about photo/face ──
-      const photoKeywords = ['photo', 'pic', 'picture', 'படம்', 'முகம்', 'face', 'look', 'profile', 'அழகா', 'அழகு', 'தோற்றம்', 'எப்படி இருக்க', 'என்ன color', 'hair', 'eyes', 'body', 'உன்னோட look', 'உன் photo'];
-      const asksAboutPhoto = photoKeywords.some(kw => text.toLowerCase().includes(kw.toLowerCase()));
-      let avatarContext = '';
-      if (asksAboutPhoto && persona) {
-        const fd = persona.faceDesc || '';
-        const bd = persona.bodyDesc || '';
-        const ad = persona.attireDesc || '';
+      const imageContext = (() => {
+        const lines: string[] = [];
+        lines.push('\n\n**[Character Image Reference — Rules & Appearance:]:**');
+        // Image 1 — main avatar photo + visual rules
+        if (avatarUri) lines.push(`Image 1 (Main Photo): ${avatarUri}`);
         if (fd || bd || ad) {
-          avatarContext = `
-
-**[User-ஐ உன் photo/look பத்தி கேட்கிறாரு — இந்த details naturally share பண்ணு, AI-ஆ describe பண்ணாதே]:** ${fd} | ${bd} | ${ad}`;
+          lines.push(`Appearance: ${[fd, bd, ad].filter(Boolean).join(' | ')}`);
+          lines.push('இந்த character-ஓட தோற்றம் எப்பவும் மனசுல வச்சு naturally respond பண்ணு.');
         }
-      }
+        // Image 2 — normal mode photo
+        if (normalAvatarUri) lines.push(`Image 2 (Normal mode photo): ${normalAvatarUri}`);
+        // Image 3 — presana mode photo
+        if (presanaAvatarUri) lines.push(`Image 3 (Presana mode photo): ${presanaAvatarUri}`);
+
+        // User Image 2: new user behavior fields (added in edit-character page)
+        const uWh = userWhatsappBeh.trim();
+        const uNm = userNormalBeh.trim();
+        const uPr = userPresanaBeh.trim();
+        const uBd = userBodyDesc.trim();
+        if (uWh || uNm || uPr || uBd) {
+          lines.push('\n**[User பத்தி Image 2 Rules — edit character page-ல் set பண்ணது:]:**');
+          if (uBd) lines.push(`User உருவம்/body: ${uBd}`);
+          if (uWh) lines.push(`User WhatsApp mode-ல்: ${uWh}`);
+          if (uNm) lines.push(`User Normal mode-ல்: ${uNm}`);
+          if (uPr) lines.push(`User Presana mode-ல்: ${uPr}`);
+          lines.push('இந்த details பார்த்து, current mode-க்கு ஏத்த மாதிரி react பண்ணு.');
+        }
+
+        return lines.length > 1 ? lines.join('\n') : '';
+      })();
+
+      // ── Avatar context: always show character description (not just on photo keywords) ──
+      const avatarContext = (fd || bd || ad)
+        ? `\n\n**[Character Appearance — எப்பவும் இதை feel பண்ணி பேசு]:** ${[fd, bd, ad].filter(Boolean).join(' | ')}`
+        : '';
 
       // ── Character context: persona details + edits ──
       const charContext = buildCharacterContext(
