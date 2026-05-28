@@ -40,6 +40,10 @@ export default function EditCharacterScreen() {
   const [normalMode, setNormalMode] = useState(false);
   const [presanaBehaviour, setPresanaBehaviour] = useState('');
   const [normalBehaviour, setNormalBehaviour] = useState('');
+  const [userWhatsappBeh, setUserWhatsappBeh] = useState('');
+  const [userNormalBeh, setUserNormalBeh] = useState('');
+  const [userPresanaBeh, setUserPresanaBeh] = useState('');
+  const [userBodyDesc, setUserBodyDesc] = useState('');
 
   // Section B expand state
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -68,6 +72,10 @@ export default function EditCharacterScreen() {
         setNormalMode(moodRaw[1] === 'normal');
         setPresanaBehaviour(data.presanaBehaviour ?? '');
         setNormalBehaviour(data.normalBehaviour ?? '');
+        setUserWhatsappBeh(data.userWhatsappBeh ?? '');
+        setUserNormalBeh(data.userNormalBeh ?? '');
+        setUserPresanaBeh(data.userPresanaBeh ?? '');
+        setUserBodyDesc(data.userBodyDesc ?? '');
       } catch {}
     };
     load();
@@ -89,6 +97,7 @@ export default function EditCharacterScreen() {
         faceDesc, bodyDesc, attireDesc, avatarPhotoUri,
         normalAvatarUri, presanaAvatarUri, relationship,
         presanaBehaviour, normalBehaviour,
+        userWhatsappBeh, userNormalBeh, userPresanaBeh, userBodyDesc,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
@@ -287,6 +296,62 @@ export default function EditCharacterScreen() {
             value={relationship}
             onChangeText={setRelationship}
             placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
+            placeholderTextColor="#bbb"
+          />
+        </View>
+
+        {/* ══════════════════════════════════════════
+            USER BEHAVIOUR — how user acts with THIS character
+        ══════════════════════════════════════════ */}
+        <View style={styles.card}>
+          <Text style={[styles.sectionLabel, { color: '#1565C0', marginBottom: 8 }]}>👤 USER — இந்த CHARACTER கிட்ட எப்படி நடந்துக்கணும்</Text>
+          <Text style={styles.fieldHint}>ஒவ்வொரு mode-லயும் user எப்படி பேசுவாரு, எப்படி feel ஆவாரு என்று சொல்லுங்க — AI அதுக்கு ஏத்த மாதிரி character react பண்ணும்.</Text>
+
+          {/* WhatsApp mode */}
+          <Text style={[styles.sectionLabel, { color: '#25D366', marginTop: 12, marginBottom: 4 }]}>💬 WhatsApp Mode — User Style</Text>
+          <TextInput
+            style={[styles.fieldInput, { minHeight: 56 }]}
+            value={userWhatsappBeh}
+            onChangeText={setUserWhatsappBeh}
+            multiline
+            textAlignVertical="top"
+            placeholder="e.g. User casual-ஆ, short-ஆ பேசுவாரு. Fun jokes போடுவாரு. Quick replies expect பண்ணுவாரு."
+            placeholderTextColor="#bbb"
+          />
+
+          {/* Normal mode */}
+          <Text style={[styles.sectionLabel, { color: '#075E54', marginTop: 10, marginBottom: 4 }]}>😇 Normal Mode — User Style</Text>
+          <TextInput
+            style={[styles.fieldInput, { minHeight: 56 }]}
+            value={userNormalBeh}
+            onChangeText={setUserNormalBeh}
+            multiline
+            textAlignVertical="top"
+            placeholder="e.g. User romantic-ஆ, double meaning-ஆ பேசுவாரு. Emotional-ஆ feel ஆவாரு."
+            placeholderTextColor="#bbb"
+          />
+
+          {/* Presana mode */}
+          <Text style={[styles.sectionLabel, { color: '#E91E63', marginTop: 10, marginBottom: 4 }]}>😈 Presana Mode — User Style</Text>
+          <TextInput
+            style={[styles.fieldInput, { minHeight: 56 }]}
+            value={userPresanaBeh}
+            onChangeText={setUserPresanaBeh}
+            multiline
+            textAlignVertical="top"
+            placeholder="e.g. User bold-ஆ, explicit-ஆ, direct-ஆ பேசுவாரு. Dominate பண்ண விரும்புவாரு."
+            placeholderTextColor="#bbb"
+          />
+
+          {/* User body description */}
+          <Text style={[styles.sectionLabel, { color: '#6D4C41', marginTop: 10, marginBottom: 4 }]}>🧍 User உருவம் / Body Description</Text>
+          <TextInput
+            style={[styles.fieldInput, { minHeight: 72 }]}
+            value={userBodyDesc}
+            onChangeText={setUserBodyDesc}
+            multiline
+            textAlignVertical="top"
+            placeholder="e.g. User 30 வயது, medium height, athletic build, dark skin. Character இதை அறிஞ்சு interact பண்ணும்."
             placeholderTextColor="#bbb"
           />
         </View>
