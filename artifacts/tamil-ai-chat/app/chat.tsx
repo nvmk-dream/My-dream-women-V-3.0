@@ -1575,43 +1575,47 @@ export default function ChatScreen() {
             )}
           </View>
 
-          {/* Navigation bar */}
+          {/* Navigation bar + Scroll to Latest */}
           {cloudPhotos.length > 0 && (
-            <View style={styles.browserNav}>
-              <TouchableOpacity
-                style={[styles.navBtn, cloudPhotoIdx === 0 && styles.navBtnDisabled]}
-                onPress={() => setCloudPhotoIdx(i => Math.max(0, i - 1))}
-                disabled={cloudPhotoIdx === 0}
-              >
-                <Text style={styles.navBtnTxt}>◀ Prev</Text>
-              </TouchableOpacity>
+            <>
+              <View style={styles.browserNav}>
+                <TouchableOpacity
+                  style={[styles.navBtn, cloudPhotoIdx === 0 && styles.navBtnDisabled]}
+                  onPress={() => setCloudPhotoIdx(i => Math.max(0, i - 1))}
+                  disabled={cloudPhotoIdx === 0}
+                >
+                  <Text style={styles.navBtnTxt}>◀ Prev</Text>
+                </TouchableOpacity>
 
-              {/* Dot indicators (show up to 10) */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dotsWrap}>
-                {cloudPhotos.slice(0, 50).map((_, i) => (
-                  <TouchableOpacity key={i} onPress={() => setCloudPhotoIdx(i)}>
-                    <View style={[styles.dot, i === cloudPhotoIdx && styles.dotActive]} />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                {/* Dot indicators (show up to 10) */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dotsWrap}>
+                  {cloudPhotos.slice(0, 50).map((_, i) => (
+                    <TouchableOpacity key={i} onPress={() => setCloudPhotoIdx(i)}>
+                      <View style={[styles.dot, i === cloudPhotoIdx && styles.dotActive]} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-              <TouchableOpacity
-                style={[styles.navBtn, cloudPhotoIdx === cloudPhotos.length - 1 && styles.navBtnDisabled]}
-                onPress={() => setCloudPhotoIdx(i => Math.min(cloudPhotos.length - 1, i + 1))}
-                disabled={cloudPhotoIdx === cloudPhotos.length - 1}
-              >
-                <Text style={styles.navBtnTxt}>Next ▶</Text>
-              </TouchableOpacity>
-            </View>
-            {/* Scroll to Latest (newest) photo */}
-            {cloudPhotos.length > 1 && cloudPhotoIdx < cloudPhotos.length - 1 && (
-              <TouchableOpacity
-                onPress={() => setCloudPhotoIdx(cloudPhotos.length - 1)}
-                style={{ alignSelf: 'center', marginTop: 6, backgroundColor: '#075E54', paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>⬇ Latest Photo</Text>
-              </TouchableOpacity>
-            )}
+                <TouchableOpacity
+                  style={[styles.navBtn, cloudPhotoIdx === cloudPhotos.length - 1 && styles.navBtnDisabled]}
+                  onPress={() => setCloudPhotoIdx(i => Math.min(cloudPhotos.length - 1, i + 1))}
+                  disabled={cloudPhotoIdx === cloudPhotos.length - 1}
+                >
+                  <Text style={styles.navBtnTxt}>Next ▶</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* ⬇ Scroll to Latest — always visible when >1 photo */}
+              {cloudPhotos.length > 1 && (
+                <TouchableOpacity
+                  onPress={() => setCloudPhotoIdx(cloudPhotos.length - 1)}
+                  disabled={cloudPhotoIdx === cloudPhotos.length - 1}
+                  style={{ alignSelf: 'center', marginTop: 6, backgroundColor: cloudPhotoIdx === cloudPhotos.length - 1 ? '#555' : '#075E54', paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: cloudPhotoIdx === cloudPhotos.length - 1 ? 0.5 : 1 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>⬇ Latest Photo ({cloudPhotos.length})</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           {/* Bottom action row */}
