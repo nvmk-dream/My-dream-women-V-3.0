@@ -262,6 +262,10 @@ export default function ChatScreen() {
         setPresanaAvatarUri(data.presanaAvatarUri);
         setPresanaBehaviour(data.presanaBehaviour ?? '');
         setNormalBehaviour(data.normalBehaviour ?? '');
+        setUserWhatsappBeh(data.userWhatsappBeh ?? '');
+        setUserNormalBeh(data.userNormalBeh ?? '');
+        setUserPresanaBeh(data.userPresanaBeh ?? '');
+        setUserBodyDesc(data.userBodyDesc ?? '');
       } else {
         setPersona(base);
         setAvatarUri(base.avatarPhotoUri);
@@ -308,6 +312,10 @@ export default function ChatScreen() {
   const [moodMode, setMoodMode] = useState<'presana' | 'normal' | 'whatsapp'>('presana');
   const [presanaBehaviour, setPresanaBehaviour] = useState('');
   const [normalBehaviour, setNormalBehaviour] = useState('');
+  const [userWhatsappBeh, setUserWhatsappBeh] = useState('');
+  const [userNormalBeh, setUserNormalBeh] = useState('');
+  const [userPresanaBeh, setUserPresanaBeh] = useState('');
+  const [userBodyDesc, setUserBodyDesc] = useState('');
 
   // ── Chat Style (wallpaper + bubble) ──
   const [chatWallpaper, setChatWallpaper] = useState('default');
@@ -723,8 +731,14 @@ export default function ChatScreen() {
         ? ''
         : '\n\n**மொழி override:** இனி normal standard Tamil-ல் மட்டும் பேசு. எந்த regional slang-உம் வேண்டாம் — plain colloquial Tamil போதும்.';
 
-      const userContext = (userName || userBehaviour)
-        ? `\n\n**User பத்தி தகவல்:** ${userName ? `User-ன் பெயர் "${userName}". ` : ''}${userBehaviour ? `User's personality & behaviour: ${userBehaviour}` : ''} — இதை மனசுல வச்சு அவங்களோட பெயர் call பண்ணி, அவங்களுக்கு ஏத்த மாதிரி respond பண்ணு.`
+      const modeUserBeh = moodMode === 'whatsapp'
+        ? userWhatsappBeh
+        : moodMode === 'normal'
+        ? userNormalBeh
+        : userPresanaBeh;
+
+      const userContext = (userName || userBehaviour || modeUserBeh || userBodyDesc)
+        ? `\n\n**User பத்தி தகவல்:**${userName ? ` User பெயர் "${userName}".` : ''}${userBehaviour ? ` Personality: ${userBehaviour}` : ''}${modeUserBeh ? `\nஇந்த mode-ல் User எப்படி பேசுவாரு: ${modeUserBeh}` : ''}${userBodyDesc ? `\nUser-ஓட தோற்றம்/உருவம்: ${userBodyDesc}` : ''} — இதை மனசுல வச்சு respond பண்ணு.`
         : '';
 
       // ── Image 2 & 3 context: normal mode photo + presana mode photo in system prompt ──
@@ -1289,10 +1303,10 @@ export default function ChatScreen() {
 
         {showScrollBtn && (
           <TouchableOpacity
-            style={{ position: 'absolute', right: 16, bottom: 90, zIndex: 99, backgroundColor: '#075E54', borderRadius: 24, width: 44, height: 44, justifyContent: 'center', alignItems: 'center', elevation: 6 }}
+            style={{ position: 'absolute', right: 12, bottom: 90, zIndex: 99, backgroundColor: '#075E54', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 4, elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4 }}
             onPress={() => flatListRef.current?.scrollToEnd({ animated: true })}
           >
-            <Text style={{ color: '#fff', fontSize: 20, lineHeight: 24 }}>⬇</Text>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>⬇ Latest</Text>
           </TouchableOpacity>
         )}
         <View style={{ position: 'relative' }}>
@@ -1568,6 +1582,15 @@ export default function ChatScreen() {
                 <Text style={styles.navBtnTxt}>Next ▶</Text>
               </TouchableOpacity>
             </View>
+            {/* Scroll to Latest (newest) photo */}
+            {cloudPhotos.length > 1 && cloudPhotoIdx < cloudPhotos.length - 1 && (
+              <TouchableOpacity
+                onPress={() => setCloudPhotoIdx(cloudPhotos.length - 1)}
+                style={{ alignSelf: 'center', marginTop: 6, backgroundColor: '#075E54', paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>⬇ Latest Photo</Text>
+              </TouchableOpacity>
+            )}
           )}
 
           {/* Bottom action row */}
