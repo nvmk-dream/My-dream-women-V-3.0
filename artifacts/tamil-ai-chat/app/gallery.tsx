@@ -570,7 +570,74 @@ export default function GalleryScreen() {
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={s.sep} />}
-            />
+            ListEmptyComponent={
+              <View style={s.center}>
+                <Text style={s.emptyEmoji}>📭</Text>
+                <Text style={[s.emptyTxt, { paddingHorizontal: 24 }]}>
+                  {'Folders கிடைக்கல.\n\nSettings → Apps → My Girls →\nPermissions → Files & Media → Allow all\n\nபிறகு App close செய்து மீண்டும் திறங்க.'}
+                </Text>
+                <TouchableOpacity
+                  style={[s.doneBtn, { backgroundColor: meta.color, marginTop: 24, minWidth: 140, paddingVertical: 12 }]}
+                  onPress={() => { setShowAlbums(false); setTimeout(() => openFolderBrowser(), 400); }}
+                >
+                  <Text style={s.doneBtnTxt}>🔄 Retry</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.doneBtn, { backgroundColor: '#444', marginTop: 12, minWidth: 140, paddingVertical: 12 }]}
+                  onPress={async () => {
+                    setShowAlbums(false);
+                    setTimeout(async () => {
+                      try {
+                        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        if (!perm.granted) {
+                          Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
+                          return;
+                        }
+                        const res = await ImagePicker.launchImageLibraryAsync({
+                          mediaTypes: ImagePicker.MediaTypeOptions.All,
+                          allowsMultipleSelection: true,
+                          quality: 0.9,
+                        });
+                        if (!res.canceled && res.assets?.length) {
+                          setUploading(true);
+                          setUploadProgress(0);
+                          setUploadTotal(res.assets.length);
+                          const folder = currentFolder
+                            ? `my-girls/storage/${albumKey}/${currentFolder.id}`
+                            : `my-girls/storage/${albumKey}`;
+                          const uploaded: CloudFile[] = [];
+                          for (let i = 0; i < res.assets.length; i++) {
+                            try {
+                              const a = res.assets[i];
+                              const mime = a.type?.startsWith('video') ? 'video/mp4' : 'image/jpeg';
+                              const result = await uploadUriToCloudinary(a.uri, mime, folder);
+                              uploaded.push({ url: result.url, public_id: result.public_id });
+                            } catch {}
+                            setUploadProgress(i + 1);
+                          }
+                          if (uploaded.length > 0) {
+                            const key = filesKey(albumKey, currentFolder?.id);
+                            const existing = await AsyncStorage.getItem(key).catch(() => null);
+                            const prev: CloudFile[] = existing ? JSON.parse(existing) : [];
+                            const updated = [...uploaded, ...prev.filter(f => !uploaded.some(u => u.public_id === f.public_id))];
+                            await AsyncStorage.setItem(key, JSON.stringify(updated));
+                            setFiles(updated);
+                            Alert.alert('✅ Upload ஆச்சு!', `${uploaded.length} file${uploaded.length > 1 ? 's' : ''} Cloud-ல் save ஆனது.`);
+                          }
+                          setUploading(false);
+                        }
+                      } catch (e: any) {
+                        setUploading(false);
+                        Alert.alert('பிழை', (e as any)?.message || 'Gallery திறக்கல');
+                      }
+                    }, 300);
+                  }}
+                >
+                  <Text style={s.doneBtnTxt}>🖼️ Gallery திற</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
           )}
         </SafeAreaView>
       </Modal>
