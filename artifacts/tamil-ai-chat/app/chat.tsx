@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages } from '../services/api';
+import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos } from '../services/api';
 
 // Per-style photo cache helpers — same key as ai-girls-cloud.tsx uses
 const stylePhotoCacheKey = (personaId: string, styleId: string) =>
@@ -269,6 +269,7 @@ export default function ChatScreen() {
   const [genPrompt, setGenPrompt] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState('normal');
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
+  const [videoLoading, setVideoLoading] = React.useState(false);
   const [fullViewImg, setFullViewImg] = useState<string | null>(null);
 
   // Cloud photo browser (full-screen)
@@ -534,6 +535,7 @@ export default function ChatScreen() {
   };
 
   const flatListRef = useRef<FlatList>(null);
+  const [showScrollBtn, setShowScrollBtn] = React.useState(false);
 
   // Load chat history from AsyncStorage; show greeting only if no history
   useEffect(() => {
@@ -542,7 +544,7 @@ export default function ChatScreen() {
     AsyncStorage.getItem(`chat_history_${persona.id}`).then(saved => {
       if (saved) {
         try {
-          const parsed = JSON.parse(saved) as Array<{ id: string; role: string; content: string; timestamp: string; imageUri?: string }>;
+          const parsed = JSON.parse(saved) as Array<{ id: string; role: string; content: string; timestamp: string; imageUri?: string; videoUrl?: string }>;
           const msgs: Message[] = parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
           setMessages(msgs);
         } catch {
@@ -637,6 +639,34 @@ export default function ChatScreen() {
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
+
+    // ── Video request detection ──────────────────────────────────
+    const videoKeywords = ['video', 'வீடியோ', 'clip', 'send video', 'video அனுப்பு', 'video வேணும்', 'video போடு'];
+    const isVideoReq = !detectPhotoStyle(text, PHOTO_STYLES, selectedStyleId) && videoKeywords.some(k => text.toLowerCase().includes(k));
+    if (isVideoReq && persona) {
+      const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
+      setMessages(prev => [...prev, userMsg]);
+      setInput('');
+      setVideoLoading(true);
+      try {
+        const videos = await listCloudinaryVideos(persona.name);
+        if (videos.length > 0) {
+          const idxKey = `video_idx_${persona.id}`;
+          const savedIdx = await AsyncStorage.getItem(idxKey).catch(() => null);
+          const idx = savedIdx ? (parseInt(savedIdx, 10) + 1) % videos.length : 0;
+          await AsyncStorage.setItem(idxKey, idx.toString());
+          const vid = videos[idx];
+          const videoMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: '🎬 இதோ!', timestamp: new Date(), videoUrl: vid.url };
+          setMessages(prev => [...prev, videoMsg]);
+        } else {
+          const noVid = `😔 இப்போ என்கிட்ட video இல்ல. Cloudinary → my-girls/videos/${persona.name.toLowerCase()} folder-ல upload பண்ணுங்க!`;
+          setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: noVid, timestamp: new Date() }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: '❌ Video load பண்ண முடியல. மீண்டும் try பண்ணுங்க.', timestamp: new Date() }]);
+      } finally { setVideoLoading(false); }
+      return;
+    }
 
     // ── Text-based photo request detection ──────────────────────────
     // If user typed a photo request, show photo directly (same as camera button)
@@ -1076,6 +1106,15 @@ export default function ChatScreen() {
               <ActivityIndicator color="#075E54" size="small" />
               <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
             </View>
+          {item.videoUrl && (
+            <TouchableOpacity
+              style={{ width: 220, height: 140, backgroundColor: '#111', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 6, overflow: 'hidden' }}
+              onPress={() => { const { Linking } = require('react-native'); Linking.openURL(item.videoUrl!); }}
+            >
+              <Text style={{ fontSize: 44 }}>▶️</Text>
+              <Text style={{ color: '#fff', fontSize: 11, marginTop: 4 }}>Tap to play video</Text>
+            </TouchableOpacity>
+          )}
           ) : item.imageUrl ? (
             <TouchableOpacity onPress={() => setFullViewImg(item.imageUrl!)} onLongPress={() => setSelectedMsg(item)} delayLongPress={400}>
               <Image source={{ uri: item.imageUrl }} style={styles.generatedImg} resizeMode="cover" />
@@ -1208,6 +1247,8 @@ export default function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.msgList}
           style={{ backgroundColor: wallpaperBg }}
+          onScroll={(e) => { const y = e.nativeEvent.contentOffset.y; const h = e.nativeEvent.contentSize.height; const vh = e.nativeEvent.layoutMeasurement.height; setShowScrollBtn(h - y - vh > 120); }}
+          scrollEventThrottle={200}
         />
         {loading && (
           <View style={styles.loadingRow}>
@@ -1220,6 +1261,14 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {showScrollBtn && (
+          <TouchableOpacity
+            style={{ position: 'absolute', right: 16, bottom: 90, zIndex: 99, backgroundColor: '#075E54', borderRadius: 24, width: 44, height: 44, justifyContent: 'center', alignItems: 'center', elevation: 6 }}
+            onPress={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          >
+            <Text style={{ color: '#fff', fontSize: 20, lineHeight: 24 }}>⬇</Text>
+          </TouchableOpacity>
+        )}
         <View style={{ position: 'relative' }}>
           {/* Floating action buttons — absolute right side, above input bar */}
           <View style={styles.chatFabs}>
