@@ -3,17 +3,19 @@ import * as Clipboard from 'expo-clipboard';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   Image, Modal, Dimensions, ActivityIndicator,
-  Alert, RefreshControl, TextInput, StatusBar,
+  Alert, RefreshControl, TextInput, StatusBar, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, deleteFromCloudinary } from '../services/api';
+import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, deleteFromCloudinary } from '../services/api';
+import { ALL_PERSONAS } from '../constants/personas';
 
 const { width } = Dimensions.get('window');
 const THUMB = (width - 6) / 3;
 const LOCAL_KEY = 'my_girls_cloud_images';
+const LOCAL_VIDEO_KEY = 'my_girls_cloud_videos';
 
 export interface CloudImage {
   url: string;
@@ -22,6 +24,14 @@ export interface CloudImage {
   createdAt: number;
   width?: number;
   height?: number;
+}
+
+export interface CloudVideo {
+  url: string;
+  public_id: string;
+  personaName: string;
+  createdAt: number;
+  format?: string;
 }
 
 export async function saveCloudImage(img: CloudImage) {
@@ -42,7 +52,6 @@ export async function saveGeneratedImageToCloud(
   category: string = 'ai',
 ): Promise<CloudImage | null> {
   try {
-    // Use category as the subfolder so persona+style photos land in the right place
     const folder = category === 'ai' ? 'my-girls' : `my-girls/${category}`;
     const result = await uploadToCloudinary(b64_json, mimeType, folder);
     const img: CloudImage = {
@@ -65,6 +74,7 @@ const CATEGORIES = [
   { key: 'ai',       label: 'AI',        icon: '🤖' },
   { key: 'faceswap', label: 'Face Swap', icon: '🤳' },
   { key: 'group',    label: 'Group',     icon: '👥' },
+  { key: 'videos',   label: 'Videos',    icon: '🎬' },
   { key: 'app-icon', label: 'App Icon',  icon: '🎯' },
 ];
 
@@ -84,6 +94,12 @@ export default function CloudStorageScreen() {
   const [deleteConfirm, setDeleteConfirm] = useState<CloudImage | null>(null);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [appIcons, setAppIcons] = useState<CloudImage[]>([]);
+
+  // Video states
+  const [videos, setVideos] = useState<CloudVideo[]>([]);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [selectedPersona, setSelectedPersona] = useState('');
+  const [loadingVideos, setLoadingVideos] = useState(false);
 
   const [secretsModal, setSecretsModal] = useState(false);
   const [cloudName, setCloudName] = useState('');
@@ -112,6 +128,11 @@ export default function CloudStorageScreen() {
         if (s.cloudApiSecret) setCloudApiSecret(s.cloudApiSecret);
         setSecretsSaved(!!(s.cloudName && s.cloudApiKey && s.cloudApiSecret));
       }
+    } catch {}
+    try {
+      const rawV = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+      const vlist: CloudVideo[] = rawV ? JSON.parse(rawV) : [];
+      setVideos(vlist);
     } catch {}
     setLoading(false);
     setRefreshing(false);
@@ -148,7 +169,6 @@ export default function CloudStorageScreen() {
   }, []);
 
   const uploadAppIcon = useCallback(async () => {
-    // DocumentPicker → file manager (Honor folders) திறக்கும், gallery இல்ல
     const result = await DocumentPicker.getDocumentAsync({
       type: 'image/*',
       copyToCacheDirectory: true,
@@ -189,6 +209,85 @@ export default function CloudStorageScreen() {
     await AsyncStorage.setItem(APP_ICON_KEY, JSON.stringify(updated));
     setAppIcons(updated);
     setPreview(null);
+  }, []);
+
+  // ── Video Upload ─────────────────────────────────────────────
+  const uploadVideo = useCallback(async () => {
+    if (!selectedPersona) {
+      Alert.alert('Persona தேர்வு', 'முதலில் ஒரு girl-ஐ தேர்வு செய்யுங்கள்!');
+      return;
+    }
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'video/*',
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const folder = `my-girls/videos/${selectedPersona.toLowerCase()}`;
+    setUploadingVideo(true);
+    try {
+      const data = await uploadUriToCloudinary(asset.uri, 'video/mp4', folder);
+      const newVid: CloudVideo = {
+        url: data.url,
+        public_id: data.public_id,
+        personaName: selectedPersona,
+        createdAt: Date.now(),
+        format: 'mp4',
+      };
+      const existing = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+      const list: CloudVideo[] = existing ? JSON.parse(existing) : [];
+      list.unshift(newVid);
+      await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(list.slice(0, 100)));
+      setVideos(list.slice(0, 100));
+      Alert.alert(
+        '✅ Video Upload ஆச்சு!',
+        `"${selectedPersona}" folder-ல் save ஆனது!\n\nChat-ல் "video வேணும்" என்று type பண்ணினா இந்த video வரும்!`,
+      );
+    } catch (e: any) {
+      Alert.alert('Upload பிழை', e?.message || 'Video upload முடியல. மீண்டும் try பண்ணுங்க');
+    } finally {
+      setUploadingVideo(false);
+    }
+  }, [selectedPersona]);
+
+  // ── Sync videos from cloud ───────────────────────────────────
+  const syncVideos = useCallback(async () => {
+    setLoadingVideos(true);
+    try {
+      const allPersonaNames = ALL_PERSONAS.map((p: any) => p.name);
+      let allVideos: CloudVideo[] = [];
+      for (const name of allPersonaNames) {
+        try {
+          const vids = await listCloudinaryVideos(name);
+          for (const v of vids) {
+            allVideos.push({
+              url: v.url,
+              public_id: v.public_id,
+              personaName: name,
+              createdAt: Date.now(),
+              format: v.format || 'mp4',
+            });
+          }
+        } catch {}
+      }
+      await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(allVideos.slice(0, 100)));
+      setVideos(allVideos);
+      Alert.alert('✅ Sync ஆச்சு!', `${allVideos.length} videos found!`);
+    } catch (e: any) {
+      Alert.alert('Sync பிழை', e?.message || 'Video sync முடியல');
+    } finally {
+      setLoadingVideos(false);
+    }
+  }, []);
+
+  const deleteVideo = useCallback(async (vid: CloudVideo) => {
+    try { await deleteFromCloudinary(vid.public_id); } catch {}
+    const existing = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+    const list: CloudVideo[] = existing ? JSON.parse(existing) : [];
+    const updated = list.filter(v => v.public_id !== vid.public_id);
+    await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(updated));
+    setVideos(updated);
   }, []);
 
   const syncFromCloud = useCallback(async () => {
@@ -290,8 +389,12 @@ export default function CloudStorageScreen() {
       ? images.length
       : c.key === 'app-icon'
         ? appIcons.length
-        : images.filter(i => i.category === c.key).length,
+        : c.key === 'videos'
+          ? videos.length
+          : images.filter(i => i.category === c.key).length,
   }));
+
+  const femalePersonas = ALL_PERSONAS.filter((p: any) => p.gender === 'female');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -342,7 +445,6 @@ export default function CloudStorageScreen() {
 
           {secretsSaved ? (
             <View style={styles.secretsChips}>
-              {/* Cloud Name chip */}
               <TouchableOpacity
                 style={styles.secretChip}
                 onPress={async () => { await Clipboard.setStringAsync(cloudName); Alert.alert('📋', 'Cloud Name copied!'); }}
@@ -356,7 +458,6 @@ export default function CloudStorageScreen() {
                 <Text style={styles.secretChipCopy}>📋</Text>
               </TouchableOpacity>
 
-              {/* API Key chip */}
               <TouchableOpacity
                 style={styles.secretChip}
                 onPress={async () => { await Clipboard.setStringAsync(cloudApiKey); Alert.alert('📋', 'API Key copied!'); }}
@@ -370,7 +471,6 @@ export default function CloudStorageScreen() {
                 <Text style={styles.secretChipCopy}>📋</Text>
               </TouchableOpacity>
 
-              {/* API Secret chip */}
               <TouchableOpacity
                 style={styles.secretChip}
                 onPress={async () => { await Clipboard.setStringAsync(cloudApiSecret); Alert.alert('📋', 'API Secret copied!'); }}
@@ -419,39 +519,129 @@ export default function CloudStorageScreen() {
         </ScrollView>
 
         <View style={styles.storageInfo}>
-          <Text style={styles.storageTitle}>☁️ Cloudinary — my-girls folder</Text>
-          <Text style={styles.storageCount}>{images.length} images</Text>
+          <Text style={styles.storageTitle}>
+            {activeCategory === 'videos' ? '🎬 Videos — my-girls/videos/' : '☁️ Cloudinary — my-girls folder'}
+          </Text>
+          <Text style={styles.storageCount}>
+            {activeCategory === 'videos' ? `${videos.length} videos` : `${images.length} images`}
+          </Text>
         </View>
 
-        {images.length === 0 && !loading && (
-          <View style={styles.syncCard}>
-            <Text style={styles.syncCardTitle}>Cloud-ல் images இல்லை</Text>
-            <Text style={styles.syncCardText}>
-              Chat-ல் AI image generate பண்ணா auto-save ஆகும்.{'\n'}
-              🔄 Sync button tap பண்ணி Cloudinary-ல் உள்ள images fetch பண்ணலாம்.
-            </Text>
-            <TouchableOpacity style={styles.syncCardBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
-              {fetchingCloud
+        {/* ── VIDEO TAB ─────────────────────────────────────────── */}
+        {activeCategory === 'videos' ? (
+          <View style={styles.videoSection}>
+            {/* Upload Card */}
+            <View style={styles.videoUploadCard}>
+              <Text style={styles.videoUploadTitle}>🎬 Video Upload</Text>
+              <Text style={styles.videoUploadHint}>
+                Chat-ல் "video வேணும்" என்று type பண்ணினா இந்த videos வரும்!{'\n'}
+                Folder: my-girls/videos/[persona name]
+              </Text>
+
+              {/* Persona picker */}
+              <Text style={styles.videoPersonaLabel}>👩 Girl தேர்வு செய்யுங்கள்:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                <View style={styles.personaRow}>
+                  {femalePersonas.map((p: any) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[styles.personaChip, selectedPersona === p.name && styles.personaChipActive]}
+                      onPress={() => setSelectedPersona(p.name)}
+                    >
+                      <Text style={styles.personaChipEmoji}>{p.emoji}</Text>
+                      <Text style={[styles.personaChipName, selectedPersona === p.name && styles.personaChipNameActive]}>
+                        {p.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {selectedPersona ? (
+                <View style={styles.selectedPersonaBox}>
+                  <Text style={styles.selectedPersonaText}>
+                    📁 Folder: my-girls/videos/{selectedPersona.toLowerCase()}/
+                  </Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[styles.videoUploadBtn, (uploadingVideo || !selectedPersona) && { opacity: 0.5 }]}
+                onPress={uploadVideo}
+                disabled={uploadingVideo || !selectedPersona}
+              >
+                {uploadingVideo
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.videoUploadBtnTxt}>📤 Video தேர்வு செய்து Upload</Text>
+                }
+              </TouchableOpacity>
+            </View>
+
+            {/* Sync button */}
+            <TouchableOpacity
+              style={[styles.syncVideosBtn, loadingVideos && { opacity: 0.6 }]}
+              onPress={syncVideos}
+              disabled={loadingVideos}
+            >
+              {loadingVideos
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.syncCardBtnTxt}>🔄 Sync from Cloud</Text>
+                : <Text style={styles.syncVideosBtnTxt}>🔄 Cloud-ல் உள்ள Videos Sync</Text>
               }
             </TouchableOpacity>
-          </View>
-        )}
 
-        {selectionMode && selectedIds.size > 0 && (
-          <View style={styles.selBar}>
-            <TouchableOpacity onPress={exitSelectionMode}>
-              <Text style={styles.selBarCancel}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.selBarCount}>{selectedIds.size} selected</Text>
-            <TouchableOpacity style={styles.selBarDelete} onPress={deleteSelected}>
-              <Text style={styles.selBarDeleteTxt}>🗑️ Delete</Text>
-            </TouchableOpacity>
+            {/* Video list */}
+            {videos.length === 0 ? (
+              <View style={styles.videoEmpty}>
+                <Text style={styles.videoEmptyIcon}>🎬</Text>
+                <Text style={styles.videoEmptyTitle}>Video இல்லை</Text>
+                <Text style={styles.videoEmptyHint}>
+                  மேலே girl-ஐ தேர்வு செய்து video upload பண்ணுங்கள்.{'\n'}
+                  அல்லது Cloudinary-ல் manual ஆக upload செய்யலாம்:{'\n'}
+                  my-girls/videos/[girl name]/
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.videoList}>
+                {videos.map((vid) => (
+                  <View key={vid.public_id} style={styles.videoItem}>
+                    <View style={styles.videoItemLeft}>
+                      <Text style={styles.videoItemIcon}>🎬</Text>
+                      <View style={styles.videoItemInfo}>
+                        <Text style={styles.videoItemPersona}>{vid.personaName}</Text>
+                        <Text style={styles.videoItemDate}>
+                          {new Date(vid.createdAt).toLocaleDateString('ta-IN')} · {vid.format || 'mp4'}
+                        </Text>
+                        <Text style={styles.videoItemId} numberOfLines={1}>
+                          {vid.public_id.split('/').pop()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.videoItemBtns}>
+                      <TouchableOpacity
+                        style={styles.videoPlayBtn}
+                        onPress={() => Linking.openURL(vid.url)}
+                      >
+                        <Text style={styles.videoPlayBtnTxt}>▶</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.videoDeleteBtn}
+                        onPress={() =>
+                          Alert.alert('Delete?', `"${vid.personaName}" video delete பண்ணட்டுமா?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Delete', style: 'destructive', onPress: () => deleteVideo(vid) },
+                          ])
+                        }
+                      >
+                        <Text style={styles.videoDeleteBtnTxt}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-        )}
 
-        {activeCategory === 'app-icon' ? (
+        ) : activeCategory === 'app-icon' ? (
           <View style={styles.appIconSection}>
             <View style={styles.appIconHeader}>
               <View>
@@ -509,32 +699,64 @@ export default function CloudStorageScreen() {
           </View>
         ) : loading ? (
           <ActivityIndicator color="#6C63FF" size="large" style={{ marginTop: 60 }} />
-        ) : filtered.length === 0 && images.length > 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyText}>{activeCategory} category-ல் images இல்லை</Text>
-          </View>
         ) : (
-          <View style={styles.grid}>
-            {filtered.map(img => {
-              const isSel = selectedIds.has(img.public_id);
-              return (
-                <TouchableOpacity
-                  key={img.public_id}
-                  onPress={() => selectionMode ? toggleSelect(img.public_id) : setPreview(img)}
-                  onLongPress={() => enterSelectionMode(img.public_id)}
-                  style={{ position: 'relative' }}
-                >
-                  <Image source={{ uri: img.url }} style={[styles.thumb, isSel && { opacity: 0.6 }]} resizeMode="cover" />
-                  {isSel && (
-                    <View style={styles.thumbCheck}>
-                      <Text style={styles.thumbCheckTxt}>✓</Text>
-                    </View>
-                  )}
+          <>
+            {images.length === 0 && (
+              <View style={styles.syncCard}>
+                <Text style={styles.syncCardTitle}>Cloud-ல் images இல்லை</Text>
+                <Text style={styles.syncCardText}>
+                  Chat-ல் AI image generate பண்ணா auto-save ஆகும்.{'\n'}
+                  🔄 Sync button tap பண்ணி Cloudinary-ல் உள்ள images fetch பண்ணலாம்.
+                </Text>
+                <TouchableOpacity style={styles.syncCardBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
+                  {fetchingCloud
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={styles.syncCardBtnTxt}>🔄 Sync from Cloud</Text>
+                  }
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              </View>
+            )}
+
+            {selectionMode && selectedIds.size > 0 && (
+              <View style={styles.selBar}>
+                <TouchableOpacity onPress={exitSelectionMode}>
+                  <Text style={styles.selBarCancel}>✕</Text>
+                </TouchableOpacity>
+                <Text style={styles.selBarCount}>{selectedIds.size} selected</Text>
+                <TouchableOpacity style={styles.selBarDelete} onPress={deleteSelected}>
+                  <Text style={styles.selBarDeleteTxt}>🗑️ Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {filtered.length === 0 && images.length > 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyText}>{activeCategory} category-ல் images இல்லை</Text>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {filtered.map(img => {
+                  const isSel = selectedIds.has(img.public_id);
+                  return (
+                    <TouchableOpacity
+                      key={img.public_id}
+                      onPress={() => selectionMode ? toggleSelect(img.public_id) : setPreview(img)}
+                      onLongPress={() => enterSelectionMode(img.public_id)}
+                      style={{ position: 'relative' }}
+                    >
+                      <Image source={{ uri: img.url }} style={[styles.thumb, isSel && { opacity: 0.6 }]} resizeMode="cover" />
+                      {isSel && (
+                        <View style={styles.thumbCheck}>
+                          <Text style={styles.thumbCheckTxt}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -582,7 +804,6 @@ export default function CloudStorageScreen() {
               cloudinary.com → Dashboard-ல் பார்க்கலாம்.
             </Text>
 
-            {/* Cloud Name */}
             <Text style={styles.secLabel}>☁️ Cloud Name</Text>
             <View style={styles.secInputRow}>
               <TextInput
@@ -601,7 +822,6 @@ export default function CloudStorageScreen() {
               )}
             </View>
 
-            {/* API Key */}
             <Text style={styles.secLabel}>🔑 API Key</Text>
             <View style={styles.secInputRow}>
               <TextInput
@@ -621,7 +841,6 @@ export default function CloudStorageScreen() {
               )}
             </View>
 
-            {/* API Secret */}
             <Text style={styles.secLabel}>🔒 API Secret</Text>
             <View style={styles.secInputRow}>
               <TextInput
@@ -641,7 +860,6 @@ export default function CloudStorageScreen() {
               )}
             </View>
 
-            {/* Buttons */}
             <View style={styles.secBtns}>
               {secretsSaved && (
                 <TouchableOpacity style={styles.secClearBtn} onPress={() => Alert.alert('Delete?', 'Secrets delete பண்ணட்டுமா?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: clearSecrets }])}>
@@ -659,7 +877,7 @@ export default function CloudStorageScreen() {
         </View>
       </Modal>
 
-      {/* Custom delete confirm (Alert blocked in Chrome web) */}
+      {/* Custom delete confirm */}
       {deleteConfirm && (
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
@@ -724,6 +942,69 @@ const styles = StyleSheet.create({
   },
   storageTitle: { color: '#fff', fontSize: 13, fontWeight: '600' },
   storageCount: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold' },
+
+  // ── Video styles ──────────────────────────────────────────
+  videoSection: { paddingHorizontal: 14, paddingBottom: 30 },
+  videoUploadCard: {
+    backgroundColor: '#0d1b2a', borderRadius: 16, padding: 18,
+    borderWidth: 1.5, borderColor: '#1565C0', marginBottom: 14,
+  },
+  videoUploadTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
+  videoUploadHint: { color: '#aaa', fontSize: 12, lineHeight: 18, marginBottom: 14 },
+  videoPersonaLabel: { color: '#60a5fa', fontSize: 13, fontWeight: '700', marginBottom: 10 },
+  personaRow: { flexDirection: 'row', gap: 10 },
+  personaChip: {
+    alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: '#16213e', borderRadius: 14, borderWidth: 1.5, borderColor: '#2a2a4a',
+  },
+  personaChipActive: { borderColor: '#6C63FF', backgroundColor: '#2d2b55' },
+  personaChipEmoji: { fontSize: 22, marginBottom: 4 },
+  personaChipName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
+  personaChipNameActive: { color: '#6C63FF' },
+  selectedPersonaBox: {
+    backgroundColor: '#0a2540', borderRadius: 10, padding: 10, marginBottom: 14,
+    borderWidth: 1, borderColor: '#1565C0',
+  },
+  selectedPersonaText: { color: '#60a5fa', fontSize: 12, fontFamily: 'monospace' },
+  videoUploadBtn: {
+    backgroundColor: '#1565C0', borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center',
+  },
+  videoUploadBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  syncVideosBtn: {
+    backgroundColor: '#374151', borderRadius: 12, paddingVertical: 13,
+    alignItems: 'center', marginBottom: 14,
+    borderWidth: 1, borderColor: '#6C63FF',
+  },
+  syncVideosBtnTxt: { color: '#6C63FF', fontSize: 14, fontWeight: '700' },
+  videoEmpty: { alignItems: 'center', paddingTop: 40, paddingBottom: 30 },
+  videoEmptyIcon: { fontSize: 56, marginBottom: 12 },
+  videoEmptyTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
+  videoEmptyHint: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  videoList: { gap: 10 },
+  videoItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#16213e', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#2a2a4a',
+  },
+  videoItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  videoItemIcon: { fontSize: 28, marginRight: 12 },
+  videoItemInfo: { flex: 1 },
+  videoItemPersona: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  videoItemDate: { color: '#aaa', fontSize: 11 },
+  videoItemId: { color: '#555', fontSize: 10, marginTop: 2 },
+  videoItemBtns: { flexDirection: 'row', gap: 8 },
+  videoPlayBtn: {
+    backgroundColor: '#1565C0', borderRadius: 10,
+    width: 38, height: 38, justifyContent: 'center', alignItems: 'center',
+  },
+  videoPlayBtnTxt: { color: '#fff', fontSize: 16 },
+  videoDeleteBtn: {
+    backgroundColor: '#2a1a1a', borderRadius: 10,
+    width: 38, height: 38, justifyContent: 'center', alignItems: 'center',
+  },
+  videoDeleteBtnTxt: { fontSize: 16 },
+
   syncCard: {
     margin: 16, padding: 20, backgroundColor: '#16213e',
     borderRadius: 16, borderWidth: 1, borderColor: '#2a2a4a', alignItems: 'center',
