@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { Client } from "@gradio/client";
 
 const router = Router();
 
@@ -30,7 +31,6 @@ router.get("/face-swap/result/:jobId", (req, res) => {
 });
 
 router.post("/face-swap", async (req, res) => {
-  // source_url = preset body image; target_url = user selfie (base64 data URI or URL)
   const { source_url, target_url } = req.body as { source_url: string; target_url: string };
   if (!source_url || !target_url) {
     res.status(400).json({ error: "source_url and target_url required" });
@@ -42,131 +42,104 @@ router.post("/face-swap", async (req, res) => {
   processSwap(jobId, source_url, target_url).catch(() => {});
 });
 
-async function toBase64(url: string): Promise<string> {
+async function urlToBlob(url: string): Promise<Blob> {
   if (url.startsWith("data:")) {
-    const m = url.match(/^data:[^;]+;base64,(.+)$/);
-    if (m) return m[1];
-    throw new Error("Invalid data URI");
+    const m = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) throw new Error("Invalid data URI");
+    const bytes = Buffer.from(m[2], "base64");
+    return new Blob([bytes], { type: m[1] });
   }
   const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!r.ok) throw new Error(`fetch failed ${r.status}`);
   const buf = await r.arrayBuffer();
-  return Buffer.from(buf).toString("base64");
+  return new Blob([buf], { type: r.headers.get("content-type") || "image/jpeg" });
 }
 
-// ── BLACKHOOL/Roop-face-swap Gradio space ──────────────────────────
-// Space: https://blackhool-roop-face-swap.hf.space
-// Endpoint: /run/predict
-// Inputs: [source_face_base64, target_image_base64]
-async function tryBlackhoolRoop(faceB64: string, bodyB64: string): Promise<string | null> {
-  const SPACE = "https://blackhool-roop-face-swap.hf.space";
+// Try a Gradio space using @gradio/client (proper SDK)
+async function tryGradioSpace(
+  spaceName: string,
+  faceBlob: Blob,
+  targetBlob: Blob,
+  timeoutMs = 120000,
+): Promise<string | null> {
+  const timer = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`${spaceName} timeout`)), timeoutMs),
+  );
 
-  // Step 1: get queue info (may need session hash)
-  const sessionHash = randomUUID().replace(/-/g, "").slice(0, 11);
-
-  // Try REST predict endpoint first
-  const predictRes = await fetch(`${SPACE}/run/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      data: [faceB64, bodyB64],
-      session_hash: sessionHash,
-    }),
-    signal: AbortSignal.timeout(120000),
-  });
-
-  if (predictRes.ok) {
-    const json = await predictRes.json() as any;
-    const out = json?.data?.[0];
-    if (out) {
-      if (typeof out === "string" && (out.startsWith("http") || out.startsWith("data:"))) return out;
-      if (out?.url) return out.url as string;
-      if (out?.path) return `${SPACE}/file=${out.path}`;
+  const run = (async () => {
+    const client = await Client.connect(spaceName);
+    const result = await client.predict("/predict", [faceBlob, targetBlob]) as any;
+    const out = result?.data?.[0];
+    if (!out) return null;
+    if (typeof out === "string" && (out.startsWith("http") || out.startsWith("data:"))) return out;
+    if (out?.url) return out.url as string;
+    if (out?.path) {
+      const host = spaceName.toLowerCase().replace("/", "-");
+      return `https://${host}.hf.space/file=${out.path}`;
     }
-  }
+    return null;
+  })();
 
-  // Step 2: Try queue/join + queue/status SSE approach
-  const joinRes = await fetch(`${SPACE}/queue/join`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      data: [faceB64, bodyB64],
-      fn_index: 0,
-      session_hash: sessionHash,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!joinRes.ok) throw new Error(`queue/join failed: ${joinRes.status}`);
-
-  // Poll queue/status
-  for (let i = 0; i < 40; i++) {
-    await new Promise<void>(r => setTimeout(r, 3000));
-    const statusRes = await fetch(`${SPACE}/queue/status?session_hash=${sessionHash}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!statusRes.ok) continue;
-    const data = await statusRes.json() as any;
-    if (data?.msg === "process_completed") {
-      const output = data?.output?.data?.[0];
-      if (!output) return null;
-      if (typeof output === "string" && (output.startsWith("http") || output.startsWith("data:"))) return output;
-      if (output?.url) return output.url as string;
-      if (output?.path) return `${SPACE}/file=${output.path}`;
-      return null;
-    }
-    if (data?.msg === "process_errored") throw new Error("Roop space returned error");
-  }
-  throw new Error("Roop space timeout");
+  return Promise.race([run, timer]);
 }
 
-// ── Fallback: tonyassi space ─────────────────────────────────────
-async function tryFallbackSpace(faceB64: string, bodyB64: string): Promise<string | null> {
-  const spaces = [
-    { slug: "tonyassi-face-swap",     ep: "run_inference" },
-    { slug: "Dentro-face-swap",       ep: "predict"       },
-    { slug: "felixrosberg-face-swap", ep: "predict"       },
-  ];
-  for (const s of spaces) {
-    try {
-      const res = await fetch(`https://${s.slug}.hf.space/run/${s.ep}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: [faceB64, bodyB64] }),
-        signal: AbortSignal.timeout(90000),
-      });
-      if (!res.ok) continue;
-      const json = await res.json() as any;
-      const out = json?.data?.[0];
-      if (!out) continue;
-      if (typeof out === "string" && (out.startsWith("http") || out.startsWith("data:"))) return out;
-      if (out?.url) return out.url as string;
-      if (out?.path) return `https://${s.slug}.hf.space/file=${out.path}`;
-    } catch { continue; }
-  }
+// Fallback: raw REST for spaces that still support /run/predict
+async function tryRestSpace(
+  spaceHost: string,
+  faceB64: string,
+  bodyB64: string,
+): Promise<string | null> {
+  const res = await fetch(`https://${spaceHost}.hf.space/run/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [faceB64, bodyB64], fn_index: 0 }),
+    signal: AbortSignal.timeout(90000),
+  });
+  if (!res.ok) return null;
+  const json = await res.json() as any;
+  const out = json?.data?.[0];
+  if (!out) return null;
+  if (typeof out === "string" && (out.startsWith("http") || out.startsWith("data:"))) return out;
+  if (out?.url) return out.url as string;
+  if (out?.path) return `https://${spaceHost}.hf.space/file=${out.path}`;
   return null;
 }
 
-// ── Main ─────────────────────────────────────────────────────────
 async function processSwap(jobId: string, bodyUrl: string, faceDataUri: string) {
   try {
-    // Convert both to base64
-    const [bodyB64, faceB64] = await Promise.all([
-      toBase64(bodyUrl),
-      toBase64(faceDataUri),
+    const [faceBlob, bodyBlob] = await Promise.all([
+      urlToBlob(faceDataUri),
+      urlToBlob(bodyUrl),
     ]);
 
-    // 1. Primary: BLACKHOOL/Roop-face-swap
+    // Convert face to base64 for REST fallback
+    const faceB64 = await faceBlob.arrayBuffer().then(b => Buffer.from(b).toString("base64"));
+    const bodyB64 = await bodyBlob.arrayBuffer().then(b => Buffer.from(b).toString("base64"));
+
     let resultUrl: string | null = null;
-    try {
-      resultUrl = await tryBlackhoolRoop(faceB64, bodyB64);
-    } catch (e: any) {
-      req_log(`Roop failed: ${e?.message}`);
+
+    // 1. tonyassi/face-swap — most reliable free HF space
+    if (!resultUrl) {
+      try { resultUrl = await tryGradioSpace("tonyassi/face-swap", faceBlob, bodyBlob, 120000); }
+      catch (e: any) { console.error("[faceswap] tonyassi failed:", e?.message?.slice(0, 100)); }
     }
 
-    // 2. Fallback: other HF spaces
+    // 2. Dentro/face-swap
     if (!resultUrl) {
-      try { resultUrl = await tryFallbackSpace(faceB64, bodyB64); } catch { /* ignore */ }
+      try { resultUrl = await tryGradioSpace("Dentro/face-swap", faceBlob, bodyBlob, 90000); }
+      catch (e: any) { console.error("[faceswap] Dentro failed:", e?.message?.slice(0, 100)); }
+    }
+
+    // 3. felixrosberg/face-swap
+    if (!resultUrl) {
+      try { resultUrl = await tryGradioSpace("felixrosberg/face-swap", faceBlob, bodyBlob, 90000); }
+      catch (e: any) { console.error("[faceswap] felixrosberg failed:", e?.message?.slice(0, 100)); }
+    }
+
+    // 4. Raw REST fallback — blackhool roop
+    if (!resultUrl) {
+      try { resultUrl = await tryRestSpace("blackhool-roop-face-swap", faceB64, bodyB64); }
+      catch (e: any) { console.error("[faceswap] blackhool REST failed:", e?.message?.slice(0, 100)); }
     }
 
     if (resultUrl) {
@@ -181,7 +154,5 @@ async function processSwap(jobId: string, bodyUrl: string, faceDataUri: string) 
     upd(jobId, { status: "error", error: err?.message || "Face swap failed" });
   }
 }
-
-function req_log(msg: string) { console.error("[faceswap]", msg); }
 
 export default router;
