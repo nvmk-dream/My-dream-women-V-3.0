@@ -196,6 +196,28 @@ router.get("/cloudinary/videos", async (req, res) => {
       } catch {}
     }
 
+    // Method 4: Broad parent-folder search + JS filter (handles Tamil/Unicode subfolder names)
+    // Cloudinary Admin API may fail for non-ASCII prefix queries; this sidesteps the issue.
+    if (resources.length === 0) {
+      try {
+        const parentParts = folder.split("/");
+        const subname = parentParts.pop() || "";
+        const parentFolder = parentParts.join("/") || "my-girls/videos";
+        const r4 = await cl.api.resources({
+          type: "upload", resource_type: "video",
+          prefix: parentFolder + "/", max_results: 300,
+        });
+        if (r4?.resources?.length) {
+          // Filter: keep only resources belonging to this specific character's subfolder
+          resources = r4.resources.filter((r: any) => {
+            const pid: string = r.public_id || "";
+            const af: string = r.asset_folder || "";
+            return pid.includes(subname) || af.includes(subname) || af === folder;
+          });
+        }
+      } catch {}
+    }
+
     const videos = resources.map((r: any) => ({
       url: r.secure_url || r.url,
       public_id: r.public_id,
