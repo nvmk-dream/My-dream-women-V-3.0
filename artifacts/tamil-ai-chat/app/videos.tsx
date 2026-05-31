@@ -80,9 +80,17 @@ export default function VideosScreen() {
 
       setUploading(true);
       const folder = `my-girls/videos/${selectedPersona.toLowerCase()}`;
-      await uploadUriToCloudinary(uri, mimeType, folder);
+      const uploaded = await uploadUriToCloudinary(uri, mimeType, folder);
+      // ✅ Add to local state immediately — don't rely on Cloudinary listing
+      // (Alert.alert is non-blocking; loadVideos would run & return [] for Tamil folders → clears state)
+      setVideos(prev => [...prev, { url: uploaded.url, public_id: uploaded.public_id, format: 'mp4' }]);
       Alert.alert('✅ Upload Success!', `${selectedPersona} folder-ல் video சேர்க்கப்பட்டது!`);
-      await loadVideos(selectedPersona);
+      // Background refresh after 3s (give Cloudinary time to index); keeps existing if empty
+      setTimeout(() => {
+        listCloudinaryVideos(selectedPersona).then(fresh => {
+          if (fresh && fresh.length > 0) setVideos(fresh as VideoItem[]);
+        }).catch(() => {});
+      }, 3000);
     } catch (e: any) {
       Alert.alert('Upload பண்ண முடியல', e?.message || 'மீண்டும் try பண்ணுங்க');
     } finally {
