@@ -45,9 +45,17 @@ router.post("/image-to-prompt", async (req, res) => {
   try {
     const { b64, mime } = await imageToBase64(image_url);
 
+    // ── Key resolution: header (mobile app user key) → env var (server key) ─
+    // x-gemini-key: user's own Gemini API key from the mobile app key rotation
+    // x-openrouter-key: user's own OpenRouter API key from the mobile app
+    const geminiKeyFromHeader = (req.headers['x-gemini-key'] as string)?.trim();
+    const geminiKey = geminiKeyFromHeader
+      || process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]
+      || process.env["GEMINI_API_KEY"];
+    // Only use Replit's custom base URL if using Replit's own env key (not user key)
+    const geminiBase = geminiKeyFromHeader ? undefined : process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
+
     // ── Primary: Gemini Vision (free, excellent quality) ──────────────
-    const geminiKey = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"] ?? process.env["GEMINI_API_KEY"];
-    const geminiBase = process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
 
     if (geminiKey) {
       try {
@@ -83,8 +91,14 @@ router.post("/image-to-prompt", async (req, res) => {
     }
 
     // ── Fallback: OpenRouter vision models ────────────────────────────
-    const orKey = process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"] ?? process.env["OPENROUTER_API_KEY"];
-    const orBase = process.env["AI_INTEGRATIONS_OPENROUTER_BASE_URL"] ?? "https://openrouter.ai/api/v1";
+    const orKeyFromHeader = (req.headers['x-openrouter-key'] as string)?.trim();
+    const orKey = orKeyFromHeader
+      || process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"]
+      || process.env["OPENROUTER_API_KEY"];
+    // If user provided their own OpenRouter key, always use real OpenRouter endpoint
+    const orBase = orKeyFromHeader
+      ? "https://openrouter.ai/api/v1"
+      : (process.env["AI_INTEGRATIONS_OPENROUTER_BASE_URL"] ?? "https://openrouter.ai/api/v1");
 
     if (orKey) {
       const visionModels = [
