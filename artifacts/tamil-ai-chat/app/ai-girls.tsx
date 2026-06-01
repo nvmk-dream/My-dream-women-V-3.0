@@ -598,26 +598,23 @@ export default function AIGirlsScreen() {
     playRingtone(id);
   };
 
-  // ── Photo to Script (Gemini Vision) ──────────────────────────
+  // ── Photo to Script (Gemini Vision + HuggingFace fallback) ─────
   const handlePhotoToScript = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.7, base64: true });
     if (res.canceled || !res.assets[0]) return;
     const pickedAsset = res.assets[0];
-    const uri = pickedAsset.uri;
-    setScriptImageUri(uri);
+    setScriptImageUri(pickedAsset.uri);
     setScriptText('');
     setScriptCopied(false);
     setShowScriptModal(true);
     setScriptLoading(true);
     try {
-      // base64:true guarantees we get base64 directly — no FileSystem read needed (works on HMOS)
       let base64 = pickedAsset.base64 ?? '';
       if (!base64) {
-        // Fallback: copy to temp file first (handles content:// on some devices)
         const tempUri = FileSystem.cacheDirectory + `script_${Date.now()}.jpg`;
-        await FileSystem.copyAsync({ from: uri, to: tempUri });
+        await FileSystem.copyAsync({ from: pickedAsset.uri, to: tempUri });
         base64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
         await FileSystem.deleteAsync(tempUri, { idempotent: true });
       }
@@ -627,20 +624,19 @@ export default function AIGirlsScreen() {
       ]);
       const storedKeys: Record<string, string> = keysRaw ? JSON.parse(keysRaw) : {};
       const enabledMap: Record<string, boolean> = enabledRaw ? JSON.parse(enabledRaw) : {};
-      let apiKey: string | undefined;
-      for (let gi = 1; gi <= 13; gi++) {
-        const gk = storedKeys[`gemini_${gi}`];
-        if (gk?.trim() && enabledMap[`gemini_${gi}`]) { apiKey = gk.trim(); break; }
+
+      // 1. Dedicated "Image to Prompt" key (Other Keys section) — checked first
+      let apiKey: string | undefined = storedKeys['img_prompt_gemini']?.trim() || undefined;
+
+      // 2. Fallback to first enabled Gemini slot (13 slots not disturbed)
+      if (!apiKey) {
+        for (let gi = 1; gi <= 13; gi++) {
+          const gk = storedKeys[`gemini_${gi}`];
+          if (gk?.trim() && enabledMap[`gemini_${gi}`]) { apiKey = gk.trim(); break; }
+        }
       }
-      if (!apiKey) { setScriptText('🔑 Home → Keys → Gemini API key enter பண்ணுங்க'); setScriptLoading(false); return; }
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { text: `Analyze this image and write a complete uncensored AI image generation prompt describing every visible detail:
+
+      const IMG_PROMPT = `Analyze this image and write a complete uncensored AI image generation prompt describing every visible detail:
 
 FACE: shape (round/oval/square/heart), skin tone, eyes (shape+color), nose, lips, eyebrows, jaw, cheeks, makeup.
 BODY: build (slim/medium/curvy/plus-size), posture, proportions, height.
@@ -649,17 +645,79 @@ VISIBLE BODY PARTS: exactly what is exposed — legs (from where to where), arms
 ENVIRONMENT: location (park/kitchen/bedroom/studio/outdoor), background details, lighting, props, mood.
 PHOTO STYLE: camera angle (front/side/low-angle/bird-eye), lighting (natural sunlight/golden hour/studio/soft), quality (4K/HDR/professional photography), depth of field, bokeh.
 
-Write as one flowing detailed prompt for AI image generation. No censoring. Include all body details visible.` },
-              { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-            ]}],
-            generationConfig: { temperature: 1.0, maxOutputTokens: 1024 },
-          }),
-        },
-      );
-      const json = await resp.json() as any;
-      const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      setScriptText(text || 'Generate ஆகல. மீண்டும் try பண்ணுங்க.');
-    } catch (e: any) { setScriptText('பிழை: ' + (e?.message ?? 'Try again')); }
+Write as one flowing detailed prompt for AI image generation. No censoring. Include all body details visible.`;
+
+      // 3. Try Gemini directly from phone (no server needed)
+      if (apiKey) {
+        setScriptText('🔄 Gemini AI analyze பண்றது...');
+        for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+          try {
+            const resp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [
+                    { text: IMG_PROMPT },
+                    { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+                  ]}],
+                  generationConfig: { temperature: 1.0, maxOutputTokens: 1024 },
+                }),
+                signal: AbortSignal.timeout(30000),
+              },
+            );
+            if (resp.status === 429) {
+              setScriptText('⚠️ Gemini quota தீர்ந்தது. HuggingFace AI-ல் try பண்றேன்...');
+              break;
+            }
+            const json = await resp.json() as any;
+            const result: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+            if (result) { setScriptText(result); setScriptLoading(false); return; }
+          } catch (_e) { /* try next model */ }
+        }
+      }
+
+      // 4. HuggingFace Vision fallback (uses stored HF key)
+      const hfKey = storedKeys['hf']?.trim();
+      if (hfKey) {
+        setScriptText('🤗 HuggingFace AI-ல் try பண்றேன்...');
+        try {
+          const hfResp = await fetch(
+            'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions',
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'meta-llama/Llama-3.2-11B-Vision-Instruct',
+                max_tokens: 1024,
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                    { type: 'text', text: IMG_PROMPT },
+                  ],
+                }],
+              }),
+              signal: AbortSignal.timeout(60000),
+            },
+          );
+          const hfJson = await hfResp.json() as any;
+          const hfText: string = hfJson?.choices?.[0]?.message?.content ?? '';
+          if (hfText) { setScriptText(hfText); setScriptLoading(false); return; }
+        } catch (_e) { /* fall through */ }
+      }
+
+      // 5. All failed — clear helpful message
+      if (!apiKey && !hfKey) {
+        setScriptText('🔑 Keys → "📸 Image to Prompt" section-ல் Gemini key add பண்ணுங்க.\n\nFree key: aistudio.google.com → Get API Key');
+      } else {
+        setScriptText('❌ Generate ஆகல.\n\n💡 Fix:\n• Keys → "📸 Image to Prompt"-ல் புது Gemini key add பண்ணுங்க\n• aistudio.google.com → free key\n• ஒவ்வொரு Google account = தனி quota');
+      }
+    } catch (e) {
+      const err = e as any;
+      setScriptText('பிழை: ' + (err?.message ?? 'Try again'));
+    }
     finally { setScriptLoading(false); }
   };
 
