@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, Alert, ActivityIndicator, StatusBar, Dimensions, Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,14 +12,45 @@ import { listCloudinaryVideos, deleteFromCloudinary, uploadUriToCloudinary } fro
 
 const { } = Dimensions.get('window');
 
+const LOCAL_VIDEO_KEY = 'my_girls_cloud_videos';
+
 interface VideoItem {
   url: string;
   public_id: string;
   format?: string;
   createdAt?: string;
+  personaName?: string;
 }
 
 const femalePersonas = (ALL_PERSONAS as any[]).filter((p: any) => p.gender === 'female');
+
+// ── Local storage helpers ────────────────────────────────────────
+async function getLocalVideos(personaName: string): Promise<VideoItem[]> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+    const all: VideoItem[] = raw ? JSON.parse(raw) : [];
+    return all.filter(v => v.personaName === personaName);
+  } catch { return []; }
+}
+
+async function saveLocalVideo(v: VideoItem): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+    const all: VideoItem[] = raw ? JSON.parse(raw) : [];
+    // Deduplicate by public_id
+    const filtered = all.filter(x => x.public_id !== v.public_id);
+    filtered.push(v);
+    await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(filtered.slice(0, 200)));
+  } catch {}
+}
+
+async function removeLocalVideo(public_id: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
+    const all: VideoItem[] = raw ? JSON.parse(raw) : [];
+    await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(all.filter(v => v.public_id !== public_id)));
+  } catch {}
+}
 
 export default function VideosScreen() {
   const router = useRouter();
@@ -27,11 +59,29 @@ export default function VideosScreen() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // Load: local first (instant), then sync from Cloudinary in background
   const loadVideos = useCallback(async (personaName: string) => {
     setLoading(true);
     try {
-      const result = await listCloudinaryVideos(personaName);
-      setVideos(result as VideoItem[]);
+      // 1. Show local videos immediately
+      const local = await getLocalVideos(personaName);
+      if (local.length > 0) setVideos(local);
+
+      // 2. Try Cloudinary sync in background (Tamil folder may fail — that's OK)
+      try {
+        const cloud = await listCloudinaryVideos(personaName);
+        if (cloud && cloud.length > 0) {
+          // Merge cloud results into local storage
+          for (const v of cloud as VideoItem[]) {
+            await saveLocalVideo({ ...v, personaName });
+          }
+          const merged = await getLocalVideos(personaName);
+          setVideos(merged);
+        } else if (local.length === 0) {
+          setVideos([]);
+        }
+        // If cloud empty but local has videos, keep local
+      } catch { /* keep local */ }
     } catch {
       setVideos([]);
     } finally {
@@ -67,12 +117,10 @@ export default function VideosScreen() {
       const uri = asset.uri;
       const mimeType = asset.mimeType || 'video/mp4';
 
-      // Format check
       if (!mimeType.startsWith('video/')) {
         Alert.alert('Format Error ❌', 'mp4, webm, mov format மட்டும் support ஆகும்');
         return;
       }
-      // Size check (max 100MB)
       if (asset.fileSize && asset.fileSize > 100 * 1024 * 1024) {
         Alert.alert('Size Error ❌', 'Video 100MB-க்கு குறைவா இருக்கணும்');
         return;
@@ -81,16 +129,25 @@ export default function VideosScreen() {
       setUploading(true);
       const folder = `my-girls/videos/${selectedPersona.toLowerCase()}`;
       const uploaded = await uploadUriToCloudinary(uri, mimeType, folder);
-      // ✅ Add to local state immediately — don't rely on Cloudinary listing
-      // (Alert.alert is non-blocking; loadVideos would run & return [] for Tamil folders → clears state)
-      setVideos(prev => [...prev, { url: uploaded.url, public_id: uploaded.public_id, format: 'mp4' }]);
-      Alert.alert('✅ Upload Success!', `${selectedPersona} folder-ல் video சேர்க்கப்பட்டது!`);
-      // Background refresh after 3s (give Cloudinary time to index); keeps existing if empty
-      setTimeout(() => {
-        listCloudinaryVideos(selectedPersona).then(fresh => {
-          if (fresh && fresh.length > 0) setVideos(fresh as VideoItem[]);
-        }).catch(() => {});
-      }, 3000);
+
+      // ✅ Save to AsyncStorage immediately — survives app restarts & Cloudinary listing failures
+      const newVid: VideoItem = {
+        url: uploaded.url,
+        public_id: uploaded.public_id,
+        format: 'mp4',
+        createdAt: new Date().toISOString(),
+        personaName: selectedPersona,
+      };
+      await saveLocalVideo(newVid);
+
+      // Update UI
+      setVideos(prev => {
+        // Avoid duplicate if already there
+        if (prev.some(v => v.public_id === newVid.public_id)) return prev;
+        return [...prev, newVid];
+      });
+
+      Alert.alert('✅ Upload Success!', `${selectedPersona} folder-ல் video சேர்க்கப்பட்டது!\n\nChat-ல் "video வேணும்" என்று type பண்ணுங்க!`);
     } catch (e: any) {
       Alert.alert('Upload பண்ண முடியல', e?.message || 'மீண்டும் try பண்ணுங்க');
     } finally {
@@ -109,6 +166,7 @@ export default function VideosScreen() {
           onPress: async () => {
             try {
               await deleteFromCloudinary(vid.public_id);
+              await removeLocalVideo(vid.public_id);
               setVideos(prev => prev.filter(v => v.public_id !== vid.public_id));
             } catch {
               Alert.alert('Delete பண்ண முடியல', 'மீண்டும் try பண்ணுங்க');
