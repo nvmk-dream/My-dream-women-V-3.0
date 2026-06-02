@@ -62,9 +62,9 @@ function detectErrorType(error: any): { should_retry: boolean; user_message: str
 }
 
 router.post("/image-to-prompt", async (req, res) => {
-  const { image_url } = req.body as { image_url: string };
-  if (!image_url) {
-    res.status(400).json({ error: "image_url required" });
+  const { image_url, b64: directB64, mime: directMime } = req.body as { image_url?: string; b64?: string; mime?: string };
+  if (!image_url && !directB64) {
+    res.status(400).json({ error: "image_url or b64 required" });
     return;
   }
 
@@ -72,7 +72,9 @@ router.post("/image-to-prompt", async (req, res) => {
   const maxTimeMs = 10 * 60 * 1000; // 10 minutes max
 
   try {
-    const { b64, mime } = await imageToBase64(image_url);
+    const { b64, mime } = directB64
+      ? { b64: directB64, mime: directMime || "image/jpeg" }
+      : await imageToBase64(image_url!);
 
     // Try Gemini first (highest quality)
     const geminiKeyFromHeader = (req.headers['x-gemini-key'] as string)?.trim();
