@@ -35,6 +35,32 @@ async function imageToBase64(image_url: string): Promise<{ b64: string; mime: st
   };
 }
 
+function detectErrorType(error: any): { should_retry: boolean; user_message: string } {
+  const msg = String(error?.message || error || "").toLowerCase();
+  
+  // Network errors
+  if (msg.includes("timeout") || msg.includes("fetch")) {
+    return { should_retry: true, user_message: "🌐 Network problem. Retrying..." };
+  }
+  
+  // Rate limit / Quota
+  if (msg.includes("429") || msg.includes("quota") || msg.includes("rate limit")) {
+    return { should_retry: true, user_message: "⏱ Daily limit reached. Trying backup..." };
+  }
+  
+  // Auth errors (no retry)
+  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid")) {
+    return { should_retry: false, user_message: "🔑 API key invalid. Check settings." };
+  }
+  
+  // Model errors
+  if (msg.includes("model") || msg.includes("unavailable")) {
+    return { should_retry: true, user_message: "🤖 Model loading. Retrying..." };
+  }
+  
+  return { should_retry: true, user_message: "🔄 Trying alternative method..." };
+}
+
 router.post("/image-to-prompt", async (req, res) => {
   const { image_url } = req.body as { image_url: string };
   if (!image_url) {
@@ -42,9 +68,13 @@ router.post("/image-to-prompt", async (req, res) => {
     return;
   }
 
+  const startTime = Date.now();
+  const maxTimeMs = 10 * 60 * 1000; // 10 minutes max
+
   try {
     const { b64, mime } = await imageToBase64(image_url);
 
+    // Try Gemini first (highest quality)
     const geminiKeyFromHeader = (req.headers['x-gemini-key'] as string)?.trim();
     const geminiKey = geminiKeyFromHeader
       || process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]
@@ -58,8 +88,13 @@ router.post("/image-to-prompt", async (req, res) => {
           apiKey: geminiKey,
           ...(geminiBase ? { httpOptions: { apiVersion: "", baseUrl: geminiBase } } : {}),
         });
+        
         for (const model of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
           try {
+            if (Date.now() - startTime > maxTimeMs) {
+              throw new Error("Timeout after 10 minutes");
+            }
+            
             const result = await ai.models.generateContent({
               model,
               contents: [{
@@ -77,14 +112,26 @@ router.post("/image-to-prompt", async (req, res) => {
               return;
             }
           } catch (e: any) {
+            const errorInfo = detectErrorType(e);
             req.log.warn({ model, err: e?.message?.slice(0, 100) }, "Gemini model failed");
+            
+            if (!errorInfo.should_retry) {
+              throw e;
+            }
           }
         }
       } catch (e: any) {
+        const errorInfo = detectErrorType(e);
+        if (!errorInfo.should_retry) {
+          req.log.error({ err: e?.message?.slice(0, 100) }, "Gemini auth failed");
+          res.status(500).json({ error: errorInfo.user_message });
+          return;
+        }
         req.log.warn({ err: e?.message?.slice(0, 100) }, "Gemini init failed");
       }
     }
 
+    // Fallback to OpenRouter (cheaper, good quality)
     const orKeyFromHeader = (req.headers['x-openrouter-key'] as string)?.trim();
     const orKey = orKeyFromHeader
       || process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"]
@@ -100,8 +147,13 @@ router.post("/image-to-prompt", async (req, res) => {
         "meta-llama/llama-4-maverick",
         "meta-llama/llama-4-scout",
       ];
+      
       for (const model of visionModels) {
         try {
+          if (Date.now() - startTime > maxTimeMs) {
+            throw new Error("Timeout after 10 minutes");
+          }
+          
           const apiRes = await fetch(`${orBase}/chat/completions`, {
             method: "POST",
             headers: { Authorization: `Bearer ${orKey}`, "Content-Type": "application/json" },
@@ -118,25 +170,60 @@ router.post("/image-to-prompt", async (req, res) => {
             }),
             signal: AbortSignal.timeout(60000),
           });
+          
           const data = await apiRes.json() as any;
-          if (apiRes.ok) {
-            const prompt = (data?.choices?.[0]?.message?.content ?? "").trim();
-            if (prompt) {
-              req.log.info({ model }, "image-to-prompt success via OpenRouter");
-              res.json({ prompt });
-              return;
+          
+          if (apiRes.status === 429) {
+            req.log.warn({ model, err: "rate_limit" }, "OpenRouter rate limited");
+            continue;
+          }
+          
+          if (!apiRes.ok) {
+            if (apiRes.status === 401 || apiRes.status === 403) {
+              throw new Error(`OpenRouter auth error: ${apiRes.status}`);
             }
+            req.log.warn({ model, err: data?.error }, "OpenRouter failed");
+            continue;
+          }
+          
+          const prompt = (data?.choices?.[0]?.message?.content ?? "").trim();
+          if (prompt) {
+            req.log.info({ model }, "image-to-prompt success via OpenRouter");
+            res.json({ prompt });
+            return;
           }
         } catch (e: any) {
+          const errorInfo = detectErrorType(e);
+          if (!errorInfo.should_retry && !String(e.message).includes("rate")) {
+            throw e;
+          }
           req.log.warn({ model, err: e?.message?.slice(0, 100) }, "OpenRouter vision model failed");
         }
       }
     }
 
-    res.status(500).json({ error: "Generate ஆகல. மீண்டும் try பண்ணுங்க." });
+    // All providers exhausted
+    const elapsedMs = Date.now() - startTime;
+    
+    if (elapsedMs > maxTimeMs) {
+      res.status(500).json({ 
+        error: "⏱ Processing timeout. Try again later." 
+      });
+    } else if (!geminiKey && !orKey) {
+      res.status(500).json({ 
+        error: "🔑 No API key configured. Add key in settings." 
+      });
+    } else {
+      res.status(500).json({ 
+        error: "🔄 Providers unavailable. Try in a few min." 
+      });
+    }
+    
   } catch (err: any) {
     req.log.error({ err }, "image-to-prompt failed");
-    res.status(500).json({ error: "Generate ஆகல. மீண்டும் try பண்ணுங்க." });
+    res.status(500).json({ 
+      error: "🔄 Processing failed. Try again." 
+    });
   }
 });
 
