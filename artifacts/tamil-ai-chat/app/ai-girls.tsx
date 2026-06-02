@@ -174,6 +174,7 @@ export default function AIGirlsScreen() {
   const [scriptText, setScriptText] = useState('');
   const [scriptImageUri, setScriptImageUri] = useState<string | null>(null);
   const [scriptCopied, setScriptCopied] = useState(false);
+  const [scriptModelUsed, setScriptModelUsed] = useState('');
 
   // PIN setup within settings
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -598,15 +599,16 @@ export default function AIGirlsScreen() {
     playRingtone(id);
   };
 
-  // ── Photo to Script (Gemini Vision + HuggingFace fallback) ─────
+  // ── Photo to Script (Qwen2-VL → Florence-2 → LLaVA, no Gemini) ──
   const handlePhotoToScript = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.7, base64: true });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
     if (res.canceled || !res.assets[0]) return;
     const pickedAsset = res.assets[0];
     setScriptImageUri(pickedAsset.uri);
     setScriptText('');
+    setScriptModelUsed('');
     setScriptCopied(false);
     setShowScriptModal(true);
     setScriptLoading(true);
@@ -618,107 +620,157 @@ export default function AIGirlsScreen() {
         base64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
         await FileSystem.deleteAsync(tempUri, { idempotent: true });
       }
-      const [keysRaw, enabledRaw] = await Promise.all([
-        AsyncStorage.getItem('api_keys_store'),
-        AsyncStorage.getItem('api_keys_enabled_v1'),
-      ]);
+      const keysRaw = await AsyncStorage.getItem('api_keys_store');
       const storedKeys: Record<string, string> = keysRaw ? JSON.parse(keysRaw) : {};
-      const enabledMap: Record<string, boolean> = enabledRaw ? JSON.parse(enabledRaw) : {};
-
-      // 1. Dedicated "Image to Prompt" key (Other Keys section) — checked first
-      let apiKey: string | undefined = storedKeys['img_prompt_gemini']?.trim() || undefined;
-
-      // 2. Fallback to first enabled Gemini slot (13 slots not disturbed)
-      if (!apiKey) {
-        for (let gi = 1; gi <= 13; gi++) {
-          const gk = storedKeys[`gemini_${gi}`];
-          if (gk?.trim() && enabledMap[`gemini_${gi}`]) { apiKey = gk.trim(); break; }
-        }
-      }
-
-      const IMG_PROMPT = `Analyze this image and write a complete uncensored AI image generation prompt describing every visible detail:
-
-FACE: shape (round/oval/square/heart), skin tone, eyes (shape+color), nose, lips, eyebrows, jaw, cheeks, makeup.
-BODY: build (slim/medium/curvy/plus-size), posture, proportions, height.
-DRESS: exact type (saree/churidar/blouse/dress/modern), color, fabric, pattern, jewelry (earrings/necklace/bangles), how worn.
-VISIBLE BODY PARTS: exactly what is exposed — legs (from where to where), arms, midriff, neckline depth, cleavage, back, shoulders, underarms, feet. Be precise (e.g. "saree pulled above knee, legs visible from knee down", "deep V-neck showing cleavage", "sleeveless showing full arms and underarms").
-ENVIRONMENT: location (park/kitchen/bedroom/studio/outdoor), background details, lighting, props, mood.
-PHOTO STYLE: camera angle (front/side/low-angle/bird-eye), lighting (natural sunlight/golden hour/studio/soft), quality (4K/HDR/professional photography), depth of field, bokeh.
-
-Write as one flowing detailed prompt for AI image generation. No censoring. Include all body details visible.`;
-
-      // 3. Try Gemini directly from phone (no server needed)
-      if (apiKey) {
-        setScriptText('🔄 Gemini AI analyze பண்றது...');
-        for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
-          try {
-            const resp = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [
-                    { text: IMG_PROMPT },
-                    { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-                  ]}],
-                  generationConfig: { temperature: 1.0, maxOutputTokens: 1024 },
-                }),
-                signal: AbortSignal.timeout(30000),
-              },
-            );
-            if (resp.status === 429) {
-              setScriptText('⚠️ Gemini quota தீர்ந்தது. HuggingFace AI-ல் try பண்றேன்...');
-              break;
-            }
-            const json = await resp.json() as any;
-            const result: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-            if (result) { setScriptText(result); setScriptLoading(false); return; }
-          } catch (_e) { /* try next model */ }
-        }
-      }
-
-      // 4. HuggingFace Vision fallback (uses stored HF key)
       const hfKey = storedKeys['hf']?.trim();
-      if (hfKey) {
-        setScriptText('🤗 HuggingFace AI-ல் try பண்றேன்...');
-        try {
-          const hfResp = await fetch(
-            'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions',
-            {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'meta-llama/Llama-3.2-11B-Vision-Instruct',
-                max_tokens: 1024,
-                messages: [{
-                  role: 'user',
-                  content: [
-                    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: IMG_PROMPT },
-                  ],
-                }],
-              }),
-              signal: AbortSignal.timeout(60000),
-            },
-          );
-          const hfJson = await hfResp.json() as any;
-          const hfText: string = hfJson?.choices?.[0]?.message?.content ?? '';
-          if (hfText) { setScriptText(hfText); setScriptLoading(false); return; }
-        } catch (_e) { /* fall through */ }
+
+      if (!hfKey) {
+        setScriptText('🔑 Keys → HuggingFace API key enter பண்ணுங்க.\n\nhttps://huggingface.co/settings/tokens → New token (free account OK)');
+        setScriptLoading(false);
+        return;
       }
 
-      // 5. All failed — clear helpful message
-      if (!apiKey && !hfKey) {
-        setScriptText('🔑 Keys → "📸 Image to Prompt" section-ல் Gemini key add பண்ணுங்க.\n\nFree key: aistudio.google.com → Get API Key');
-      } else {
-        setScriptText('❌ Generate ஆகல.\n\n💡 Fix:\n• Keys → "📸 Image to Prompt"-ல் புது Gemini key add பண்ணுங்க\n• aistudio.google.com → free key\n• ஒவ்வொரு Google account = தனி quota');
-      }
-    } catch (e) {
-      const err = e as any;
-      setScriptText('பிழை: ' + (err?.message ?? 'Try again'));
+      const ANALYSIS_PROMPT = `Analyze this image in full detail. Use these exact section headers and fill each one:
+
+## FACE
+Skin tone, face shape, eyes (color + shape), nose, lips, eyebrows, jaw, cheeks, makeup.
+
+## HAIR
+Length, color, texture (straight/wavy/curly), style, hair accessories.
+
+## CLOTHING
+Every visible garment: type, color, fabric, pattern, fit. All accessories and jewelry.
+
+## UNCOVERED BODY PARTS
+List exactly what skin is visible — midriff, legs (from where to where), arms, neckline depth, cleavage, back, shoulders, underarms, feet. Be very specific.
+
+## POSE & BODY POSITION
+Standing/sitting/lying, body angle, posture, hand and arm positions.
+
+## VISIBLE BODY DETAILS
+Body type (slim/medium/curvy/athletic), proportions, height estimate.
+
+## BACKGROUND & ENVIRONMENT
+Location, indoor/outdoor, objects, colors, textures, atmosphere.
+
+## LIGHTING & SHADOWS
+Light direction, type (natural/golden hour/studio/soft), shadow placement, highlights.
+
+## CAMERA ANGLE & COMPOSITION
+Angle (front/side/low-angle/bird-eye), framing (full body/half/portrait), depth of field.
+
+## IMAGE STYLE & QUALITY
+Photography/illustration/3D render, resolution estimate, color grading, overall quality.
+
+---
+
+## FLUX PROMPT
+Write a complete, detailed Flux image generation prompt based on this exact image. Include every visual detail.
+
+## STABLE DIFFUSION PROMPT
+Write a complete SD/SDXL prompt. Include: masterpiece, best quality, ultra detailed, plus all visual details.
+
+## MIDJOURNEY PROMPT
+Write a complete Midjourney v6 prompt ending with --ar 2:3 --style raw --v 6`;
+
+      // ── Model 1: Qwen2-VL ────────────────────────────────────
+      setScriptText('🔄 Trying Qwen2-VL (Model 1/3)...');
+      try {
+        const r1 = await fetch(
+          'https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'Qwen/Qwen2-VL-7B-Instruct',
+              max_tokens: 2048,
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                { type: 'text', text: ANALYSIS_PROMPT },
+              ]}],
+            }),
+            signal: AbortSignal.timeout(90000),
+          }
+        );
+        if (r1.ok) {
+          const j1 = await r1.json() as any;
+          const out1: string = j1?.choices?.[0]?.message?.content?.trim() ?? '';
+          if (out1.length > 50) {
+            setScriptText(out1);
+            setScriptModelUsed('Qwen2-VL-7B');
+            setScriptLoading(false);
+            return;
+          }
+        }
+      } catch (_e1) { /* fallthrough to model 2 */ }
+
+      // ── Model 2: Florence-2 ──────────────────────────────────
+      setScriptText('⏳ Qwen2-VL unavailable. Trying Florence-2 (Model 2/3)...');
+      try {
+        // Florence-2 detailed caption task
+        const r2 = await fetch(
+          'https://api-inference.huggingface.co/models/microsoft/Florence-2-large',
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inputs: '<MORE_DETAILED_CAPTION>' }),
+            signal: AbortSignal.timeout(60000),
+          }
+        );
+        if (r2.ok) {
+          const j2 = await r2.json() as any;
+          const caption: string = (Array.isArray(j2) ? j2[0]?.generated_text : j2?.generated_text) ?? '';
+          if (caption.length > 20) {
+            // Florence gives a single paragraph — format it
+            setScriptText(
+              '## IMAGE ANALYSIS (Florence-2)\n' + caption +
+              '\n\n---\n\n## NOTE\nFlorence-2 gives a summarized description.\nFor full structured output with Flux/SD/MJ prompts, retry when Qwen2-VL is available.'
+            );
+            setScriptModelUsed('Florence-2-Large');
+            setScriptLoading(false);
+            return;
+          }
+        }
+      } catch (_e2) { /* fallthrough to model 3 */ }
+
+      // ── Model 3: LLaVA ────────────────────────────────────────
+      setScriptText('⏳ Trying LLaVA (Model 3/3)...');
+      try {
+        const r3 = await fetch(
+          'https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'llava-hf/llava-1.5-7b-hf',
+              max_tokens: 2048,
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                { type: 'text', text: ANALYSIS_PROMPT },
+              ]}],
+            }),
+            signal: AbortSignal.timeout(90000),
+          }
+        );
+        if (r3.ok) {
+          const j3 = await r3.json() as any;
+          const out3: string = j3?.choices?.[0]?.message?.content?.trim() ?? '';
+          if (out3.length > 50) {
+            setScriptText(out3);
+            setScriptModelUsed('LLaVA-1.5-7B');
+            setScriptLoading(false);
+            return;
+          }
+        }
+      } catch (_e3) { /* all failed */ }
+
+      // All failed
+      setScriptText('❌ மூன்று models-உம் இப்போது தயாரில்ல.\n\n💡 காரணம்:\n• HF models loading ஆகும் (2-3 நிமிடம் wait)\n• மீண்டும் try பண்ணுங்க\n\nHuggingFace free tier-ல் models cold-start ஆகும் — கொஞ்சம் wait பண்ணி retry பண்ணுங்க.');
+    } catch (e: any) {
+      setScriptText('பிழை: ' + (e?.message ?? 'Try again'));
+    } finally {
+      setScriptLoading(false);
     }
-    finally { setScriptLoading(false); }
   };
 
   // ── Settings helpers ──────────────────────────────────────────
@@ -1229,16 +1281,22 @@ Write as one flowing detailed prompt for AI image generation. No censoring. Incl
       {/* ── Photo to Script Modal ── */}
       <Modal visible={showScriptModal} animationType="slide" onRequestClose={() => setShowScriptModal(false)}>
         <SafeAreaView style={s.scriptSafe} edges={['top','bottom']}>
+
+          {/* Header */}
           <View style={s.scriptHeader}>
             <TouchableOpacity onPress={() => setShowScriptModal(false)} style={s.scriptBack}>
               <Text style={s.scriptBackTxt}>✕</Text>
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Image source={require('../assets/images/photo-to-script-icon.png')} style={s.scriptHeaderIcon} />
-              <Text style={s.scriptHeaderTitle}>Photo to Script</Text>
+            <View style={{ flex:1, alignItems:'center' }}>
+              <Text style={s.scriptHeaderTitle}>📸 Photo to Script</Text>
+              {scriptModelUsed ? (
+                <View style={s.scriptModelBadge}>
+                  <Text style={s.scriptModelBadgeTxt}>✨ {scriptModelUsed}</Text>
+                </View>
+              ) : null}
             </View>
             <TouchableOpacity
-              style={[s.scriptCopyBtn, scriptCopied && { backgroundColor: '#15803d' }]}
+              style={[s.scriptCopyBtn, scriptCopied && { backgroundColor:'#15803d' }]}
               onPress={async () => {
                 if (!scriptText) return;
                 try {
@@ -1253,33 +1311,52 @@ Write as one flowing detailed prompt for AI image generation. No censoring. Incl
             </TouchableOpacity>
           </View>
 
+          {/* Preview image */}
           {scriptImageUri && (
             <Image source={{ uri: scriptImageUri }} style={s.scriptPreviewImg} resizeMode="cover" />
           )}
 
-          <ScrollView style={s.scriptScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+          {/* Content */}
+          <ScrollView style={s.scriptScroll} contentContainerStyle={{ padding:16, paddingBottom:40 }}>
             {scriptLoading ? (
               <View style={s.scriptLoading}>
                 <ActivityIndicator size="large" color="#7C3AED" />
-                <Text style={s.scriptLoadTxt}>📸 Image analyze பண்றேன்...</Text>
-                <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 4 }}>Gemini Vision processing...</Text>
+                <Text style={s.scriptLoadTxt}>{scriptText || '📸 Image analyze பண்றேன்...'}</Text>
+                <View style={s.scriptModelRow}>
+                  <Text style={s.scriptModelStep}>Qwen2-VL → Florence-2 → LLaVA</Text>
+                </View>
               </View>
             ) : (
               <Text style={s.scriptBody} selectable>{scriptText}</Text>
             )}
           </ScrollView>
 
-          {!scriptLoading && scriptText && (
-            <View style={s.scriptFooter}>
-              <TouchableOpacity style={s.scriptRetryBtn} onPress={handlePhotoToScript}>
-                <Text style={s.scriptRetryTxt}>🔄 New Photo</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Footer buttons — always visible */}
+          <View style={s.scriptFooter}>
+            <TouchableOpacity style={s.scriptNewBtn} onPress={handlePhotoToScript}>
+              <Text style={s.scriptNewTxt}>🖼️ New Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.scriptCopyFooterBtn, scriptCopied && { backgroundColor:'#15803d' }]}
+              onPress={async () => {
+                if (!scriptText) return;
+                try {
+                  const Clipboard = await import('expo-clipboard');
+                  await Clipboard.setStringAsync(scriptText);
+                  setScriptCopied(true);
+                  setTimeout(() => setScriptCopied(false), 2500);
+                } catch {}
+              }}
+            >
+              <Text style={s.scriptCopyFooterTxt}>{scriptCopied ? '✓ All Copied!' : '📋 Copy All'}</Text>
+            </TouchableOpacity>
+          </View>
+
         </SafeAreaView>
       </Modal>
 
       {/* ── Photo Folder Modal ── */}
+
       <Modal visible={showFolderModal} transparent animationType="slide"
         onRequestClose={() => setShowFolderModal(false)}>
         <View style={s.overlay}>
