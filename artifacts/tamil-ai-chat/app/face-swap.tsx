@@ -618,9 +618,7 @@ export default function FaceSwapScreen() {
           <View style={s.vidmageCard}>
             <Text style={s.vidmageTitle}>⚠️ AI Models இப்போது Busy</Text>
             <Text style={s.vidmageDesc}>
-              HuggingFace free models இப்போது respond ஆகவில்லை.{'
-'}
-              கீழே உள்ள vidmage.ai-ல் free-ஆக face swap பண்ணலாம்!
+              HuggingFace free models இப்போது respond ஆகவில்லை.{' '}கீழே உள்ள vidmage.ai-ல் free-ஆக face swap பண்ணலாம்!
             </Text>
             <TouchableOpacity
               style={s.vidmageBtn}
