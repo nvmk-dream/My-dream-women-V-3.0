@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos } from '../services/api';
+import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile } from '../services/api';
 
 // Per-style photo cache helpers — same key as ai-girls-cloud.tsx uses
 const stylePhotoCacheKey = (personaId: string, styleId: string) =>
@@ -52,6 +52,7 @@ import {
 import { saveGeneratedImageToCloud } from './cloud-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
@@ -427,6 +428,7 @@ Each label: 1 sentence max.`;
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
   const [showGenModal, setShowGenModal] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState('normal');
@@ -848,6 +850,122 @@ Each label: 1 sentence max.`;
       } catch {}
     }
   };
+
+
+  const handleFileAttach = useCallback(async () => {
+    if (!persona) return;
+    try {
+      // Show pick options: image/video or document
+      Alert.alert(
+        'File Analysis 📎',
+        'என்ன analyze பண்ணணும்?',
+        [
+          {
+            text: '📷 Photo / Video',
+            onPress: async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) { Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க'); return; }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                base64: true,
+                quality: 0.7,
+              });
+              if (result.canceled || !result.assets[0]) return;
+              const asset = result.assets[0];
+              const isVideo = asset.type === 'video';
+              const b64 = asset.base64;
+              if (!b64) { Alert.alert('Error', 'File read பண்ண முடியல'); return; }
+
+              const userMsg: Message = {
+                id: Date.now().toString(), role: 'user',
+                content: isVideo ? `🎬 Video analyze பண்ணுங்க` : `📷 Photo analyze பண்ணுங்க`,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, userMsg]);
+              setFileLoading(true);
+
+              try {
+                const { reply } = await analyzeFile({
+                  fileBase64: b64,
+                  fileName: asset.fileName || (isVideo ? 'video.mp4' : 'photo.jpg'),
+                  fileType: isVideo ? 'video' : 'image',
+                  mimeType: asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+                  characterName: persona.name,
+                  characterPrompt: persona.prompt,
+                });
+                setMessages(prev => [...prev, {
+                  id: (Date.now()+1).toString(), role: 'assistant',
+                  content: reply, timestamp: new Date(),
+                }]);
+              } catch (e: any) {
+                setMessages(prev => [...prev, {
+                  id: (Date.now()+1).toString(), role: 'assistant',
+                  content: `${persona.name}: File analyze பண்ண முடியல! மீண்டும் try பண்ணுங்க 😔`,
+                  timestamp: new Date(),
+                }]);
+              } finally { setFileLoading(false); }
+            },
+          },
+          {
+            text: '📄 Document (PDF/TXT)',
+            onPress: async () => {
+              const result = await DocumentPicker.getDocumentAsync({
+                type: ['application/pdf', 'text/plain', 'application/msword',
+                       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                copyToCacheDirectory: true,
+              });
+              if (result.canceled || !result.assets?.[0]) return;
+              const asset = result.assets[0];
+
+              // Read file as base64
+              let b64 = '';
+              try {
+                const FileSystem = await import('expo-file-system');
+                b64 = await FileSystem.default.readAsStringAsync(asset.uri, {
+                  encoding: FileSystem.default.EncodingType.Base64,
+                });
+              } catch (e) {
+                Alert.alert('Error', 'Document read பண்ண முடியல');
+                return;
+              }
+
+              const userMsg: Message = {
+                id: Date.now().toString(), role: 'user',
+                content: `📄 ${asset.name} — analyze பண்ணுங்க`,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, userMsg]);
+              setFileLoading(true);
+
+              try {
+                const { reply } = await analyzeFile({
+                  fileBase64: b64,
+                  fileName: asset.name,
+                  fileType: 'document',
+                  mimeType: asset.mimeType || 'application/pdf',
+                  characterName: persona.name,
+                  characterPrompt: persona.prompt,
+                });
+                setMessages(prev => [...prev, {
+                  id: (Date.now()+1).toString(), role: 'assistant',
+                  content: reply, timestamp: new Date(),
+                }]);
+              } catch (e: any) {
+                setMessages(prev => [...prev, {
+                  id: (Date.now()+1).toString(), role: 'assistant',
+                  content: `${persona.name}: Document analyze பண்ண முடியல! மீண்டும் try பண்ணுங்க 😔`,
+                  timestamp: new Date(),
+                }]);
+              } finally { setFileLoading(false); }
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+    } catch (e) {
+      Alert.alert('Error', 'File pick பண்ண முடியல');
+    }
+  }, [persona]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -1627,6 +1745,16 @@ Each label: 1 sentence max.`;
           </View>
           {/* Compact input bar — WhatsApp style */}
           <View style={styles.inputBar}>
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={handleFileAttach}
+              disabled={fileLoading || loading}
+            >
+              {fileLoading
+                ? <ActivityIndicator color="#6C5CE7" size="small" />
+                : <Text style={{ fontSize: 20 }}>📎</Text>
+              }
+            </TouchableOpacity>
             <TextInput
               style={styles.input}
               value={input}
@@ -2307,6 +2435,7 @@ const styles = StyleSheet.create({
   cameraIcon: { fontSize: 18 },
   sendBtn: { backgroundColor: '#25D366', width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   sendBtnDisabled: { backgroundColor: '#a8d5b5' },
+  attachBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE7F6', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
   sendIcon: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   pickerSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%' },
