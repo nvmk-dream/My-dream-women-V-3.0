@@ -877,10 +877,11 @@ Each label: 1 sentence max.`;
               // Read file as base64 using static FileSystem (asset.base64 is unreliable on Android)
               let b64 = '';
               try {
-                b64 = await FileSystem.readAsStringAsync(asset.uri, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-              } catch {
+                const tempUri = FileSystem.cacheDirectory + 'chat_upload_' + Date.now();
+                await FileSystem.copyAsync({ from: asset.uri, to: tempUri });
+                b64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
+              } catch (e) {
+                console.error(e);
                 Alert.alert('Error', 'Photo read பண்ண முடியல — மீண்டும் try பண்ணுங்க');
                 return;
               }
@@ -930,10 +931,11 @@ Each label: 1 sentence max.`;
               // Read file as base64 using static FileSystem import
               let b64 = '';
               try {
-                b64 = await FileSystem.readAsStringAsync(asset.uri, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
+                const tempUri = FileSystem.cacheDirectory + 'chat_doc_' + Date.now();
+                await FileSystem.copyAsync({ from: asset.uri, to: tempUri });
+                b64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
               } catch (e) {
+                console.error(e);
                 Alert.alert('Error', 'Document read பண்ண முடியல — மீண்டும் try பண்ணுங்க');
                 return;
               }
