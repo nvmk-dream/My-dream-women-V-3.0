@@ -581,3 +581,36 @@ export async function generateImageHuggingFace(
 
   throw lastError;
 }
+
+// ── File Analysis — uses dedicated server-side Gemini_key_1..6 + groq_key ────
+export async function analyzeFile(params: {
+  fileBase64: string;
+  fileName: string;
+  fileType: 'image' | 'video' | 'document';
+  mimeType: string;
+  userPrompt?: string;
+  characterName?: string;
+  characterPrompt?: string;
+  mood?: string;
+}): Promise<{ reply: string; docText?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000);
+  try {
+    const res = await fetch(`${REPLIT_API}/api/analyze-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as any;
+      throw new Error(err?.error || `File analysis failed: ${res.status}`);
+    }
+    const data = await res.json() as any;
+    return { reply: data.reply || 'பதில் வரல', docText: data.docText };
+  } catch (e: any) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
