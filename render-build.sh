@@ -18,7 +18,7 @@ else
 fi
 
 echo "==> Installing api-server workspace deps (filtered, no lockfile freeze to tolerate minor drift)"
-pnpm install --filter @workspace/api-server...
+pnpm install --filter @workspace/api-server... --no-frozen-lockfile
 
 echo "==> Building api-server"
 pnpm --filter @workspace/api-server run build
@@ -27,3 +27,5 @@ echo "==> Installing @gradio/client (runtime, not bundled)"
 npm install @gradio/client
 
 echo "==> Render build complete"
+
+echo "==> Build complete at 2026-06-12 07:00 UTC"
