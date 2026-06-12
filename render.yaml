@@ -26,4 +26,4 @@ services:
         sync: false
       - key: AIFACESWAP_KEY
         sync: false
-      - fromGroup: Multimidia Key
+      - fromGroup: "Multimidia Key"
