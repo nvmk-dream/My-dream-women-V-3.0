@@ -1756,25 +1756,28 @@ Each label: 1 sentence max.`;
           </View>
           {/* Compact input bar — WhatsApp style */}
           <View style={styles.inputBar}>
-            <TouchableOpacity
-              style={styles.attachBtn}
-              onPress={handleFileAttach}
-              disabled={fileLoading || loading}
-            >
-              {fileLoading
-                ? <ActivityIndicator color="#6C5CE7" size="small" />
-                : <Text style={{ fontSize: 20 }}>📎</Text>
-              }
-            </TouchableOpacity>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
-              placeholderTextColor="#999"
-              multiline
-              maxLength={1000}
-            />
+            {/* Input wrapper: text + 📎 inside the rounded box */}
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
+                placeholderTextColor="#999"
+                multiline
+                maxLength={1000}
+              />
+              <TouchableOpacity
+                style={styles.attachBtn}
+                onPress={handleFileAttach}
+                disabled={fileLoading || loading}
+              >
+                {fileLoading
+                  ? <ActivityIndicator color="#999" size="small" />
+                  : <Text style={{ fontSize: 20, color: '#888' }}>📎</Text>
+                }
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
               onPress={handleSend}
@@ -2437,16 +2440,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 8, paddingRight: 64,
     backgroundColor: '#F0F0F0', borderTopWidth: 1, borderTopColor: '#ddd', gap: 8,
   },
-  input: { flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120, color: '#111', borderWidth: 1, borderColor: '#ddd' },
+  inputWrapper: {
+    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
+    backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#ddd',
+    paddingRight: 4,
+  },
+  input: { flex: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120, color: '#111', minHeight: 44 },
   btnStack: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   promptImageBtn: { backgroundColor: '#E91E8C', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   promptPickBtn: { backgroundColor: '#7B1FA2', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
   cameraBtn: { backgroundColor: '#E53935', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
   translateBtn: { backgroundColor: '#1565C0', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
   cameraIcon: { fontSize: 18 },
-  sendBtn: { backgroundColor: '#25D366', width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  sendBtnDisabled: { backgroundColor: '#a8d5b5' },
-  attachBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE7F6', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  sendBtn: { backgroundColor: '#00897B', width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  sendBtnDisabled: { backgroundColor: '#80CBC4' },
+  attachBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 4, marginRight: 2 },
   sendIcon: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   pickerSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%' },
