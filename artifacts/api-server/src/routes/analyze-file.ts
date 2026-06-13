@@ -4,20 +4,23 @@ import { GoogleGenAI } from "@google/genai";
 const router = Router();
 
 // ── Dedicated File Analysis Key Rotation ─────────────────────────────────────
-// Uses ONLY Gemini_key_1..6 (AIzaSy... format) and groq_key
-// Never touches existing chat keys
 function getFileGeminiKeys(): string[] {
   const keys: string[] = [];
   for (let i = 1; i <= 6; i++) {
-    const k = process.env[`Gemini_key_${i}`]?.trim();
-    // Only accept valid Google AI Studio keys (AIzaSy... format)
+    // Upper/Lowercase எல்லாவற்றையும் சரிபார்க்கும் (Render-க்கு ஏற்றது)
+    const val = process.env[`Gemini_key_${i}`] || process.env[`GEMINI_KEY_${i}`] || process.env[`Gemini_Key_${i}`];
+    const k = val?.trim();
     if (k && k.startsWith("AIzaSy")) keys.push(k);
   }
+  if (keys.length === 0) console.log("[analyze-file] ⚠️ Gemini Keys எதுவுமே இல்லை! Render env-ஐ சரிபார்க்கவும்.");
   return keys;
 }
 
 function getGroqKey(): string | undefined {
-  return process.env["groq_key"]?.trim() || undefined;
+  // Groq_key / groq_key / GROQ_KEY / GROQ_API_KEY எல்லாத்தையும் try பண்ணும்
+  const val = process.env["Groq_key"] || process.env["groq_key"] || process.env["GROQ_KEY"] || process.env["GROQ_API_KEY"];
+  if (!val) console.log("[analyze-file] ⚠️ Groq key இல்லை! Render env-ஐ சரிபார்க்கவும்.");
+  return val?.trim() || undefined;
 }
 
 const laxSafety = [
@@ -38,7 +41,7 @@ async function tryGeminiKeys(
     try {
       const ai = new GoogleGenAI({ apiKey: key });
       const resp = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash", // 1.5-flash: more quota available vs 2.0-flash
         contents,
         config: {
           systemInstruction,
@@ -75,7 +78,7 @@ async function tryGroqText(
         max_tokens: 800,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.log("[analyze-file] Groq error:", res.status, await res.text()); return null; }
     const data: any = await res.json();
     return data?.choices?.[0]?.message?.content?.trim() || null;
   } catch {
