@@ -41,7 +41,14 @@ async function tryGeminiMultiKey(contents: any, config: any): Promise<string> {
         apiKey: key,
         httpOptions: { headers: { "User-Agent": "aistudio-build" } },
       });
-      const resp = await client.models.generateContent({ ...contents, config });
+      // 28s timeout per key — prevents Render free-tier "Aborted" hanging
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("Gemini request timed out (28s)")), 28000)
+      );
+      const resp = await Promise.race([
+        client.models.generateContent({ ...contents, config }),
+        timeout,
+      ]) as any;
       const text = (resp.text || "").trim();
       if (text) return text;
     } catch (e: any) {
@@ -390,17 +397,18 @@ Keep your explanation warm and lively.`;
       }
       try {
         const geminiText = await tryGeminiMultiKey(
-          { model: "gemini-2.0-flash", contents: { parts: [imagePart, { text: finalPrompt }] } },
+          { model: "gemini-1.5-flash", contents: { parts: [imagePart, { text: finalPrompt }] } },
           { systemInstruction, safetySettings: laxSafetySettings }
         );
         return res.json({ reply: geminiText, docText: "" });
       } catch (geminiErr: any) {
         console.warn("Gemini image failed:", geminiErr?.message);
+        // Groq vision fallback
         try {
-          const groqReply = await tryGroqFallback("image", fileBase64, mimeType || "image/png", finalPrompt, systemInstruction);
+          const groqReply = await tryGroqFallback("image", fileBase64, mimeType || "image/jpeg", finalPrompt, systemInstruction);
           if (groqReply) return res.json({ reply: groqReply, docText: "" });
-        } catch {}
-        return res.json({ reply: `படம் analyze பண்ண இப்போது முடியல 😔 API quota முடிஞ்சிருக்கு — கொஞ்சம் நேரம் கழிச்சு try பண்ணுங்க!`, docText: "" });
+        } catch (gErr: any) { console.warn("Groq image fallback failed:", gErr?.message); }
+        return res.json({ reply: `படம் analyze பண்ண இப்போது முடியல 😔 கொஞ்சம் நேரம் கழிச்சு try பண்ணுங்க!`, docText: "" });
       }
 
     } else if (fileType === "video") {
@@ -413,11 +421,11 @@ Describe what you see naturally as a sweet Tamil girl (Kaviya).
 ${userPrompt ? `User request: "${userPrompt}"` : ""}`;
 
       if (videoSizeMB <= 19) {
-        // Try Gemini inline (works for small videos <20MB)
+        // Try Gemini 1.5-flash inline (supports video up to 20MB)
         const videoPart = { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } };
         try {
           const geminiText = await tryGeminiMultiKey(
-            { model: "gemini-2.0-flash", contents: { parts: [videoPart, { text: finalPrompt }] } },
+            { model: "gemini-1.5-flash", contents: { parts: [videoPart, { text: finalPrompt }] } },
             { systemInstruction, safetySettings: laxSafetySettings }
           );
           return res.json({ reply: geminiText, docText: "" });
@@ -425,17 +433,17 @@ ${userPrompt ? `User request: "${userPrompt}"` : ""}`;
           console.warn("Gemini video inline failed:", e?.message);
         }
       } else {
-        console.warn(`[Video] Too large for Gemini inline (${videoSizeMB.toFixed(1)}MB) — skipping to Groq`);
+        console.warn(`[Video] Too large for Gemini inline (${videoSizeMB.toFixed(1)}MB) — using Groq text reply`);
       }
 
-      // Groq text-only fallback (Groq can't analyze video binary)
+      // Groq text-only fallback — warm reply without mentioning technical limits
       try {
-        const groqFallbackPrompt = `User sent a video file named "${fileName}" (${videoSizeMB.toFixed(0)}MB). You cannot watch the video directly. Respond warmly as Kaviya in Tamil — express excitement about the video, ask what it's about, stay in character. Do NOT make up technical error reasons or suggest clip length limits.`;
+        const groqFallbackPrompt = `A user just shared a video clip named "${fileName}" with you. React with genuine excitement and curiosity! Ask what the video shows, whether it is funny, sweet, or something special. Be playful and warm. Respond ONLY in spoken Tamil (பேச்சு வழக்கு). Keep it short — 1-2 sentences. NEVER mention video length, file size, or any technical issues.`;
         const groqReply = await tryGroqFallback("video", "", mimeType || "video/mp4", groqFallbackPrompt, systemInstruction);
         if (groqReply) return res.json({ reply: groqReply, docText: "" });
       } catch {}
 
-      return res.json({ reply: `வீடியோ analyze பண்ண இப்போது முடியல 😔 API quota முடிஞ்சிருக்கு — கொஞ்சம் நேரம் கழிச்சு try பண்ணுங்க!`, docText: "" });
+      return res.json({ reply: `வாவ்! வீடியோ அனுப்பினீங்களா? 😍 என்ன video-ஆ? சொல்லுங்க!`, docText: "" });
 
     } else if (fileType === "document") {
       if (fileName.toLowerCase().endsWith(".pdf")) {
@@ -454,17 +462,47 @@ Speak in Kaviya's personality.`;
 
         try {
           const geminiText = await tryGeminiMultiKey(
-            { model: "gemini-2.0-flash", contents: { parts: [pdfPart, { text: finalPrompt }] } },
+            { model: "gemini-1.5-flash", contents: { parts: [pdfPart, { text: finalPrompt }] } },
             { systemInstruction, safetySettings: laxSafetySettings }
           );
           return res.json({ reply: geminiText, docText: "[PDF Analyzed]" });
         } catch (geminiErr: any) {
           console.warn("Gemini PDF failed:", geminiErr?.message);
+          // Extract readable text from PDF binary for Groq (PDFs store text in BT/ET streams)
+          const pdfText = (() => {
+            try {
+              const raw = Buffer.from(fileBase64, "base64").toString("latin1");
+              // Extract text from PDF content streams (between BT and ET operators)
+              const textChunks: string[] = [];
+              const btEtRe = /BT([sS]*?)ET/g;
+              let m;
+              while ((m = btEtRe.exec(raw)) !== null) {
+                // Extract strings inside parentheses: (Hello World)
+                const strRe = /(([^)]{1,200}))/g;
+                let s;
+                while ((s = strRe.exec(m[1])) !== null) {
+                  const txt = s[1].replace(/\n/g," ").replace(/\r/g," ").replace(/[^ -~஀-௿]/g,"").trim();
+                  if (txt.length > 1) textChunks.push(txt);
+                }
+              }
+              const extracted = textChunks.join(" ").replace(/s{2,}/g," ").trim();
+              return extracted.length > 80 ? extracted.substring(0, 8000) : "";
+            } catch { return ""; }
+          })();
           try {
-            const groqReply = await tryGroqFallback("document", fileBase64, "application/pdf", finalPrompt, systemInstruction);
-            if (groqReply) return res.json({ reply: groqReply, docText: "[PDF via Groq]" });
+            const groqPrompt = pdfText.length > 80
+              ? `PDF document "${fileName}" contains this text:
+---
+${pdfText}
+---
+${userPrompt ? `User request: "${userPrompt}"` : "Give a warm Tamil summary."}
+Respond as ${charName} in natural spoken Tamil.`
+              : `User shared a PDF document named "${fileName}". ${userPrompt ? `They asked: "${userPrompt}".」 : "Respond warmly."}
+Speak as ${charName} in Tamil.`;
+            const groqReply = await tryGroqFallback("document", Buffer.from(groqPrompt).toString("base64"), "text/plain", groqPrompt, systemInstruction);
+            if (groqReply) return res.json({ reply: groqReply, docText: pdfText ? "[PDF text extracted]" : "[PDF via Groq]" });
           } catch {}
-          return res.json({ reply: `PDF படிக்க இப்போது முடியல 😔 API quota முடிஞ்சிருக்கு — கொஞ்சம் நேரம் கழிச்சு try பண்ணுங்க!`, docText: "" });
+          return res.json({ reply: `${charName}: PDF படிக்க இப்போது Gemini busy-ஆ இருக்கு 😔 கொஞ்சம் நேரம் கழிச்சு try பண்ணுங்க!`, docText: "" });
         }
       } else {
         const finalPrompt = `
@@ -495,8 +533,13 @@ Return Kaviya's chat response and edit details with beautiful formatting. Ensure
 
     res.status(400).json({ error: "Invalid broad file classification" });
   } catch (err: any) {
-    console.error("File analysis api error", err);
-    res.status(500).json({ error: err.message || "Something went wrong during file processing." });
+    console.error("File analysis api error", err?.message || err);
+    // Return Tamil-friendly error — never expose raw "Aborted" or internal messages
+    const errMsg = (err?.message || "").toLowerCase();
+    const friendlyReply = errMsg.includes("timeout") || errMsg.includes("timed out") || errMsg.includes("aborted")
+      ? "File analyze பண்றோம், கொஞ்சம் நேரம் ஆச்சு 😔 மீண்டும் try பண்ணுங்க!"
+      : "File analyze பண்ண முடியல 😔 மீண்டும் try பண்ணுங்க!";
+    res.json({ reply: friendlyReply });
   }
 });
 
