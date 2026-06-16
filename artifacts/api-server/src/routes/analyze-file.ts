@@ -233,6 +233,7 @@ router.post("/analyze-file", async (req, res) => {
           uploadedFileName = uploadResult.name;
           console.log(`[analyze-file] Uploaded: ${uploadedFileName}`);
 
+          if (!uploadedFileName) throw new Error("File upload returned no name");
           const activeFile = await waitForActive(ai, uploadedFileName);
           console.log(`[analyze-file] File ACTIVE: ${activeFile.uri}`);
 
