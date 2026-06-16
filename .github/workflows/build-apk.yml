@@ -100,7 +100,7 @@ jobs:
       - name: Expo Prebuild
         working-directory: artifacts/tamil-ai-chat
         env:
-          EXPO_PUBLIC_API_URL: https://my-girls-1-5.onrender.com
+          EXPO_PUBLIC_API_URL: https://my-dream-women.onrender.com
           EXPO_NO_TELEMETRY: 1
           CI: 1
         run: |
@@ -143,7 +143,7 @@ jobs:
       - name: Bundle JS with expo export:embed
         working-directory: artifacts/tamil-ai-chat
         env:
-          EXPO_PUBLIC_API_URL: https://my-girls-1-5.onrender.com
+          EXPO_PUBLIC_API_URL: https://my-dream-women.onrender.com
           EXPO_NO_TELEMETRY: 1
           NODE_ENV: production
         run: |
