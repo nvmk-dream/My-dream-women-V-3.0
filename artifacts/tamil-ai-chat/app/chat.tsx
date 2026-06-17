@@ -1083,14 +1083,30 @@ Each label: 1 sentence max.`;
         return;
       }
 
+      // For video: use Cloudinary thumbnail URL (frame at 0s, 800px wide, JPEG)
+      // so_0 = seek to 0 seconds, w_800 = resize width, f_jpg = JPEG format
+      // This converts: /video/upload/v123/vid.mp4 → /video/upload/so_0,w_800/v123/vid.jpg
+      // Analyze the thumbnail as an IMAGE — fast, no Render timeout issues!
+      let analyzeUrl = cloudUrl;
+      let analyzeFileType: string = isVideo ? 'video' : 'image';
+      let analyzeMimeType = mimeType;
+
+      if (isVideo && cloudUploadSucceeded) {
+        analyzeUrl = cloudUrl
+          .replace('/video/upload/', '/video/upload/so_0,w_800/')
+          .replace(/\.(mp4|mov|avi|mkv|webm)(\?.*)?$/, '.jpg');
+        analyzeFileType = 'image';
+        analyzeMimeType = 'image/jpeg';
+      }
+
       const { reply } = await analyzeFile({
         ...(cloudUploadSucceeded
-          ? { fileUrl: cloudUrl }          // ✅ URL only — tiny payload
-          : { fileBase64: b64 }            // image fallback only (video blocked above)
+          ? { fileUrl: analyzeUrl }         // ✅ URL only — thumbnail for video, image URL for photo
+          : { fileBase64: b64 }             // image fallback only (video blocked above)
         ),
         fileName,
-        fileType: isVideo ? 'video' : 'image',
-        mimeType,
+        fileType: analyzeFileType,
+        mimeType: analyzeMimeType,
         userPrompt: caption || undefined,
         characterName: persona.name,
         characterPrompt: persona.prompt,
