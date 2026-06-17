@@ -9,15 +9,15 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary } from '../services/api';
 
-const APP_VERSION = '1.2.0 (Build 61)';
-const LATEST_APK_URL = 'https://expo.dev/artifacts/eas/kSXWfdv4e7iY3GTwRvBCPY.apk';
+const APP_VERSION = '1.2.0';
+const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
 const API_BASE = '';
-const GITHUB_REPO = 'nnvvmm663-sketch/my-dream-girle';
+const GITHUB_REPO = 'nvmk1985-blip/My-Dream-Women';
 const WORKFLOW_FILE = 'build-apk.yml';
 const KEYS_STORAGE = 'api_keys_store';
 
 const CUSTOM_SERVER_KEY = 'custom_server_url';
-const DEFAULT_SERVER = 'https://my-girls-1-5.onrender.com';
+const DEFAULT_SERVER = 'https://my-dream-women.onrender.com';
 
 type BuildStatus = 'idle' | 'triggering' | 'queued' | 'in_progress' | 'success' | 'failure';
 
@@ -492,12 +492,14 @@ export default function SettingsScreen() {
             <Text style={s.cardTitle}>App Info</Text>
           </View>
           {[
-            ['App', 'My Girls'],
+            ['App', 'My Dream Women'],
             ['Version', APP_VERSION],
-            ['Package', 'com.smk1.tamilaichat'],
-            ['Storage', 'Cloudinary'],
+            ['Package', 'com.mydreamwomen'],
+            ['Storage', 'Cloudinary (dazmrxsyc)'],
+            ['Cloudinary Mail', 'Nvmmmnv80@gmail.com'],
             ['AI Model', 'Gemini 2.5 Flash'],
             ['Characters', '10 Tamil AI'],
+            ['Server', 'my-dream-women.onrender.com'],
           ].map(([label, val]) => (
             <View key={label} style={s.infoRow}>
               <Text style={s.infoLabel}>{label}</Text>
