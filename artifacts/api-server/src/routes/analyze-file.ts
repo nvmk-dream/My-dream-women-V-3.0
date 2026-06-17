@@ -367,77 +367,88 @@ router.post("/analyze-file", async (req, res) => {
       });
     }
 
-    // ── VIDEO — Gemini File API + waitForActive() polling ────────────────────
+    // ── VIDEO ─────────────────────────────────────────────────────────────────
     if (fileType === "video") {
       const prompt = userPrompt
         ? `User uploaded a video (${fileName}). User says: "${userPrompt}". ${characterName} respond in Tamil — describe what you see, be warm and engaging.`
         : `User shared a video. Watch it carefully and react naturally as ${characterName} in Tamil — describe what you see.`;
 
       const videoBuffer = Buffer.from(fileBase64, "base64");
-      const videoBlob = new Blob([videoBuffer], { type: mimeType || "video/mp4" });
-
+      const videoSizeMB = videoBuffer.length / 1024 / 1024;
       const videoErrors: string[] = [];
+
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      for (const key of allGeminiKeys) {
-        let uploadedFileName: string | undefined;
-        try {
-          const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 90000 } } as any);
-
-          console.log(
-            `[analyze-file] Uploading video (${(videoBuffer.length / 1024 / 1024).toFixed(1)}MB) to File API...`,
-          );
-
-          const uploadResult: any = await (ai.files as any).upload({
-            file: videoBlob,
-            config: { mimeType: mimeType || "video/mp4", displayName: fileName },
-          });
-          uploadedFileName = uploadResult.name;
-          console.log(`[analyze-file] Uploaded: ${uploadedFileName}`);
-
-          if (!uploadedFileName) throw new Error("File upload returned no name");
-          const activeFile = await waitForActive(ai, uploadedFileName);
-          console.log(`[analyze-file] File ACTIVE: ${activeFile.uri}`);
-
-          const geminiContents = [
-            {
-              role: "user",
-              parts: [
-                { fileData: { fileUri: activeFile.uri, mimeType: mimeType || "video/mp4" } },
-                { text: prompt },
-              ],
-            },
-          ];
-
-          const resp = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: geminiContents,
-            config: { systemInstruction, safetySettings: laxSafety },
-          });
-
-          const text = (resp.text || "").trim();
-
-          // Cleanup uploaded file (best-effort)
-          await (ai.files as any).delete({ name: uploadedFileName }).catch((e: any) =>
-            console.log("[analyze-file] File delete failed:", e.message),
-          );
-
-          if (text) return res.json({ reply: text });
-        } catch (e: any) {
-          const msg = e.message || String(e);
-          console.log(`[analyze-file] Video key ${key.slice(-6)} failed: ${msg}`);
-          videoErrors.push(`Key ...${key.slice(-6)}: ${msg}`);
-          if (uploadedFileName) {
-            try {
-              const cleanAi = new GoogleGenAI({ apiKey: key });
-              await (cleanAi.files as any).delete({ name: uploadedFileName }).catch(() => {});
-            } catch {}
+      // ── Step 1: Try inline data first (fast — no File API wait, beats Render 30s timeout)
+      // Works for videos under ~20MB. gemini-2.0-flash supports inline video.
+      if (videoSizeMB < 18) {
+        console.log(`[analyze-file] Trying inline video (${videoSizeMB.toFixed(1)}MB)...`);
+        for (const key of allGeminiKeys) {
+          try {
+            const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 25000 } } as any);
+            const resp = await ai.models.generateContent({
+              model: "gemini-2.0-flash",
+              contents: [{
+                role: "user",
+                parts: [
+                  { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } },
+                  { text: prompt },
+                ],
+              }],
+              config: { systemInstruction, safetySettings: laxSafety },
+            });
+            const text = (resp.text || "").trim();
+            if (text) {
+              console.log(`[analyze-file] Inline video success!`);
+              return res.json({ reply: text });
+            }
+          } catch (e: any) {
+            const msg = e.message || String(e);
+            console.log(`[analyze-file] Inline video key ${key.slice(-6)} failed: ${msg}`);
+            videoErrors.push(`Inline key ...${key.slice(-6)}: ${msg}`);
           }
-          continue;
         }
       }
 
-      // Groq text-only fallback for video
+      // ── Step 2: File API fallback (for large videos or when inline fails)
+      // Only if we still have time — skip if Render timeout is likely
+      if (videoSizeMB >= 18) {
+        const videoBlob = new Blob([videoBuffer], { type: mimeType || "video/mp4" });
+        for (const key of allGeminiKeys) {
+          let uploadedFileName: string | undefined;
+          try {
+            const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 90000 } } as any);
+            console.log(`[analyze-file] Uploading large video (${videoSizeMB.toFixed(1)}MB) to File API...`);
+            const uploadResult: any = await (ai.files as any).upload({
+              file: videoBlob,
+              config: { mimeType: mimeType || "video/mp4", displayName: fileName },
+            });
+            uploadedFileName = uploadResult.name;
+            if (!uploadedFileName) throw new Error("File upload returned no name");
+            const activeFile = await waitForActive(ai, uploadedFileName);
+            const resp = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{ role: "user", parts: [
+                { fileData: { fileUri: activeFile.uri, mimeType: mimeType || "video/mp4" } },
+                { text: prompt },
+              ]}],
+              config: { systemInstruction, safetySettings: laxSafety },
+            });
+            const text = (resp.text || "").trim();
+            await (ai.files as any).delete({ name: uploadedFileName }).catch(() => {});
+            if (text) return res.json({ reply: text });
+          } catch (e: any) {
+            const msg = e.message || String(e);
+            console.log(`[analyze-file] File API key ${key.slice(-6)} failed: ${msg}`);
+            videoErrors.push(`FileAPI key ...${key.slice(-6)}: ${msg}`);
+            if (uploadedFileName) {
+              try { const c = new GoogleGenAI({ apiKey: key }); await (c.files as any).delete({ name: uploadedFileName }).catch(() => {}); } catch {}
+            }
+          }
+        }
+      }
+
+      // ── Step 3: Groq text-only fallback
       const videoDebugBlock = buildDebugBlock(videoErrors);
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(systemInstruction, groqPrompt);
