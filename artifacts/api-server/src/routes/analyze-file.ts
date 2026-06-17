@@ -4,23 +4,66 @@ import mammoth from "mammoth";
 
 const router = Router();
 
+// Gemini key env var names we check
+const GEMINI_ENV_NAMES = [
+  "GEMINI_API_KEY",
+  "AI_INTEGRATIONS_GEMINI_API_KEY",
+  ...Array.from({ length: 12 }, (_, i) => [
+    `GEMINI_API_KEY_${i + 1}`,
+    `Gemini_key_${i + 1}`,
+    `GEMINI_KEY_${i + 1}`,
+  ]).flat(),
+];
+
+// Groq key env var names we check
+const GROQ_ENV_NAMES = ["Groq_key", "groq_key", "GROQ_KEY", "GROQ_API_KEY"];
+
 function getServerGeminiKeys(): string[] {
-  const candidates: (string | undefined)[] = [
-    process.env["GEMINI_API_KEY"],
-    process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
-  ];
-  for (let i = 1; i <= 12; i++) {
-    candidates.push(
-      process.env[`GEMINI_API_KEY_${i}`] ||
-      process.env[`Gemini_key_${i}`] ||
-      process.env[`GEMINI_KEY_${i}`]
-    );
-  }
+  const candidates = GEMINI_ENV_NAMES.map(n => process.env[n]?.trim() ?? "");
   return [...new Set(
-    candidates
-      .map(k => k?.trim() ?? "")
-      .filter(k => k.length > 10 && (k.startsWith("AIza") || k.startsWith("AQ")))
+    candidates.filter(k => k.length > 10 && (k.startsWith("AIza") || k.startsWith("AQ")))
   )];
+}
+
+// Returns human-readable issues found in Render environment vars
+function diagnoseServerKeys(): string[] {
+  const issues: string[] = [];
+
+  // ── Gemini key checks ────────────────────────────────────────────
+  const geminiEnvFound = GEMINI_ENV_NAMES.filter(n => process.env[n]?.trim());
+  if (geminiEnvFound.length === 0) {
+    issues.push("Render Env: Gemini key இல்லை (GEMINI_API_KEY set பண்ணவில்லை)");
+  } else {
+    for (const name of geminiEnvFound) {
+      const val = process.env[name]!.trim();
+      if (val.startsWith("sk-")) {
+        issues.push(`Render Env: ${name} — OpenAI key போட்டுள்ளீர்கள் (sk- prefix). Gemini key வேண்டும் (AIza...)`);
+      } else if (val.startsWith("gsk_")) {
+        issues.push(`Render Env: ${name} — Groq key போட்டுள்ளீர்கள் (gsk_ prefix). Gemini key வேண்டும் (AIza...)`);
+      } else if (val.startsWith("hf_")) {
+        issues.push(`Render Env: ${name} — HuggingFace key போட்டுள்ளீர்கள் (hf_ prefix). Gemini key வேண்டும் (AIza...)`);
+      } else if (val.startsWith("Bearer ")) {
+        issues.push(`Render Env: ${name} — "Bearer " prefix உள்ளது, அதை நீக்கவும்`);
+      } else if (!val.startsWith("AIza") && !val.startsWith("AQ")) {
+        issues.push(`Render Env: ${name} — தவறான format ("${val.slice(0, 8)}..."). Gemini key AIza அல்லது AQ-ல் தொடங்க வேண்டும்`);
+      }
+    }
+  }
+
+  // ── Groq key checks ──────────────────────────────────────────────
+  const groqEnvFound = GROQ_ENV_NAMES.filter(n => process.env[n]?.trim());
+  if (groqEnvFound.length === 0) {
+    issues.push("Render Env: Groq key இல்லை (Groq_key / GROQ_API_KEY set பண்ணவில்லை) — fallback இயங்காது");
+  } else {
+    for (const name of groqEnvFound) {
+      const val = process.env[name]!.trim();
+      if (!val.startsWith("gsk_")) {
+        issues.push(`Render Env: ${name} — தவறான format ("${val.slice(0, 8)}..."). Groq key gsk_ -ல் தொடங்க வேண்டும்`);
+      }
+    }
+  }
+
+  return issues;
 }
 
 function mergeGeminiKeys(clientKeys: string[] = []): string[] {
@@ -197,9 +240,26 @@ router.post("/analyze-file", async (req, res) => {
     const allGeminiKeys = mergeGeminiKeys(
       Array.isArray(clientGeminiKeys) ? clientGeminiKeys : [],
     );
+    const serverKeyCount = getServerGeminiKeys().length;
+    const clientKeyCount = Array.isArray(clientGeminiKeys) ? clientGeminiKeys.length : 0;
     console.log(
-      `[analyze-file] Keys: ${allGeminiKeys.length} total (${clientGeminiKeys?.length || 0} client + ${getServerGeminiKeys().length} server) for fileType=${fileType}`,
+      `[analyze-file] Keys: ${allGeminiKeys.length} total (${clientKeyCount} client + ${serverKeyCount} server) for fileType=${fileType}`,
     );
+
+    // Run environment diagnosis once — included in debug block when AI fails
+    const envIssues = diagnoseServerKeys();
+    if (envIssues.length > 0) {
+      console.warn("[analyze-file] Env issues detected:", envIssues);
+    }
+
+    // Helper: build full debug block combining API errors + env issues
+    function buildDebugBlock(apiErrors: string[]): string {
+      const lines: string[] = [];
+      if (apiErrors.length > 0) lines.push(...apiErrors.map(e => `• ${e}`));
+      if (envIssues.length > 0) lines.push(...envIssues.map(e => `• ${e}`));
+      if (lines.length === 0) return "";
+      return `\n\n⚠️ Debug Info:\n${lines.join("\n")}`;
+    }
 
     const systemInstruction = buildSystemPrompt(characterName, characterPrompt);
 
@@ -223,9 +283,7 @@ router.post("/analyze-file", async (req, res) => {
 
       const groqPrompt = `User shared a photo (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't see the image directly. React sweetly in Tamil — ask what's in the photo, compliment them for sharing, stay in character.`;
       const groqReply = await tryGroqText(systemInstruction, groqPrompt);
-      const debugBlock = imgErrors.length > 0
-        ? `\n\n⚠️ Gemini Debug:\n${imgErrors.map(e => `• ${e}`).join("\n")}`
-        : "";
+      const debugBlock = buildDebugBlock(imgErrors);
       if (groqReply) return res.json({ reply: groqReply + debugBlock });
 
       return res.json({
@@ -304,9 +362,7 @@ router.post("/analyze-file", async (req, res) => {
       }
 
       // Groq text-only fallback
-      const videoDebugBlock = videoErrors.length > 0
-        ? `\n\n⚠️ Gemini Debug:\n${videoErrors.map(e => `• ${e}`).join("\n")}`
-        : "";
+      const videoDebugBlock = buildDebugBlock(videoErrors);
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(systemInstruction, groqPrompt);
       if (groqReply) return res.json({ reply: groqReply + videoDebugBlock });
@@ -340,7 +396,7 @@ router.post("/analyze-file", async (req, res) => {
         const { text: geminiReply, errors: pdfErrors } = await tryGeminiKeys(geminiContents, systemInstruction, allGeminiKeys);
         if (geminiReply) return res.json({ reply: geminiReply });
 
-        const pdfDebugBlock = pdfErrors.length > 0 ? `\n\n⚠️ Gemini Debug:\n${pdfErrors.map(e => `• ${e}`).join("\n")}` : "";
+        const pdfDebugBlock = buildDebugBlock(pdfErrors);
         const pdfText = (() => {
           try {
             return Buffer.from(fileBase64, "base64")
@@ -379,7 +435,7 @@ router.post("/analyze-file", async (req, res) => {
           systemInstruction,
           allGeminiKeys,
         );
-        const docxDebugBlock = docxErrors.length > 0 ? `\n\n⚠️ Gemini Debug:\n${docxErrors.map(e => `• ${e}`).join("\n")}` : "";
+        const docxDebugBlock = buildDebugBlock(docxErrors);
         if (geminiReply) return res.json({ reply: geminiReply, docText });
 
         const groqReply = await tryGroqText(systemInstruction, docPrompt);
@@ -414,7 +470,7 @@ router.post("/analyze-file", async (req, res) => {
         systemInstruction,
         allGeminiKeys,
       );
-      const txtDebugBlock = txtErrors.length > 0 ? `\n\n⚠️ Gemini Debug:\n${txtErrors.map(e => `• ${e}`).join("\n")}` : "";
+      const txtDebugBlock = buildDebugBlock(txtErrors);
       if (txtGeminiReply) return res.json({ reply: txtGeminiReply, docText });
 
       const txtGroqReply = await tryGroqText(systemInstruction, docPrompt);
