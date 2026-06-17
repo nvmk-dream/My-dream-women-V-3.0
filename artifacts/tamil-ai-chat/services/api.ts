@@ -315,9 +315,8 @@ export async function generateImage(params: {
 const CLOUDINARY_CLOUD = 'dazmrxsyc';
 const CLOUDINARY_PRESET = 'my_girls_upload';
 
-// URI-based upload — uses expo-file-system/legacy uploadAsync which natively
-// handles file://, content://, ph:// URIs on Android/HMOS via ContentResolver.
-// Falls back to RN FormData blob if legacy upload fails (covers iOS/web).
+// URI-based upload — uses expo-file-system uploadAsync directly (no /legacy).
+// Handles file://, content://, ph:// URIs on Android/iOS via ContentResolver.
 export async function uploadUriToCloudinary(
   uri: string,
   mimeType: string = 'image/jpeg',
@@ -328,44 +327,21 @@ export async function uploadUriToCloudinary(
     ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`
     : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
 
-  // Primary path — legacy FileSystem.uploadAsync (best for content:// on HMOS)
-  try {
-    const Legacy = await import('expo-file-system/legacy');
-    const res = await Legacy.uploadAsync(endpoint, uri, {
-      httpMethod: 'POST',
-      uploadType: Legacy.FileSystemUploadType.MULTIPART,
-      fieldName: 'file',
-      mimeType,
-      parameters: { upload_preset: CLOUDINARY_PRESET, folder },
-    });
-    if (res.status < 200 || res.status >= 300) {
-      let msg = `Upload failed: HTTP ${res.status}`;
-      try { msg = (JSON.parse(res.body) as any)?.error?.message || msg; } catch {}
-      throw new Error(msg);
-    }
-    const data = JSON.parse(res.body) as any;
-    return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
-  } catch (legacyErr: any) {
-    // Fallback — RN FormData blob (works for file:// URIs)
-    const ext = isVideo ? 'mp4' : 'jpg';
-    const form = new FormData();
-    form.append('file', { uri, type: mimeType, name: `upload.${ext}` } as any);
-    form.append('upload_preset', CLOUDINARY_PRESET);
-    form.append('folder', folder);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90000);
-    try {
-      const res = await fetch(endpoint, { method: 'POST', body: form, signal: controller.signal });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as any;
-        throw new Error(err?.error?.message || legacyErr?.message || `Upload failed: ${res.status}`);
-      }
-      const data = await res.json() as any;
-      return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
-    } finally {
-      clearTimeout(timer);
-    }
+  const FileSystem = await import('expo-file-system');
+  const res = await FileSystem.uploadAsync(endpoint, uri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType,
+    parameters: { upload_preset: CLOUDINARY_PRESET, folder },
+  });
+  if (res.status < 200 || res.status >= 300) {
+    let msg = `Upload failed: HTTP ${res.status}`;
+    try { msg = (JSON.parse(res.body) as any)?.error?.message || msg; } catch {}
+    throw new Error(msg);
   }
+  const data = JSON.parse(res.body) as any;
+  return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
 }
 
 export async function uploadToCloudinary(
