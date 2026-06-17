@@ -1045,13 +1045,14 @@ Each label: 1 sentence max.`;
     try {
       // 1. Upload to Cloudinary for permanent URL
       let cloudUrl = uri; // fallback to local if upload fails
+      let cloudinaryErr: string | null = null;
       try {
         const folder = `chat_media/${persona.name.replace(/\s+/g,'_')}`;
         const result = await uploadUriToCloudinary(uri, mimeType, folder);
         cloudUrl = result.url;
       } catch (upErr: any) {
-        // Cloudinary upload failed — still proceed with local URI display
-        console.warn('[staging] Cloudinary upload failed, using local URI:', upErr?.message);
+        cloudinaryErr = upErr?.message || 'Upload failed';
+        console.warn('[staging] Cloudinary upload failed:', cloudinaryErr);
       }
 
       // 2. Add user message with cloudUrl as sentMediaUri
@@ -1068,13 +1069,24 @@ Each label: 1 sentence max.`;
       setFileLoading(true);
 
       // 3. Analyze with Gemini/Groq
-      // If Cloudinary upload succeeded → send URL only (tiny payload, no base64 travel)
-      // If Cloudinary failed → fallback to base64
       const cloudUploadSucceeded = cloudUrl.startsWith('http') && cloudUrl.includes('cloudinary');
+
+      // Video + Cloudinary failed → DO NOT send huge base64 (causes "Network request failed")
+      // Show a helpful error with fix instructions instead.
+      if (isVideo && !cloudUploadSucceeded) {
+        const errDetail = cloudinaryErr || 'Unknown error';
+        setMessages(prev => [...prev, {
+          id: (Date.now()+1).toString(), role: 'assistant',
+          content: `${persona.name}: Video Cloudinary-ல் upload ஆகல 😔\n\nகாரணம்: ${errDetail}\n\n💡 திருத்தம்:\nCloudinary Dashboard → Upload Presets → my_girls_upload → Resource type = "Auto" என்று மாற்றுங்க. பிறகு மீண்டும் try பண்ணுங்க!`,
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
       const { reply } = await analyzeFile({
         ...(cloudUploadSucceeded
-          ? { fileUrl: cloudUrl }          // ✅ URL only — 50 bytes, not MBs!
-          : { fileBase64: b64 }            // ⚠️ Fallback: base64
+          ? { fileUrl: cloudUrl }          // ✅ URL only — tiny payload
+          : { fileBase64: b64 }            // image fallback only (video blocked above)
         ),
         fileName,
         fileType: isVideo ? 'video' : 'image',
