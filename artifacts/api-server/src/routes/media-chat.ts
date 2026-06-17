@@ -41,7 +41,13 @@ function is429(err: any): boolean {
   );
 }
 
-// ── Groq vision fallback (llama-3.2-90b-vision) ──────────────────────────────
+// ── Groq vision fallback — tries multiple models in order ────────────────────
+const GROQ_VISION_MODELS = [
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "llama-3.2-90b-vision-preview",
+  "llama-3.2-11b-vision-preview",
+];
+
 async function generateWithGroq(
   b64: string,
   mimeType: string,
@@ -51,32 +57,42 @@ async function generateWithGroq(
   const key = getGroqKey();
   if (!key) throw new Error("No GROQ_KEY set");
 
-  const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
-      messages: [
-        { role: "system", content: systemInstruction },
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
-            { type: "text", text: userText },
-          ],
-        },
-      ],
-      max_tokens: 512,
-      temperature: 0.9,
-    }),
-  });
+  let lastGroqErr: Error | undefined;
+  for (const model of GROQ_VISION_MODELS) {
+    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemInstruction },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } },
+              { type: "text", text: userText },
+            ],
+          },
+        ],
+        max_tokens: 512,
+        temperature: 0.9,
+      }),
+    });
 
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Groq error ${resp.status}: ${err.slice(0, 200)}`);
+    if (resp.ok) {
+      const json: any = await resp.json();
+      return (json.choices?.[0]?.message?.content ?? "").trim() || "பதில் வரல 😅";
+    }
+
+    const errText = await resp.text();
+    // 404 = model not found → try next; other errors = fail immediately
+    if (resp.status === 404) {
+      lastGroqErr = new Error(`Groq model ${model} not found (404)`);
+      continue;
+    }
+    throw new Error(`Groq ${model} error ${resp.status}: ${errText.slice(0, 300)}`);
   }
-  const json: any = await resp.json();
-  return (json.choices?.[0]?.message?.content ?? "").trim() || "பதில் வரல 😅";
+  throw lastGroqErr ?? new Error("All Groq vision models unavailable");
 }
 
 // ── Gemini + Groq cascading generate (image only) ────────────────────────────
@@ -104,12 +120,8 @@ async function generateImageReply(
     }
   }
 
-  // All Gemini keys quota-exhausted → try Groq
-  try {
-    return await generateWithGroq(b64, mimeType, userText, systemInstruction);
-  } catch (groqErr: any) {
-    throw lastErr ?? groqErr;
-  }
+  // All Gemini keys quota-exhausted → try Groq (surface Groq error directly)
+  return await generateWithGroq(b64, mimeType, userText, systemInstruction);
 }
 
 // ── Lax safety settings ──────────────────────────────────────────────────────
