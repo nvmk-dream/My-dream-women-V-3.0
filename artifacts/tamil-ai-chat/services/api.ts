@@ -315,8 +315,9 @@ export async function generateImage(params: {
 const CLOUDINARY_CLOUD = 'dazmrxsyc';
 const CLOUDINARY_PRESET = 'my_girls_upload';
 
-// URI-based upload — uses expo-file-system uploadAsync directly (no /legacy).
-// Handles file://, content://, ph:// URIs on Android/iOS via ContentResolver.
+// URI-based upload — expo-file-system/legacy uploadAsync (required for v19+).
+// Handles content://, file://, ph:// URIs natively on Android/iOS.
+// Falls back to fetch FormData for edge cases.
 export async function uploadUriToCloudinary(
   uri: string,
   mimeType: string = 'image/jpeg',
@@ -326,22 +327,45 @@ export async function uploadUriToCloudinary(
   const endpoint = isVideo
     ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`
     : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
+  const ext = isVideo ? 'mp4' : 'jpg';
 
-  const FileSystem = await import('expo-file-system');
-  const res = await FileSystem.uploadAsync(endpoint, uri, {
-    httpMethod: 'POST',
-    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-    fieldName: 'file',
-    mimeType,
-    parameters: { upload_preset: CLOUDINARY_PRESET, folder },
-  });
-  if (res.status < 200 || res.status >= 300) {
-    let msg = `Upload failed: HTTP ${res.status}`;
-    try { msg = (JSON.parse(res.body) as any)?.error?.message || msg; } catch {}
-    throw new Error(msg);
+  // Primary: legacy uploadAsync — best for content:// URIs on Android
+  try {
+    const Legacy = await import('expo-file-system/legacy');
+    const res = await Legacy.uploadAsync(endpoint, uri, {
+      httpMethod: 'POST',
+      uploadType: Legacy.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType,
+      parameters: { upload_preset: CLOUDINARY_PRESET, folder },
+    });
+    if (res.status < 200 || res.status >= 300) {
+      let msg = `Upload failed: HTTP ${res.status}`;
+      try { msg = (JSON.parse(res.body) as any)?.error?.message || msg; } catch {}
+      throw new Error(msg);
+    }
+    const data = JSON.parse(res.body) as any;
+    return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
+  } catch (legacyErr: any) {
+    // Fallback: fetch FormData (works for file:// URIs and iOS)
+    const form = new FormData();
+    form.append('file', { uri, type: mimeType, name: `upload.${ext}` } as any);
+    form.append('upload_preset', CLOUDINARY_PRESET);
+    form.append('folder', folder);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    try {
+      const res = await fetch(endpoint, { method: 'POST', body: form, signal: controller.signal });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as any;
+        throw new Error(err?.error?.message || legacyErr?.message || `Upload failed: ${res.status}`);
+      }
+      const data = await res.json() as any;
+      return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  const data = JSON.parse(res.body) as any;
-  return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
 }
 
 export async function uploadToCloudinary(
