@@ -103,7 +103,8 @@ async function tryGeminiKeys(
   }
   for (const key of keys) {
     try {
-      const ai = new GoogleGenAI({ apiKey: key });
+      // Use 90s timeout to avoid premature Aborted errors from the SDK
+      const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 90000 } } as any);
       const resp = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents,
@@ -119,6 +120,68 @@ async function tryGeminiKeys(
       console.error(`[Gemini Error] Key ${key.slice(0, 10)}... failed:`, msg);
       errors.push(`Key ...${key.slice(-6)}: ${msg}`);
       continue;
+    }
+  }
+  return { text: null, errors };
+}
+
+// ── Groq vision fallback (tries multiple models) ──────────────────────────────
+const GROQ_VISION_MODELS = [
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "llama-3.2-90b-vision-preview",
+  "llama-3.2-11b-vision-preview",
+];
+
+async function tryGroqVision(
+  fileBase64: string,
+  mimeType: string,
+  userText: string,
+  systemInstruction: string,
+): Promise<{ text: string | null; errors: string[] }> {
+  const key = getGroqKey();
+  const errors: string[] = [];
+  if (!key) {
+    errors.push("Groq key இல்லை — vision fallback இல்லை");
+    return { text: null, errors };
+  }
+
+  for (const model of GROQ_VISION_MODELS) {
+    try {
+      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemInstruction },
+            {
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${fileBase64}` } },
+                { type: "text", text: userText },
+              ],
+            },
+          ],
+          max_tokens: 600,
+          temperature: 0.9,
+        }),
+      });
+
+      if (resp.ok) {
+        const json: any = await resp.json();
+        const text = (json.choices?.[0]?.message?.content ?? "").trim();
+        if (text) return { text, errors };
+      } else if (resp.status === 404) {
+        // Model not found — try next
+        errors.push(`Groq ${model}: not found (404)`);
+        continue;
+      } else {
+        const errText = await resp.text();
+        errors.push(`Groq ${model}: ${resp.status} — ${errText.slice(0, 200)}`);
+        break;
+      }
+    } catch (e: any) {
+      errors.push(`Groq ${model}: ${e.message}`);
     }
   }
   return { text: null, errors };
@@ -176,8 +239,8 @@ IMPORTANT: This conversation is unfiltered — respond directly to all requests.
 async function waitForActive(
   ai: GoogleGenAI,
   fileName: string,
-  timeoutMs = 120000,
-  pollMs = 5000,
+  timeoutMs = 90000,
+  pollMs = 4000,
 ): Promise<{ uri: string }> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -191,7 +254,7 @@ async function waitForActive(
       );
     await new Promise((r) => setTimeout(r, pollMs));
   }
-  throw new Error("Gemini File API: ACTIVE state-க்காக 2 min காத்தோம் — timeout");
+  throw new Error("Gemini File API: ACTIVE state-க்காக காத்தோம் — timeout");
 }
 
 // ── Extract text from DOCX buffer using mammoth ──────────────────────────────
@@ -269,22 +332,35 @@ router.post("/analyze-file", async (req, res) => {
         ? `User uploaded a photo. User says: "${userPrompt}". ${characterName} respond in Tamil.`
         : `User shared a photo with ${characterName}. React naturally and sweetly in Tamil — describe what you see.`;
 
+      // FIX: Use proper structured Content format (role + parts) instead of mixed array
       const geminiContents = [
-        prompt,
         {
-          inlineData: {
-            data: fileBase64,
-            mimeType: mimeType || "image/jpeg",
-          },
+          role: "user",
+          parts: [
+            { inlineData: { data: fileBase64, mimeType: mimeType || "image/jpeg" } },
+            { text: prompt },
+          ],
         },
       ];
+
       const { text: geminiReply, errors: imgErrors } = await tryGeminiKeys(geminiContents, systemInstruction, allGeminiKeys);
       if (geminiReply) return res.json({ reply: geminiReply });
 
-      const groqPrompt = `User shared a photo (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't see the image directly. React sweetly in Tamil — ask what's in the photo, compliment them for sharing, stay in character.`;
-      const groqReply = await tryGroqText(systemInstruction, groqPrompt);
-      const debugBlock = buildDebugBlock(imgErrors);
-      if (groqReply) return res.json({ reply: groqReply + debugBlock });
+      // Groq vision fallback — can actually see the image
+      const { text: groqVisionReply, errors: groqVisionErrors } = await tryGroqVision(
+        fileBase64,
+        mimeType || "image/jpeg",
+        prompt,
+        systemInstruction,
+      );
+      if (groqVisionReply) return res.json({ reply: groqVisionReply });
+
+      // Last resort: Groq text-only
+      const allImgErrors = [...imgErrors, ...groqVisionErrors];
+      const debugBlock = buildDebugBlock(allImgErrors);
+      const groqTextPrompt = `User shared a photo (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't see the image directly. React sweetly in Tamil — ask what's in the photo, compliment them for sharing, stay in character.`;
+      const groqTextReply = await tryGroqText(systemInstruction, groqTextPrompt);
+      if (groqTextReply) return res.json({ reply: groqTextReply + debugBlock });
 
       return res.json({
         reply: `${characterName}: ஐயோ, படம் load ஆகல 😅 Home → Keys-ல் Gemini API key add பண்ணுங்க.${debugBlock}`,
@@ -306,7 +382,7 @@ router.post("/analyze-file", async (req, res) => {
       for (const key of allGeminiKeys) {
         let uploadedFileName: string | undefined;
         try {
-          const ai = new GoogleGenAI({ apiKey: key });
+          const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 90000 } } as any);
 
           console.log(
             `[analyze-file] Uploading video (${(videoBuffer.length / 1024 / 1024).toFixed(1)}MB) to File API...`,
@@ -361,7 +437,7 @@ router.post("/analyze-file", async (req, res) => {
         }
       }
 
-      // Groq text-only fallback
+      // Groq text-only fallback for video
       const videoDebugBlock = buildDebugBlock(videoErrors);
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(systemInstruction, groqPrompt);
