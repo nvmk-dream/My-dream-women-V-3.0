@@ -158,7 +158,7 @@ async function extractDocxText(buffer: Buffer): Promise<string> {
 router.post("/analyze-file", async (req, res) => {
   try {
     const {
-      fileBase64,
+      fileUrl,
       fileName = "file",
       fileType,
       mimeType,
@@ -167,9 +167,22 @@ router.post("/analyze-file", async (req, res) => {
       characterPrompt = "",
       clientGeminiKeys = [],
     } = req.body;
+    let { fileBase64 } = req.body;
 
-    if (!fileBase64) {
-      return res.status(400).json({ error: "fileBase64 is required" });
+    if (!fileBase64 && !fileUrl) {
+      return res.status(400).json({ error: "fileBase64 or fileUrl is required" });
+    }
+
+    // If URL provided instead of base64 — fetch from Cloudinary (server-to-server, fast)
+    if (!fileBase64 && fileUrl) {
+      try {
+        const resp = await fetch(fileUrl as string);
+        if (!resp.ok) throw new Error(`URL fetch failed: ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        fileBase64 = Buffer.from(buf).toString("base64");
+      } catch (fetchErr: any) {
+        return res.status(400).json({ error: `Could not fetch file from URL: ${fetchErr?.message}` });
+      }
     }
 
     // Merge client keys (user's Gemini quota) + server keys
