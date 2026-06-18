@@ -301,6 +301,7 @@ router.post("/analyze-file", async (req, res) => {
       userPrompt = "",
       characterName = "Kaviya",
       characterPrompt = "",
+      imageVideoSystemPrompt = "",
       clientGeminiKeys = [],
     } = req.body;
     let { fileBase64 } = req.body;
@@ -347,6 +348,11 @@ router.post("/analyze-file", async (req, res) => {
     }
 
     const systemInstruction = buildSystemPrompt(characterName, characterPrompt);
+    // Use user-defined image/video prompt if provided; otherwise use default system instruction
+    const mediaSystemInstruction = imageVideoSystemPrompt.trim()
+      ? buildSystemPrompt(characterName, imageVideoSystemPrompt.trim())
+      : systemInstruction;
+    console.log(`[analyze-file] imageVideoSystemPrompt set: ${imageVideoSystemPrompt.trim().length > 0}`);
 
     // ── IMAGE ────────────────────────────────────────────────────────────────
     if (fileType === "image") {
@@ -366,7 +372,7 @@ router.post("/analyze-file", async (req, res) => {
         },
       ];
 
-      const { text: geminiReply, errors: imgErrors } = await tryGeminiKeys(geminiContents, systemInstruction, allGeminiKeys, "image");
+      const { text: geminiReply, errors: imgErrors } = await tryGeminiKeys(geminiContents, mediaSystemInstruction, allGeminiKeys, "image");
       if (geminiReply) return res.json({ reply: geminiReply });
 
       // Groq vision fallback — can actually see the image
@@ -374,7 +380,7 @@ router.post("/analyze-file", async (req, res) => {
         fileBase64,
         mimeType || "image/jpeg",
         prompt,
-        systemInstruction,
+        mediaSystemInstruction,
       );
       if (groqVisionReply) return res.json({ reply: groqVisionReply });
 
@@ -382,7 +388,7 @@ router.post("/analyze-file", async (req, res) => {
       const allImgErrors = [...imgErrors, ...groqVisionErrors];
       const debugBlock = buildDebugBlock(allImgErrors);
       const groqTextPrompt = `User shared a photo (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't see the image directly. React sweetly in Tamil — ask what's in the photo, compliment them for sharing, stay in character.`;
-      const groqTextReply = await tryGroqText(systemInstruction, groqTextPrompt);
+      const groqTextReply = await tryGroqText(mediaSystemInstruction, groqTextPrompt);
       if (groqTextReply) return res.json({ reply: groqTextReply + debugBlock });
 
       return res.json({
@@ -423,7 +429,7 @@ router.post("/analyze-file", async (req, res) => {
                     { text: prompt },
                   ],
                 }],
-                config: { systemInstruction, safetySettings: laxSafety },
+                config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
               });
               const text = (resp.text || "").trim();
               if (text) {
@@ -463,7 +469,7 @@ router.post("/analyze-file", async (req, res) => {
                 { fileData: { fileUri: activeFile.uri, mimeType: mimeType || "video/mp4" } },
                 { text: prompt },
               ]}],
-              config: { systemInstruction, safetySettings: laxSafety },
+              config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
             });
             const text = (resp.text || "").trim();
             await (ai.files as any).delete({ name: uploadedFileName }).catch(() => {});
@@ -482,7 +488,7 @@ router.post("/analyze-file", async (req, res) => {
       // ── Step 3: Groq text-only fallback
       const videoDebugBlock = buildDebugBlock(videoErrors);
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
-      const groqReply = await tryGroqText(systemInstruction, groqPrompt);
+      const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
       if (groqReply) return res.json({ reply: groqReply + videoDebugBlock });
 
       return res.json({
@@ -530,7 +536,7 @@ router.post("/analyze-file", async (req, res) => {
           pdfText.trim().length > 50
             ? `Document content:\n---\n${pdfText}\n---\n${userPrompt ? `User request: "${userPrompt}"` : "Give a warm Tamil summary of this document."}\nRespond as ${characterName} in Tamil.`
             : `User shared a PDF (${fileName}). ${userPrompt ? `They request: "${userPrompt}".` : "Respond warmly in Tamil."}`;
-        const groqReply = await tryGroqText(systemInstruction, groqPrompt);
+        const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
         if (groqReply) return res.json({ reply: groqReply + pdfDebugBlock });
 
         return res.json({
