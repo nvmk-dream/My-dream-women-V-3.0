@@ -25,13 +25,13 @@ interface ApiKeyEntry {
   status: KeyStatus;
 }
 
+const DEFAULT_SERVER = 'https://my-dream-women.onrender.com';
+
 const DEFAULT_KEYS: Omit<ApiKeyEntry, 'value' | 'expanded' | 'status'>[] = [
-  { id: 'expo',       label: 'Expo Token',   site: 'expo.dev',          enabled: false },
   { id: 'github',     label: 'GitHub Token', site: 'github.com',        enabled: false },
   { id: 'cloudinary', label: 'Cloudinary',   site: 'cloudinary.com',    enabled: false },
   { id: 'hf',         label: 'HuggingFace',  site: 'huggingface.co',    enabled: false },
-  { id: 'openrouter',  label: 'OpenRouter API', site: 'openrouter.ai',     enabled: false },
-  { id: 'fal',         label: 'FAL AI',          site: 'fal.ai',            enabled: false },
+  { id: 'openrouter',  label: 'OpenRouter API', site: 'openrouter.ai',   enabled: false },
   { id: 'img_prompt_gemini', label: '📸 Image to Prompt', site: 'aistudio.google.com', enabled: false },
 ];
 
@@ -143,8 +143,8 @@ export default function KeysScreen() {
 
   useEffect(() => {
     loadKeys().then(({ parsed, enabled }) => {
-      // Auto-check any key that has a value
       autoCheckAll(parsed, enabled);
+      loadServerDefaults(true); // Server defaults-ஐ silent-ஆக auto-fill
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -377,14 +377,58 @@ export default function KeysScreen() {
     setSyncing(true);
     await new Promise(r => setTimeout(r, 1500));
     setSyncing(false);
-    Alert.alert('Cloud Save', 'Keys encrypted cloud-ல் save ✅');
+    Alert.alert('Cloud Save', 'Keys cloud-ல் save ✅');
+  };
+
+  // Server-ல் இருக்கும் defaults-ஐ auto-fill பண்றோம்
+  const loadServerDefaults = async (silent = false) => {
+    try {
+      const res = await fetch(`${DEFAULT_SERVER}/api/app-config`);
+      if (!res.ok) { if (!silent) Alert.alert('Error', 'Server எட்டவில்லை'); return; }
+      const cfg = await res.json() as {
+        githubToken?: string | null; hfToken?: string | null;
+        openrouterKey?: string | null;
+        cloudinary?: { cloudName?: string | null };
+        geminiKeys?: string[];
+      };
+      const savedRaw = await AsyncStorage.getItem(KEYS_STORAGE);
+      const savedEn = await AsyncStorage.getItem(KEYS_ENABLED_STORAGE);
+      const parsed: Record<string, string> = savedRaw ? JSON.parse(savedRaw) : {};
+      const enabledMap: Record<string, boolean> = savedEn ? JSON.parse(savedEn) : {};
+      let filled = 0;
+
+      // Gemini 13 slots
+      if (cfg.geminiKeys?.length) {
+        for (let i = 0; i < 13; i++) {
+          const k = cfg.geminiKeys[i] || ''; const id = `gemini_${i + 1}`;
+          if (k && !parsed[id]) { parsed[id] = k; enabledMap[id] = true; filled++; }
+        }
+      }
+      const fill = (id: string, val: string | null | undefined) => {
+        if (val && !parsed[id]) { parsed[id] = val; enabledMap[id] = true; filled++; }
+      };
+      fill('github', cfg.githubToken);
+      fill('hf', cfg.hfToken);
+      fill('openrouter', cfg.openrouterKey);
+      fill('cloudinary', cfg.cloudinary?.cloudName);
+
+      if (filled > 0) {
+        await AsyncStorage.setItem(KEYS_STORAGE, JSON.stringify(parsed));
+        await AsyncStorage.setItem(KEYS_ENABLED_STORAGE, JSON.stringify(enabledMap));
+        await loadKeys();
+        if (!silent) Alert.alert('✅ Loaded', `Server-இல் இருந்து ${filled} key(s) fill ஆனது!`);
+      } else {
+        if (!silent) Alert.alert('ℹ️ Already Set', 'எல்லா keys-உம் already உள்ளன!');
+      }
+    } catch {
+      if (!silent) Alert.alert('Error', 'Server connection fail');
+    }
   };
 
   const cloudLoad = async () => {
     setSyncing(true);
-    await new Promise(r => setTimeout(r, 1500));
+    await loadServerDefaults(false);
     setSyncing(false);
-    Alert.alert('Cloud Load', 'Cloud keys load ✅');
   };
 
   return (
