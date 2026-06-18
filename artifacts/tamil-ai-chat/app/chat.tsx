@@ -1176,7 +1176,21 @@ Each label: 1 sentence max.`;
       return;
     }
 
-    // Text-based photo detection disabled — user prefers to use camera icon list
+    // ── "அனுப்பு / anuppu / anupu" + style name → show Cloudinary photo ──────
+    // Triggers ONLY when user explicitly asks to send a photo (with the send keyword)
+    // No AI generation — Cloudinary photos only
+    const SEND_TRIGGERS = ['அனுப்பு', 'anuppu', 'anupu', 'send photo', 'photo anuppu', 'photo அனுப்பு'];
+    const hasSendTrigger = SEND_TRIGGERS.some(w => text.toLowerCase().includes(w.toLowerCase()));
+    if (hasSendTrigger) {
+      const detectedStyle = detectPhotoStyle(text, PHOTO_STYLES, selectedStyleId);
+      const styleToShow = detectedStyle ?? selectedStyleId;
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(), role: 'user', content: text, timestamp: new Date(),
+      }]);
+      setInput('');
+      setTimeout(() => handleShowGalleryInChat(styleToShow), 50);
+      return;
+    }
 
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
