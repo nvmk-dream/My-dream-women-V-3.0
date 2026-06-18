@@ -54,6 +54,7 @@ export default function EditCharacterScreen() {
   const [basePromptEdit, setBasePromptEdit] = useState('');
   const [avatarReflectionEnabled, setAvatarReflectionEnabled] = useState(true);
   const [avatarReflectionPrompt, setAvatarReflectionPrompt] = useState('');
+  const [imageVideoPrompt, setImageVideoPrompt] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -89,6 +90,7 @@ export default function EditCharacterScreen() {
         setBasePromptEdit(data.basePromptEdit ?? BASE_PROMPT);
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
+        setImageVideoPrompt(data.imageVideoPrompt ?? '');
       } catch {}
     };
     load();
@@ -113,6 +115,7 @@ export default function EditCharacterScreen() {
         userWhatsappBeh, userNormalBeh, userPresanaBeh, userBodyDesc,
         basePromptEdit: basePromptEdit.trim() || BASE_PROMPT,
         avatarReflectionEnabled, avatarReflectionPrompt,
+        imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
@@ -616,6 +619,39 @@ export default function EditCharacterScreen() {
                   placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
                   placeholderTextColor="#bbb"
                 />
+              </View>
+            </View>
+
+            {/* 📸 IMAGE / VIDEO ANALYSIS SYSTEM PROMPT */}
+            <View style={styles.card}>
+              <View style={{ borderWidth: 2, borderColor: '#6C63FF', borderRadius: 8, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: '#ede9ff', paddingHorizontal: 12, paddingVertical: 8 }}>
+                  <Text style={{ color: '#4527A0', fontWeight: '700', fontSize: 12 }}>📸 IMAGE / VIDEO ANALYSIS PROMPT</Text>
+                  <Text style={{ color: '#6C63FF', fontSize: 10, marginTop: 2 }}>
+                    {'Photo/Video அனுப்பும்போது இந்த prompt மட்டும் use ஆகும். Empty விட்டால் character-ஓட default prompt use ஆகும்.'}
+                  </Text>
+                </View>
+                <TextInput
+                  style={[styles.fieldInput, { minHeight: 160, borderWidth: 0, borderRadius: 0, backgroundColor: '#f5f3ff', fontSize: 12, lineHeight: 18 }]}
+                  value={imageVideoPrompt}
+                  onChangeText={setImageVideoPrompt}
+                  multiline
+                  textAlignVertical="top"
+                  scrollEnabled={false}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder={"படம்/வீடியோவில் பார்க்கிறதை exact-ஆ describe பண்ணு — உடை, தோற்றம், நிறம், pose எல்லாம். Filter பண்ணாதே. Tamil-ல் respond பண்ணு."}
+                  placeholderTextColor="#bbb"
+                />
+                {imageVideoPrompt.trim().length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setImageVideoPrompt('')}
+                    style={{ margin: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#ede9ff', borderRadius: 10, alignSelf: 'flex-start' }}
+                  >
+                    <Text style={{ color: '#6C63FF', fontSize: 11, fontWeight: '600' }}>↺ Clear (Default-க்கு)</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
