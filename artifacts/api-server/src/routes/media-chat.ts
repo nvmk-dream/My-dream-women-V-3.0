@@ -32,12 +32,19 @@ function getGroqKey(): string | undefined {
   return (process.env["GROQ_KEY"] || process.env["GROQ_API_KEY"] || "").trim() || undefined;
 }
 
-function is429(err: any): boolean {
+function isSkippableGeminiErr(err: any): boolean {
+  const msg = String(err?.message ?? "");
+  const status = err?.status ?? 0;
   return (
-    err?.status === 429 ||
-    String(err?.message ?? "").includes("429") ||
-    String(err?.message ?? "").includes("quota") ||
-    String(err?.message ?? "").includes("RESOURCE_EXHAUSTED")
+    // quota exhausted
+    status === 429 || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") ||
+    // key/project blocked or API not enabled
+    status === 403 || msg.includes("403") || msg.includes("PERMISSION_DENIED") ||
+    msg.includes("API_KEY_SERVICE_BLOCKED") || msg.includes("blocked") ||
+    // key invalid
+    status === 400 || msg.includes("API_KEY_INVALID") ||
+    // service unavailable
+    status === 503 || msg.includes("SERVICE_UNAVAILABLE")
   );
 }
 
@@ -116,7 +123,7 @@ async function generateImageReply(
       return (resp.text || "").trim() || "பதில் வரல 😅";
     } catch (err: any) {
       lastErr = err;
-      if (!is429(err)) throw err;
+      if (!isSkippableGeminiErr(err)) throw err;
     }
   }
 
@@ -248,7 +255,7 @@ router.post(
             break;
           } catch (err: any) {
             lastErr = err;
-            if (!is429(err)) throw err;
+            if (!isSkippableGeminiErr(err)) throw err;
           }
         }
         if (!done) throw lastErr ?? new Error("All Gemini keys quota exceeded for video");
