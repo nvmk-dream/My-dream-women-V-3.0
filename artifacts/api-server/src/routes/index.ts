@@ -10,6 +10,7 @@ import imageToPromptRouter from "./image-to-prompt";
 import generateImageRouter from "./generate-image";
 import analyzeFileRouter from "./analyze-file";
 import mediaChatRouter from "./media-chat";
+import appConfigRouter from "./app-config";
 
 const router: IRouter = Router();
 
@@ -23,6 +24,7 @@ router.use(imageToPromptRouter);
 router.use(generateImageRouter);
 router.use(analyzeFileRouter);
 router.use(mediaChatRouter);
+router.use(appConfigRouter);
 
 // Temporary backup download route
 router.get("/download/backup", (_req, res) => {
