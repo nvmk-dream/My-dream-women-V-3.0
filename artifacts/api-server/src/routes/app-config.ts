@@ -3,7 +3,6 @@ import { Router } from "express";
 const router = Router();
 
 router.get("/app-config", (_req, res) => {
-  // Gemini keys — slot 1 uses base key, slots 2-13 use GEMINI_API_KEY_2..13
   const baseGemini =
     process.env["GEMINI_API_KEY"] ||
     process.env["AI_INTEGRATIONS_GEMINI_API_KEY"] ||
@@ -13,16 +12,12 @@ router.get("/app-config", (_req, res) => {
     const slotKey = process.env[`GEMINI_API_KEY_${i}`] || "";
     geminiKeys.push(slotKey || (i === 1 ? baseGemini : ""));
   }
-  // If slot 1 still empty but base key exists, fill it
   if (!geminiKeys[0] && baseGemini) geminiKeys[0] = baseGemini;
 
   res.json({
     githubToken: process.env["GITHUB_KEY"] || null,
-    hfToken: process.env["HF_TOKEN"] || null,
-    openrouterKey:
-      process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"] ||
-      process.env["OPENROUTER_API_KEY"] ||
-      null,
+    hfToken: process.env["HUGGING_FACE_KEY"] || null,
+    openrouterKey: process.env["OPEN_ROTTER_API_KEY"] || null,
     cloudinary: {
       cloudName:
         process.env["CLOUDNARY_USER_NAME"] ||
