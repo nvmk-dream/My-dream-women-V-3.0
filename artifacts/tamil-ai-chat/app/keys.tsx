@@ -405,7 +405,7 @@ export default function KeysScreen() {
       if (cfg.geminiKeys?.length) {
         for (let i = 0; i < 13; i++) {
           const k = cfg.geminiKeys[i] || ''; const id = `gemini_${i + 1}`;
-          if (k && !parsed[id]) { parsed[id] = k; enabledMap[id] = true; filled++; }
+          if (k) { parsed[id] = k; enabledMap[id] = true; filled++; }
         }
       }
       // Server values always overwrite — Render-ல் set ஆனது தான் correct value
