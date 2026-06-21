@@ -149,6 +149,8 @@ export default function AIGirlsScreen() {
   // ── Settings state ────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [wakingServer, setWakingServer] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'unknown'|'ok'|'sleeping'>('unknown');
   const [autoMsgEnabled, setAutoMsgEnabled] = useState(false);
   const [intervals, setIntervals] = useState<Record<string, number | null>>({});
   const [autoUnreads, setAutoUnreads] = useState<Record<string, boolean>>({});
@@ -820,6 +822,31 @@ Then write these prompts:
     setIsOnline(next);
     try { await AsyncStorage.setItem('chat_is_online', String(next)); } catch {}
   };
+  const wakeRenderServer = async () => {
+    if (wakingServer) return;
+    setWakingServer(true);
+    setServerStatus('unknown');
+    try {
+      const savedUrl = await AsyncStorage.getItem('custom_server_url').catch(() => null);
+      const serverUrl = savedUrl || 'https://my-dream-women.onrender.com';
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 35000);
+      const res = await fetch(`${serverUrl}/api/healthz`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        setServerStatus('ok');
+        Alert.alert('✅ Server Online!', 'Render server ready! Messages அனுப்பலாம்.');
+      } else {
+        setServerStatus('sleeping');
+        Alert.alert('⚠️ Server பிரச்னை', 'Server respond பண்றது ஆனா error. மீண்டும் try பண்ணுங்க.');
+      }
+    } catch {
+      setServerStatus('sleeping');
+      Alert.alert('⏳ Waking up...', 'Server wake ஆகுது — 30-60s கழித்து மீண்டும் tap பண்ணுங்க.');
+    } finally {
+      setWakingServer(false);
+    }
+  };
 
   const buildPushPayload = (ivMap: Record<string, number | null>) => {
     const activeIntervals: Record<string, number> = {};
@@ -964,9 +991,24 @@ Then write these prompts:
               v{Constants.expoConfig?.version ?? '1.0'} ({process.env.EXPO_PUBLIC_BUILD_NUMBER ?? Constants.expoConfig?.android?.versionCode ?? ''})
             </Text>
           </View>
-          <View style={[s.statusPill, isOnline ? s.statusOnline : s.statusOffline]}>
+          <TouchableOpacity
+            style={[s.statusPill, isOnline ? s.statusOnline : s.statusOffline]}
+            onPress={toggleOnline}
+            activeOpacity={0.8}
+          >
             <Text style={s.statusPillTxt}>{isOnline ? '🌐 Online' : '📡 Offline'}</Text>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.wakePill, serverStatus === 'ok' && s.wakePillOk]}
+            onPress={wakeRenderServer}
+            disabled={wakingServer}
+            activeOpacity={0.7}
+          >
+            {wakingServer
+              ? <ActivityIndicator size="small" color="#fff" style={{ width: 16, height: 16 }} />
+              : <Text style={s.wakePillTxt}>{serverStatus === 'ok' ? '✅' : '🔄'}</Text>
+            }
+          </TouchableOpacity>
         </View>
         <View style={s.headerIcons}>
           <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
@@ -1673,6 +1715,9 @@ const s = StyleSheet.create({
   buildBadge: { backgroundColor: '#7C3AED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   buildBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  wakePill: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#1a3a5c', justifyContent: 'center', alignItems: 'center' },
+  wakePillOk: { backgroundColor: '#1B5E20' },
+  wakePillTxt: { fontSize: 13 },
   statusOnline: { backgroundColor: '#1B5E20' },
   statusOffline: { backgroundColor: '#B71C1C' },
   statusPillTxt: { color: '#fff', fontSize: 11, fontWeight: '600' },
