@@ -5,7 +5,7 @@ const router = Router();
 
 function cfg() {
   cloudinary.config({
-    cloud_name: process.env["CLOUDINARY_CLOUD_NAME"],
+    cloud_name: process.env["CLOUDINARY_CLOUD_NAME"] || process.env["CLOUDNARY_USER_NAME"],
     api_key:    process.env["API_KEY"] || process.env["CLOUDINARY_API_KEY"],
     api_secret: process.env["API_SECRET"] || process.env["CLOUDINARY_API_SECRET"],
   });
@@ -45,7 +45,7 @@ ensurePreset().catch(() => {/* silent */});
 router.get("/cloudinary/config", async (_req, res) => {
   await ensurePreset();
   res.json({
-    cloudName: process.env["CLOUDINARY_CLOUD_NAME"],
+    cloudName: process.env["CLOUDINARY_CLOUD_NAME"] || process.env["CLOUDNARY_USER_NAME"],
     uploadPreset: PRESET_NAME,
   });
 });
@@ -56,7 +56,6 @@ router.post("/cloudinary/upload", async (req, res) => {
       b64_json: string; mimeType?: string; folder?: string;
     };
     if (!b64_json) { res.status(400).json({ error: "b64_json is required" }); return; }
-
     await ensurePreset();
     const cl = cfg();
     const dataUri = `data:${mimeType};base64,${b64_json}`;
@@ -76,38 +75,22 @@ router.get("/cloudinary/list", async (req, res) => {
     const folder = (req.query["folder"] as string) || "my-girls";
     const cl = cfg();
     let resources: any[] = [];
-
     try {
-      const r1 = await (cl.api as any).resources_by_asset_folder(folder, {
-        max_results: 50,
-        resource_type: "image",
-      });
+      const r1 = await (cl.api as any).resources_by_asset_folder(folder, { max_results: 50, resource_type: "image" });
       if (r1?.resources?.length) resources = r1.resources;
     } catch {}
-
     if (resources.length === 0) {
       try {
-        const r2 = await cl.api.resources({
-          type: "upload",
-          resource_type: "image",
-          prefix: folder + "/",
-          max_results: 50,
-        });
+        const r2 = await cl.api.resources({ type: "upload", resource_type: "image", prefix: folder + "/", max_results: 50 });
         if (r2?.resources?.length) resources = r2.resources;
       } catch {}
     }
-
     if (resources.length === 0) {
       try {
-        const r3 = await cl.api.resources({
-          asset_folder: folder,
-          max_results: 50,
-          resource_type: "image",
-        } as any);
+        const r3 = await cl.api.resources({ asset_folder: folder, max_results: 50, resource_type: "image" } as any);
         if (r3?.resources?.length) resources = r3.resources;
       } catch {}
     }
-
     const images = resources.map((r: any) => ({
       url: r.secure_url, public_id: r.public_id,
       width: r.width, height: r.height, created_at: r.created_at,
@@ -122,19 +105,10 @@ router.get("/cloudinary/list", async (req, res) => {
 router.get("/cloudinary/debug-all", async (req, res) => {
   try {
     const cl = cfg();
-    const result = await cl.api.resources({
-      type: "upload",
-      resource_type: "image",
-      prefix: "my-girls/",
-      max_results: 50,
-    });
+    const result = await cl.api.resources({ type: "upload", resource_type: "image", prefix: "my-girls/", max_results: 50 });
     res.json({
       total: result.resources?.length,
-      paths: result.resources?.map((r: any) => ({
-        public_id: r.public_id,
-        folder: r.folder,
-        url: r.secure_url?.slice(0, 100),
-      })),
+      paths: result.resources?.map((r: any) => ({ public_id: r.public_id, folder: r.folder, url: r.secure_url?.slice(0, 100) })),
     });
   } catch (err: any) {
     res.status(500).json({ error: err?.message });
@@ -158,42 +132,28 @@ router.get("/cloudinary/videos", async (req, res) => {
     const folder = (req.query["folder"] as string) || "my-girls/videos";
     const cl = cfg();
     let resources: any[] = [];
-
     try {
-      const r1 = await (cl.api as any).resources_by_asset_folder(folder, {
-        max_results: 100, resource_type: "video",
-      });
+      const r1 = await (cl.api as any).resources_by_asset_folder(folder, { max_results: 100, resource_type: "video" });
       if (r1?.resources?.length) resources = r1.resources;
     } catch {}
-
     if (resources.length === 0) {
       try {
-        const r2 = await cl.api.resources({
-          type: "upload", resource_type: "video",
-          prefix: folder + "/", max_results: 100,
-        });
+        const r2 = await cl.api.resources({ type: "upload", resource_type: "video", prefix: folder + "/", max_results: 100 });
         if (r2?.resources?.length) resources = r2.resources;
       } catch {}
     }
-
     if (resources.length === 0) {
       try {
-        const r3 = await (cl.api as any).resources({
-          asset_folder: folder, max_results: 100, resource_type: "video",
-        });
+        const r3 = await (cl.api as any).resources({ asset_folder: folder, max_results: 100, resource_type: "video" });
         if (r3?.resources?.length) resources = r3.resources;
       } catch {}
     }
-
     if (resources.length === 0) {
       try {
         const parentParts = folder.split("/");
         const subname = parentParts.pop() || "";
         const parentFolder = parentParts.join("/") || "my-girls/videos";
-        const r4 = await cl.api.resources({
-          type: "upload", resource_type: "video",
-          prefix: parentFolder + "/", max_results: 300,
-        });
+        const r4 = await cl.api.resources({ type: "upload", resource_type: "video", prefix: parentFolder + "/", max_results: 300 });
         if (r4?.resources?.length) {
           resources = r4.resources.filter((r: any) => {
             const pid: string = r.public_id || "";
@@ -203,14 +163,9 @@ router.get("/cloudinary/videos", async (req, res) => {
         }
       } catch {}
     }
-
     const videos = resources.map((r: any) => ({
-      url: r.secure_url || r.url,
-      public_id: r.public_id,
-      format: r.format || "mp4",
-      duration: r.duration,
+      url: r.secure_url || r.url, public_id: r.public_id, format: r.format || "mp4", duration: r.duration,
     }));
-
     res.json({ videos });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Video list failed" });
