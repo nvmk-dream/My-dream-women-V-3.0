@@ -90,6 +90,8 @@ router.post("/image-to-prompt", async (req, res) => {
     const geminiKey = geminiKeyFromHeader
       || process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]
       || process.env["GEMINI_API_KEY_1"]
+      || process.env["GEMINI_API_KEY_2"]
+      || process.env["GEMINI_API_KEY_3"]
       || process.env["GEMINI_API_KEY"];
     const geminiBase = geminiKeyFromHeader ? undefined : process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
 
@@ -146,6 +148,8 @@ router.post("/image-to-prompt", async (req, res) => {
     const orKeyFromHeader = (req.headers['x-openrouter-key'] as string)?.trim();
     const orKey = orKeyFromHeader
       || process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"]
+      || process.env["OPEN_ROTTER_API_KEY"]
+      || process.env["OPEN_ROUTER_API_KEY"]
       || process.env["OPENROUTER_API_KEY"];
     const orBase = orKeyFromHeader
       ? "https://openrouter.ai/api/v1"
