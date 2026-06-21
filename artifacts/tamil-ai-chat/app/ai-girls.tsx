@@ -1006,7 +1006,7 @@ Then write these prompts:
           >
             {wakingServer
               ? <ActivityIndicator size="small" color="#fff" style={{ width: 16, height: 16 }} />
-              : <Text style={s.wakePillTxt}>{serverStatus === 'ok' ? '✅' : '🔄'}</Text>
+              : <Text style={s.wakePillTxt}>{serverStatus === 'ok' ? '✅ Server' : '🔄 Wake'}</Text>
             }
           </TouchableOpacity>
         </View>
