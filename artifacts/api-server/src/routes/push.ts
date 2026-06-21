@@ -3,8 +3,8 @@ import webpush from 'web-push';
 
 const router = Router();
 
-const VAPID_PUBLIC  = 'BLlPmW00bzDvxEV_q1aBa-pqnBX60DA2AGUbZSRg0k3Fkeu2xASDo3ycT1HWL3cyCon-t8rXKVfmpRs4YZqELjs';
-const VAPID_PRIVATE = 'NaSi3INcMRbzKHtN0608cHGe1-73A4znMkGiawJrcSQ';
+const VAPID_PUBLIC  = process.env['VAPID_PUBLIC_KEY']  || 'BLlPmW00bzDvxEV_q1aBa-pqnBX60DA2AGUbZSRg0k3Fkeu2xASDo3ycT1HWL3cyCon-t8rXKVfmpRs4YZqELjs';
+const VAPID_PRIVATE = process.env['VAPID_PRIVATE_KEY'] || 'NaSi3INcMRbzKHtN0608cHGe1-73A4znMkGiawJrcSQ';
 
 webpush.setVapidDetails('mailto:admin@mygirls.app', VAPID_PUBLIC, VAPID_PRIVATE);
 
