@@ -988,7 +988,7 @@ Then write these prompts:
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
           <View style={s.buildBadge}>
             <Text style={s.buildBadgeTxt}>
-              v{Constants.expoConfig?.version ?? '1.0'} ({process.env.EXPO_PUBLIC_BUILD_NUMBER ?? Constants.expoConfig?.android?.versionCode ?? ''})
+              v{Constants.expoConfig?.version ?? '1.0'} ({Constants.expoConfig?.android?.versionCode ?? ''})
             </Text>
           </View>
           <TouchableOpacity
@@ -1715,9 +1715,9 @@ const s = StyleSheet.create({
   buildBadge: { backgroundColor: '#7C3AED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   buildBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  wakePill: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#1a3a5c', justifyContent: 'center', alignItems: 'center' },
+  wakePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: '#1a3a5c', justifyContent: 'center', alignItems: 'center' },
   wakePillOk: { backgroundColor: '#1B5E20' },
-  wakePillTxt: { fontSize: 13 },
+  wakePillTxt: { color: '#fff', fontSize: 11, fontWeight: '600' },
   statusOnline: { backgroundColor: '#1B5E20' },
   statusOffline: { backgroundColor: '#B71C1C' },
   statusPillTxt: { color: '#fff', fontSize: 11, fontWeight: '600' },
