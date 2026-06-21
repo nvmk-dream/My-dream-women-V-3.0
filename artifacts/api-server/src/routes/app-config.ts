@@ -23,6 +23,14 @@ router.get("/app-config", (_req, res) => {
         process.env["CLOUDNARY_USER_NAME"] ||
         process.env["CLOUDINARY_CLOUD_NAME"] ||
         null,
+      apiKey:
+        process.env["API_KEY"] ||
+        process.env["CLOUDINARY_API_KEY"] ||
+        null,
+      apiSecret:
+        process.env["API_SECRET"] ||
+        process.env["CLOUDINARY_API_SECRET"] ||
+        null,
     },
     geminiKeys,
     defaultServerUrl: "https://my-dream-women.onrender.com",
@@ -30,4 +38,3 @@ router.get("/app-config", (_req, res) => {
 });
 
 export default router;
-
