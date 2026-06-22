@@ -242,7 +242,7 @@ export default function AIGirlsScreen() {
     Alert.alert(`✅`, `"${name}" character add ஆச்சு!
 
 📁 Cloudinary folders ready (main + ${ALL_PHOTO_STYLE_IDS.length} style folders): my-girls/${id}/`);
-
+  };
   // ── blob URI → base64 helper ──────────────────────────────────
   const uriToBase64 = async (uri: string): Promise<string> => {
     const resp = await fetch(uri);
