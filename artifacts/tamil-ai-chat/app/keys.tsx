@@ -326,9 +326,9 @@ export default function KeysScreen() {
         const status = await testGeminiKey(value);
         setMultimediaStatuses(prev => { const n = [...prev]; n[slotIndex] = status; return n; });
         Alert.alert(status === 'ok' ? '✅ Connected!' : '⚠️ Saved (Key Error)',
-          status === 'ok' ? `Multimedia Key ${slotIndex + 1} valid & active!` : `Key saved but test failed.`);
+          status === 'ok' ? `Gemini ${slotIndex + 1} valid & active!` : `Key saved but test failed.`);
       } else {
-        Alert.alert('✅ Cleared', `Multimedia Key ${slotIndex + 1} cleared.`);
+        Alert.alert('✅ Cleared', `Gemini ${slotIndex + 1} cleared.`);
         const newSt = [...multimediaStatuses]; newSt[slotIndex] = 'idle';
         setMultimediaStatuses(newSt);
       }
@@ -670,7 +670,7 @@ export default function KeysScreen() {
                       <Text style={s.multimediaNumTxt}>{i + 1}</Text>
                     </View>
                     <View style={s.slotInfo}>
-                      <Text style={s.slotLabel}>Multimedia Key {i + 1}</Text>
+                      <Text style={s.slotLabel}>Gemini {i + 1}</Text>
                       <Text style={s.slotValue}>
                         {val ? val.slice(0, 8) + '••••' + val.slice(-4) : 'Not set'}
                       </Text>
