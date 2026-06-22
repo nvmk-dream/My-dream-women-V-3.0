@@ -145,10 +145,15 @@ export default function EditCharacterScreen() {
     try {
       const keysRaw = await AsyncStorage.getItem('api_keys_store');
       const parsed = keysRaw ? JSON.parse(keysRaw) : {};
+      // Multimedia Gemini keys (primary) → regular Gemini (fallback)
       const geminiKeys: string[] = [];
-      for (let k = 1; k <= 10; k++) {
-        const v = (parsed[`gemini_${k}`] ?? '').trim();
+      for (let k = 1; k <= 5; k++) {
+        const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
         if (v) geminiKeys.push(v);
+      }
+      for (let k = 1; k <= 13; k++) {
+        const v = (parsed[`gemini_${k}`] ?? '').trim();
+        if (v && !geminiKeys.includes(v)) geminiKeys.push(v);
       }
       const legacyGem = (parsed['gemini'] ?? '').trim();
       if (legacyGem && !geminiKeys.includes(legacyGem)) geminiKeys.push(legacyGem);
