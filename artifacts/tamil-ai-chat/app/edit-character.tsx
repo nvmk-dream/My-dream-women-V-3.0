@@ -145,18 +145,13 @@ export default function EditCharacterScreen() {
     try {
       const keysRaw = await AsyncStorage.getItem('api_keys_store');
       const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-      // Multimedia Gemini keys (primary) → regular Gemini (fallback)
+      // Avatar field analysis: Multimedia Gemini keys ONLY (multimedia_gemini_1…5)
+      // Chat keys (gemini_1…13) reserved for chat — not used here
       const geminiKeys: string[] = [];
       for (let k = 1; k <= 5; k++) {
         const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
         if (v) geminiKeys.push(v);
       }
-      for (let k = 1; k <= 13; k++) {
-        const v = (parsed[`gemini_${k}`] ?? '').trim();
-        if (v && !geminiKeys.includes(v)) geminiKeys.push(v);
-      }
-      const legacyGem = (parsed['gemini'] ?? '').trim();
-      if (legacyGem && !geminiKeys.includes(legacyGem)) geminiKeys.push(legacyGem);
       if (geminiKeys.length === 0) return;
 
       const prompt = `Look at this photo and describe the person in three short English phrases (each under 15 words):
