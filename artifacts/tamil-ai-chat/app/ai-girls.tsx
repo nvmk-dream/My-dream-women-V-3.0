@@ -23,7 +23,7 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder } from '../services/api';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
@@ -138,6 +138,8 @@ export default function AIGirlsScreen() {
   const [newCharName, setNewCharName] = useState('');
   const [newCharRole, setNewCharRole] = useState('');
   const [newCharSub, setNewCharSub] = useState('');
+  const [newCharDesc, setNewCharDesc] = useState('');
+  const [newCharPersonality, setNewCharPersonality] = useState('');
   const [customChars, setCustomChars] = useState<Persona[]>([]);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
 
@@ -218,31 +220,63 @@ export default function AIGirlsScreen() {
     const name = newCharName.trim();
     const role = newCharRole.trim() || 'தோழி';
     const sub = newCharSub.trim() || '';
+    const desc = newCharDesc.trim();
+    const personality = newCharPersonality.trim();
     if (!name) { Alert.alert('பெயர் வேணும்', 'Character பெயர் type பண்ணுங்க'); return; }
-    const id = 'custom_' + name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now().toString(36);
+
+    // Folder name = character name (lowercase, spaces → hyphens)
+    const folderName = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+    const id = 'custom_' + folderName + '_' + Date.now().toString(36);
     const color = FOLDER_COLORS[Math.floor(Math.random() * FOLDER_COLORS.length)];
     const letter = name.charAt(0);
+
+    // Build prompt with BASE_PROMPT style
+    const charLine = [
+      `நீ "${name}"`,
+      role ? `User-ஓட ${role}` : '',
+      sub ? `(${sub})` : '',
+      desc ? `\n${desc}` : '',
+      personality ? `\n${personality}` : '',
+      `\nUser-ஐ இயல்பான தமிழ்ல, casual-ஆ, warmly பேசு.`,
+    ].filter(Boolean).join(' ');
+
     const newP: Persona = {
       id, name, emoji: '✨', avatarColor: color, avatarLetter: letter,
-      lastMsg: 'வணக்கம்!', time: 'now', prompt: `நீ ${name}. ${role}${sub ? ' · ' + sub : ''}. WhatsApp-ல தமிழ்-ல இயல்பா பேசு.`,
+      lastMsg: 'வணக்கம்!', time: 'now',
+      prompt: charLine,
       gender: 'female', profession: sub || role, relationship: role,
       greeting: `வணக்கம்! நான் ${name}.`,
     };
+
     const updated = [...customChars, newP];
     setCustomChars(updated);
     await AsyncStorage.setItem('custom_personas_v1', JSON.stringify(updated));
     setShowAddCharModal(false);
     setNewCharName(''); setNewCharRole(''); setNewCharSub('');
+    setNewCharDesc(''); setNewCharPersonality('');
     loadPersonas();
-    // Auto-create Cloudinary folders + all 15 style subfolders (fire-and-forget)
-    const ALL_PHOTO_STYLE_IDS = ['breast','buttocks','cleavage','halfbreast','highslit','legs','lingerie','lowneck','normal','nude','seductive','seminude','sleeping','wet','saree'];
-    createCloudinaryFolder(`my-girls/${id}`).catch(() => {});
-    createCloudinaryFolder(`my-girls/videos/${id}`).catch(() => {});
-    ALL_PHOTO_STYLE_IDS.forEach(styleId => createCloudinaryFolder(`my-girls/${id}/${styleId}`).catch(() => {}));
-    Alert.alert(`✅`, `"${name}" character add ஆச்சு!
 
-📁 Cloudinary folders ready (main + ${ALL_PHOTO_STYLE_IDS.length} style folders): my-girls/${id}/`);
+    // ── Auto-create Cloudinary folders (fire-and-forget) ──────────
+    // Main folder: my-girls/{name}/
+    // Video folder: my-girls/videos/{name}/
+    // Photo style subfolders: my-girls/{name}/{style}/
+    const STYLE_IDS = PHOTO_FOLDERS.map(f => f.id);
+    createCloudinaryFolder(`my-girls/${folderName}`).catch(() => {});
+    createCloudinaryFolder(`my-girls/videos/${folderName}`).catch(() => {});
+    STYLE_IDS.forEach(styleId =>
+      createCloudinaryFolder(`my-girls/${folderName}/${styleId}`).catch(() => {})
+    );
+
+    Alert.alert(
+      `✅ "${name}" add ஆச்சு!`,
+      `📁 Cloudinary folders creating:\n` +
+      `my-girls/${folderName}/\n` +
+      `└── ${STYLE_IDS.join(', ')}\n\n` +
+      `AsyncStorage-ல் save ஆச்சு!`
+    );
   };
+
   // ── blob URI → base64 helper ──────────────────────────────────
   const uriToBase64 = async (uri: string): Promise<string> => {
     const resp = await fetch(uri);
@@ -1599,28 +1633,57 @@ Then write these prompts:
       <Modal visible={showAddCharModal} transparent animationType="slide"
         onRequestClose={() => setShowAddCharModal(false)}>
         <View style={s.overlay}>
-          <View style={[s.profileSheet, { padding: 20, maxHeight: '70%' }]}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#075E54', marginBottom: 14 }}>
-              ➕ புது Character add பண்ணு
-            </Text>
-            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>பெயர் *</Text>
-            <TextInput style={s.profileInput} value={newCharName} onChangeText={setNewCharName}
-              placeholder="உதா: ரஞ்சினி" placeholderTextColor="#aaa" />
-            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6, marginTop: 8 }}>Role (relationship)</Text>
-            <TextInput style={s.profileInput} value={newCharRole} onChangeText={setNewCharRole}
-              placeholder="உதா: காதலி, தோழி, அக்கா..." placeholderTextColor="#aaa" />
-            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6, marginTop: 8 }}>Profession</Text>
-            <TextInput style={s.profileInput} value={newCharSub} onChangeText={setNewCharSub}
-              placeholder="உதா: Doctor, Teacher..." placeholderTextColor="#aaa" />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <Pressable style={s.cancelBtn} onPress={() => { setShowAddCharModal(false); setNewCharName(''); setNewCharRole(''); setNewCharSub(''); }}>
-                <Text style={s.cancelTxt}>Cancel</Text>
-              </Pressable>
-              <Pressable style={s.saveBtn} onPress={saveNewCharacter}>
-                <Text style={s.saveTxt}>Save</Text>
-              </Pressable>
+          <ScrollView style={{ width: '100%' }} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled">
+            <View style={[s.profileSheet, { padding: 20 }]}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#075E54', marginBottom: 14 }}>
+                ➕ புது Character
+              </Text>
+
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>பெயர் *</Text>
+              <TextInput style={s.profileInput} value={newCharName} onChangeText={setNewCharName}
+                placeholder="உதா: ரஞ்சினி" placeholderTextColor="#aaa" />
+
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: 10 }}>Relationship (Role)</Text>
+              <TextInput style={s.profileInput} value={newCharRole} onChangeText={setNewCharRole}
+                placeholder="உதா: காதலி, தோழி, அக்கா, மனைவி..." placeholderTextColor="#aaa" />
+
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: 10 }}>Profession</Text>
+              <TextInput style={s.profileInput} value={newCharSub} onChangeText={setNewCharSub}
+                placeholder="உதா: Doctor, Teacher, Engineer..." placeholderTextColor="#aaa" />
+
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: 10 }}>Description (வருணனை)</Text>
+              <TextInput style={[s.profileInput, { minHeight: 70 }]} value={newCharDesc}
+                onChangeText={setNewCharDesc} multiline numberOfLines={3}
+                placeholder="உதா: 28 வயது, கோவை பொண்ணு. அன்பான, caring personality..."
+                placeholderTextColor="#aaa" textAlignVertical="top" />
+
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4, marginTop: 10 }}>Personality (குணம்)</Text>
+              <TextInput style={[s.profileInput, { minHeight: 70 }]} value={newCharPersonality}
+                onChangeText={setNewCharPersonality} multiline numberOfLines={3}
+                placeholder="உதா: Normal mode-ல் shy-ஆ பேசுவா, presana mode-ல் bold-ஆ..."
+                placeholderTextColor="#aaa" textAlignVertical="top" />
+
+              <Text style={{ fontSize: 10, color: '#888', marginTop: 8, marginBottom: 12, lineHeight: 15 }}>
+                📁 Cloudinary: my-girls/{பெயர்}/ + {PHOTO_FOLDERS.length} photo style folders auto-create ஆகும்{'
+'}
+                💾 AsyncStorage-ல் save ஆகும்
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable style={s.cancelBtn} onPress={() => {
+                  setShowAddCharModal(false);
+                  setNewCharName(''); setNewCharRole(''); setNewCharSub('');
+                  setNewCharDesc(''); setNewCharPersonality('');
+                }}>
+                  <Text style={s.cancelTxt}>Cancel</Text>
+                </Pressable>
+                <Pressable style={s.saveBtn} onPress={saveNewCharacter}>
+                  <Text style={s.saveTxt}>💾 Save</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
