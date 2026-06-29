@@ -258,38 +258,61 @@ export default function AIGirlsScreen() {
     setNewCharDesc(''); setNewCharPersonality('');
     loadPersonas();
 
-    // ── Auto-create Cloudinary folders ──────────────────────────
-    // Structure: my-girls/{folderName}/ + video + 12 style sub-folders
+    // ── Auto-create Cloudinary folders (sequential / waterfall) ──
+    // Step 1: parent → Step 2: sub-folders (style + videos)
+    // Cloudinary path-based: my-girls/{name}/{style} auto-creates parent too.
     const STYLE_IDS = PHOTO_FOLDERS.map(f => f.id);
+    const charFolder   = `my-girls/${folderName}`;
+    const videosFolder = `my-girls/videos/${folderName}`;
 
     Alert.alert(
       `✅ "${name}" add ஆச்சு!`,
       `📁 Cloudinary folders creating...
-my-girls/${folderName}/
-└── ${STYLE_IDS.join(", ")}
+${charFolder}/
+└── ${STYLE_IDS.join(', ')}
 
 AsyncStorage-ல் save ஆச்சு!`
     );
 
-    // Real folder creation in background — show result to user
-    Promise.allSettled([
-      createCloudinaryFolder(`my-girls/${folderName}`),
-      createCloudinaryFolder(`my-girls/videos/${folderName}`),
-      ...STYLE_IDS.map(styleId => createCloudinaryFolder(`my-girls/${folderName}/${styleId}`)),
-    ]).then(results => {
-      const failed = results.filter(
-        r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)
-      ).length;
-      if (failed > 0) {
-        console.warn(`[Cloudinary] ${failed}/${results.length} folders failed — ${folderName}`);
-        Alert.alert(
-          '⚠️ Cloudinary folder பிரச்சனை',
-          `${failed}/${results.length} folders create ஆகல.\n\nCloudinary credentials Render-ல் set ஆகியுள்ளதா confirm பண்ணுங்க:\n• CLOUDINARY_CLOUD_NAME\n• API_KEY\n• API_SECRET`
+    // Waterfall: parent first → on success, create all sub-folders
+    (async () => {
+      try {
+        // Step 1 — parent character folder
+        const parentOk = await createCloudinaryFolder(charFolder);
+        if (!parentOk) {
+          Alert.alert(
+            '⚠️ Cloudinary folder பிரச்சனை',
+            `"${folderName}" parent folder create ஆகல.\n\nRender env vars confirm பண்ணுங்க:\n• CLOUDINARY_CLOUD_NAME\n• API_KEY\n• API_SECRET`
+          );
+          return;
+        }
+        console.log(`[Cloudinary] ✅ Parent folder: ${charFolder}`);
+
+        // Step 2 — sub-folders in parallel (style list + videos)
+        const subFolders = [
+          videosFolder,
+          ...STYLE_IDS.map(styleId => `${charFolder}/${styleId}`),
+        ];
+        const results = await Promise.allSettled(
+          subFolders.map(f => createCloudinaryFolder(f))
         );
-      } else {
-        console.log(`[Cloudinary] ✅ All ${results.length} folders created: my-girls/${folderName}/`);
+        const failed = results.filter(
+          r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value)
+        ).length;
+
+        if (failed > 0) {
+          console.warn(`[Cloudinary] ${failed}/${results.length} sub-folders failed — ${folderName}`);
+          Alert.alert(
+            '⚠️ Sub-folder பிரச்சனை',
+            `${failed}/${subFolders.length} photo style folders create ஆகல.\nமீண்டும் character edit → save செய்யுங்க.`
+          );
+        } else {
+          console.log(`[Cloudinary] ✅ All ${subFolders.length + 1} folders ready: ${charFolder}/`);
+        }
+      } catch (e: any) {
+        console.warn('[Cloudinary] Folder creation error:', e?.message);
       }
-    });
+    })();
   };
 
   // ── blob URI → base64 helper ──────────────────────────────────
