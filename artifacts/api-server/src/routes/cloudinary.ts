@@ -200,10 +200,12 @@ router.post("/cloudinary/create-folder", async (req, res) => {
 
   // Method 2: Unsigned upload fallback — upload tiny placeholder to create folder
   try {
+    // Note: public_id must NOT start with '.' — Cloudinary rejects it.
+    // Use '_keep' as a valid placeholder name.
     await cl.uploader.unsigned_upload(
       `data:image/png;base64,${PLACEHOLDER_B64}`,
       PRESET_NAME,
-      { folder: folderPath, public_id: '.keep', resource_type: 'image' }
+      { folder: folderPath, public_id: '_keep', resource_type: 'image' }
     );
     return res.json({ ok: true, folder: folderPath, method: 'upload' });
   } catch (err2: any) {

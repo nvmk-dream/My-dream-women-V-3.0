@@ -271,15 +271,24 @@ my-girls/${folderName}/
 AsyncStorage-ல் save ஆச்சு!`
     );
 
-    // Real folder creation in background
+    // Real folder creation in background — show result to user
     Promise.allSettled([
       createCloudinaryFolder(`my-girls/${folderName}`),
       createCloudinaryFolder(`my-girls/videos/${folderName}`),
       ...STYLE_IDS.map(styleId => createCloudinaryFolder(`my-girls/${folderName}/${styleId}`)),
     ]).then(results => {
-      const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)).length;
-      if (failed > 0) console.warn(`[Cloudinary] ${failed}/${results.length} folders failed — ${folderName}`);
-      else console.log(`[Cloudinary] ✅ All ${results.length} folders created: my-girls/${folderName}/`);
+      const failed = results.filter(
+        r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)
+      ).length;
+      if (failed > 0) {
+        console.warn(`[Cloudinary] ${failed}/${results.length} folders failed — ${folderName}`);
+        Alert.alert(
+          '⚠️ Cloudinary folder பிரச்சனை',
+          `${failed}/${results.length} folders create ஆகல.\n\nCloudinary credentials Render-ல் set ஆகியுள்ளதா confirm பண்ணுங்க:\n• CLOUDINARY_CLOUD_NAME\n• API_KEY\n• API_SECRET`
+        );
+      } else {
+        console.log(`[Cloudinary] ✅ All ${results.length} folders created: my-girls/${folderName}/`);
+      }
     });
   };
 
