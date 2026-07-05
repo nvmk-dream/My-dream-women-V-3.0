@@ -16,7 +16,7 @@ const COVER_H = 150;
 const DEFAULT_COVER = require('../assets/images/icon.png');
 const COVER_KEY = 'home_cover_image';
 const CUSTOM_SERVER_KEY = 'custom_server_url';
-const DEFAULT_RENDER_URL = 'https://my-girls-1-5.onrender.com';
+const DEFAULT_RENDER_URL = 'https://my-dream-women.onrender.com';
 
 const CATEGORIES = [
   { key: 'pictures',    label: 'Pictures',    emoji: '🖼️',  bg: '#4A90D9', route: '/gallery?album=pictures' },
@@ -151,7 +151,7 @@ export default function HomeScreen() {
           <View style={s.coverBar}>
             <View style={s.headerLeft}>
               <Text style={s.headerCloud}>☁️</Text>
-              <Text style={s.headerTitle}>My Girls</Text>
+              <Text style={s.headerTitle}>My Dream Women</Text>
             </View>
             <View style={s.coverActions}>
               <TouchableOpacity style={s.editBtn} onPress={() => setShowPickModal(true)}>
@@ -167,7 +167,7 @@ export default function HomeScreen() {
         <View style={s.compactBar}>
           <View style={s.headerLeft}>
             <Text style={s.headerCloud}>☁️</Text>
-            <Text style={s.headerTitle}>My Girls</Text>
+            <Text style={s.headerTitle}>My Dream Women</Text>
           </View>
           <View style={s.coverActions}>
             <TouchableOpacity style={s.editBtn} onPress={() => setShowPickModal(true)}>

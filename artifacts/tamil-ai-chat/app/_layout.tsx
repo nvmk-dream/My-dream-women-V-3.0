@@ -191,7 +191,7 @@ export default function RootLayout() {
           {pinLocked && (
             <View style={pin.overlay}>
               <StatusBar backgroundColor="#000" barStyle="light-content" />
-              <Text style={pin.appName}>My Girls ☁️</Text>
+              <Text style={pin.appName}>My Dream Women ☁️</Text>
               <Text style={pin.heading}>🔒 PIN Enter பண்ணுங்க</Text>
 
               {/* 4 dots */}
