@@ -399,20 +399,6 @@ export async function uploadToCloudinary(
 export async function listCloudinaryImages(
   folder: string = 'my-girls',
 
-// Server stores the metadata so photos survive app reinstall.
-export async function trackCloudinaryUpload(
-  folder: string,
-  public_id: string,
-  url: string,
-): Promise<void> {
-  try {
-    await fetch(`${REPLIT_API}/api/cloudinary/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder, public_id, url, created_at: new Date().toISOString() }),
-    });
-  } catch { /* fire-and-forget — upload already succeeded */ }
-}
 
 ): Promise<{ url: string; public_id: string }[]> {
   const controller = new AbortController();
@@ -431,6 +417,21 @@ export async function trackCloudinaryUpload(
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Server stores the metadata so photos survive app reinstall.
+export async function trackCloudinaryUpload(
+  folder: string,
+  public_id: string,
+  url: string,
+): Promise<void> {
+  try {
+    await fetch(`${REPLIT_API}/api/cloudinary/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder, public_id, url, created_at: new Date().toISOString() }),
+    });
+  } catch { /* fire-and-forget — upload already succeeded */ }
 }
 
 
