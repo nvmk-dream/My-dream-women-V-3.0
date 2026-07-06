@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS } from '../constants/personas';
 import {
   listCloudinaryImages,
+  trackCloudinaryUpload,
   uploadToCloudinary,
   uploadUriToCloudinary,
   deleteFromCloudinary,
@@ -133,6 +134,8 @@ export default function AIGirlsCloudScreen() {
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
         const uploaded = await uploadUriToCloudinary(asset.uri, mime, folder);
         newPhotos.push({ url: uploaded.url, public_id: uploaded.public_id });
+        // Track server-side so photos survive app reinstall
+        trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
         done++;
       } catch (e: any) {
         const reason = (e?.message || String(e) || 'unknown').slice(0, 120);
