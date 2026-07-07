@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_PERSONAS } from '../constants/personas';
+import { getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 
 const BUILTIN_PHOTO_STYLES = [
   'Breast Show', 'Buttocks', 'Cleavage', 'Half Breast',
@@ -65,7 +66,22 @@ export default function NotesScreen() {
   const [translateError, setTranslateError] = useState('');
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then(raw => { if (raw) setAllNotes(JSON.parse(raw)); });
+    const loadNotes = async () => {
+      // Step 1: AsyncStorage — instant load (works offline)
+      const localRaw = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+      const local: CharNotes = localRaw ? JSON.parse(localRaw) : {};
+      if (Object.keys(local).length) setAllNotes(local);
+      // Step 2: Cloudinary meta — restore after reinstall (local wins on conflict)
+      try {
+        const cloud = await getCloudinaryMeta('character_notes_v2');
+        if (cloud && typeof cloud === 'object' && !Array.isArray(cloud)) {
+          const merged: CharNotes = { ...(cloud as CharNotes), ...local };
+          setAllNotes(merged);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
+        }
+      } catch { /* cloud offline — local still shown */ }
+    };
+    loadNotes();
   }, []);
 
   // Reload merged personas + custom styles whenever screen is focused
@@ -110,10 +126,12 @@ export default function NotesScreen() {
       const merged = [...current, newStyle];
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(merged));
       setCustomStyles(merged);
+      setCloudinaryMeta('custom_photo_styles_v1', merged).catch(() => {}); // cloud backup
     } catch {
       const updated = [...customStyles, newStyle];
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
     }
     setNewStyleName('');
     setNewStylePrompt('');
@@ -128,10 +146,12 @@ export default function NotesScreen() {
       const updated = current.filter(s => s.id !== id);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
       setCustomStyles(updated);
+      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
     } catch {
       const updated = customStyles.filter(s => s.id !== id);
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
     }
   };
 
@@ -146,6 +166,7 @@ export default function NotesScreen() {
   const save = useCallback(async (updated: CharNotes) => {
     setAllNotes(updated);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setCloudinaryMeta('character_notes_v2', updated).catch(() => {}); // cloud backup
   }, []);
 
   const pages: Page[] = activeChar ? (allNotes[activeChar.id] ?? []) : [];

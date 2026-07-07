@@ -10,7 +10,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, deleteFromCloudinary } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const COLS = 3;
@@ -85,8 +85,25 @@ export default function GalleryScreen() {
   }, [router, showAlbums, showAssets]));
 
   useEffect(() => {
-    AsyncStorage.getItem(foldersKey(albumKey))
-      .then(v => { if (v) setSubFolders(JSON.parse(v)); }).catch(() => {});
+    const loadFolders = async () => {
+      // Step 1: AsyncStorage — instant load (works offline)
+      const localRaw = await AsyncStorage.getItem(foldersKey(albumKey)).catch(() => null);
+      const local: SubFolder[] = localRaw ? JSON.parse(localRaw) : [];
+      if (local.length) setSubFolders(local);
+      // Step 2: Cloudinary meta — merge & restore after reinstall
+      try {
+        const cloud = await getCloudinaryMeta(`gallery_folders_${albumKey}`);
+        if (Array.isArray(cloud) && cloud.length > 0) {
+          const merged = [...local];
+          for (const cf of cloud as SubFolder[]) {
+            if (!merged.some(f => f.id === cf.id)) merged.push(cf);
+          }
+          setSubFolders(merged);
+          await AsyncStorage.setItem(foldersKey(albumKey), JSON.stringify(merged)).catch(() => {});
+        }
+      } catch { /* cloud offline — local still shown */ }
+    };
+    loadFolders();
   }, [albumKey]);
 
   useEffect(() => {
@@ -412,6 +429,7 @@ export default function GalleryScreen() {
     const updated = [...subFolders, { id, label: name }];
     setSubFolders(updated);
     await AsyncStorage.setItem(foldersKey(albumKey), JSON.stringify(updated));
+    setCloudinaryMeta(`gallery_folders_${albumKey}`, updated).catch(() => {}); // cloud backup
     setFolderDialog(false);
     setFolderName('');
     Alert.alert('✅', `"${name}" folder உருவாக்கப்பட்டது!`);
