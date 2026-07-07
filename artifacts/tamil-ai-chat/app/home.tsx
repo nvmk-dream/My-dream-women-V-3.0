@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, Alert,
   ScrollView, StatusBar, Dimensions, Image, Modal, FlatList, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadUriToCloudinary } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const COLS = 4;
@@ -35,6 +36,17 @@ const CATEGORIES = [
   { key: 'videos',      label: 'Videos',      emoji: '🎬',  bg: '#1565C0', route: '/videos' },
 ];
 
+// Tiles that get a ☁️ cloud button (keys, cloud, projects, notes excluded)
+const CLOUD_ENABLED = new Set([
+  'pictures','camera','movies','screenshots','downloads',
+  'documents','music','icons','ai-girls','videos',
+]);
+
+// Gallery-based categories that upload to storage folder
+const GALLERY_CATS = new Set([
+  'pictures','camera','movies','screenshots','downloads','documents','music','icons',
+]);
+
 type CloudPhoto = { uri: string };
 
 export default function HomeScreen() {
@@ -45,6 +57,12 @@ export default function HomeScreen() {
   const [showCloudPicker, setShowCloudPicker] = useState(false);
   const [serverStatus, setServerStatus] = useState<'unknown'|'ok'|'sleeping'>('unknown');
   const [wakingServer, setWakingServer] = useState(false);
+
+  // ── Cloud sheet state ─────────────────────────────────────────────
+  const [cloudSheet, setCloudSheet] = useState<string | null>(null); // category key
+  const [cloudUploading, setCloudUploading] = useState(false);
+  const [cloudProgress, setCloudProgress] = useState(0);
+  const [cloudTotal, setCloudTotal] = useState(0);
 
   useEffect(() => {
     AsyncStorage.getItem(COVER_KEY).then(v => { if (v) setCoverUri(v); }).catch(() => {});
@@ -73,10 +91,10 @@ export default function HomeScreen() {
       const savedUrl = await AsyncStorage.getItem(CUSTOM_SERVER_KEY).catch(() => null);
       const serverUrl = savedUrl || DEFAULT_RENDER_URL;
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 35000);
-      const res = await fetch(`${serverUrl}/api/healthz`, { signal: controller.signal });
+      const timer = setTimeout(() => controller.abort(), 30000);
+      await fetch(`${serverUrl}/api/healthz`, { signal: controller.signal });
       clearTimeout(timer);
-      setServerStatus(res.ok ? 'ok' : 'sleeping');
+      setServerStatus('ok');
     } catch {
       setServerStatus('sleeping');
     } finally {
@@ -84,35 +102,29 @@ export default function HomeScreen() {
     }
   };
 
-  const saveCover = useCallback(async (uri: string) => {
-    setCoverUri(uri);
-    try { await AsyncStorage.setItem(COVER_KEY, uri); } catch {}
+  const pickFromGallery = useCallback(async () => {
+    setShowPickModal(false);
+    await new Promise(r => setTimeout(r, 400));
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission', 'Gallery access allow பண்ணுங்க'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [16, 9], quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setCoverUri(result.assets[0].uri);
+      AsyncStorage.setItem(COVER_KEY, result.assets[0].uri).catch(() => {});
+    }
   }, []);
 
-  const pickFromGallery = async () => {
+  const openCloudPicker = useCallback(async () => {
     setShowPickModal(false);
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) return;
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      });
-      if (!res.canceled && res.assets[0]) {
-        await saveCover(res.assets[0].uri);
-      }
-    } catch {}
-  };
-
-  const openCloudPicker = async () => {
-    setShowPickModal(false);
-    const photos: CloudPhoto[] = [];
+    const photos: { uri: string }[] = [];
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const cloudKeys = keys.filter(k => k.startsWith('cloud_photos_'));
-      const pairs = await AsyncStorage.multiGet(cloudKeys);
+      const pairs = await AsyncStorage.multiGet(
+        keys.filter(k => k.startsWith('cloud_photos_') || k === 'my_girls_cloud_images'),
+      );
       for (const [, val] of pairs) {
         if (!val) continue;
         try {
@@ -123,13 +135,91 @@ export default function HomeScreen() {
     } catch {}
     setCloudPhotos(photos);
     setShowCloudPicker(true);
-  };
+  }, []);
 
   const resetToDefault = () => {
     setShowPickModal(false);
     setCoverUri(null);
     AsyncStorage.removeItem(COVER_KEY).catch(() => {});
   };
+
+  // ── Cloud quick-upload from home screen ──────────────────────────
+  const handleCloudUpload = async (catKey: string) => {
+    setCloudSheet(null);
+    await new Promise(r => setTimeout(r, 300));
+
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission', 'Gallery access allow பண்ணுங்க'); return; }
+
+    const isVideo = catKey === 'videos' || catKey === 'movies';
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: isVideo
+        ? ImagePicker.MediaTypeOptions.Videos
+        : ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      selectionLimit: 20,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    const assets = result.assets;
+    const total = assets.length;
+    setCloudUploading(true);
+    setCloudProgress(0);
+    setCloudTotal(total);
+
+    // Cloud folder path — matches gallery.tsx convention
+    const folder = catKey === 'ai-girls'
+      ? 'my-girls/ai'
+      : catKey === 'videos'
+        ? 'my-girls/videos/general'
+        : `my-girls/storage/${catKey}`;
+
+    let done = 0;
+    const failures: string[] = [];
+
+    for (let i = 0; i < assets.length; i++) {
+      const asset = assets[i];
+      try {
+        const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+        await uploadUriToCloudinary(asset.uri, mime, folder);
+        done++;
+      } catch (e: any) {
+        failures.push((e?.message || 'unknown').slice(0, 80));
+      }
+      setCloudProgress(i + 1);
+    }
+
+    setCloudUploading(false);
+    setCloudProgress(0);
+    setCloudTotal(0);
+
+    const cat = CATEGORIES.find(c => c.key === catKey);
+    if (done > 0) {
+      Alert.alert(
+        failures.length ? '⚠️ Partial Upload' : `✅ ${cat?.emoji} Cloud Upload ஆச்சு!`,
+        `${done}/${total} files "${cat?.label}" cloud folder-ல் save ஆச்சு.${failures.length ? `\n${failures.length} fail ஆச்சு.` : ''}`,
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: '☁️ View', onPress: () => { if (cat?.route) router.push(cat.route as any); } },
+        ],
+      );
+    } else {
+      Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.\n${failures[0] || ''}`);
+    }
+  };
+
+  const openCloudSheet = (catKey: string) => {
+    // ai-girls and videos have their own dedicated cloud screen — navigate directly
+    if (catKey === 'ai-girls' || catKey === 'videos') {
+      const cat = CATEGORIES.find(c => c.key === catKey);
+      if (cat?.route) router.push(cat.route as any);
+      return;
+    }
+    setCloudSheet(catKey);
+  };
+
+  const cloudSheetCat = CATEGORIES.find(c => c.key === cloudSheet);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -198,21 +288,102 @@ export default function HomeScreen() {
         <Text style={s.sectionLabel}>STORAGE</Text>
 
         <View style={s.grid}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity
-              key={cat.key}
-              style={s.tile}
-              onPress={() => { if (cat.route) router.push(cat.route as any); }}
-              activeOpacity={0.7}
-            >
-              <View style={[s.tileIcon, { backgroundColor: cat.bg }]}>
-                <Text style={s.tileEmoji}>{cat.emoji}</Text>
+          {CATEGORIES.map(cat => {
+            const hasCloud = CLOUD_ENABLED.has(cat.key);
+            return (
+              <View key={cat.key} style={s.tile}>
+                <TouchableOpacity
+                  style={s.tileIconWrap}
+                  onPress={() => { if (cat.route) router.push(cat.route as any); }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.tileIcon, { backgroundColor: cat.bg }]}>
+                    <Text style={s.tileEmoji}>{cat.emoji}</Text>
+                  </View>
+                  {/* ☁️ cloud badge — only for CLOUD_ENABLED categories */}
+                  {hasCloud && (
+                    <TouchableOpacity
+                      style={s.cloudBadge}
+                      onPress={() => openCloudSheet(cat.key)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={s.cloudBadgeTxt}>☁️</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                <Text style={s.tileLabel} numberOfLines={1}>{cat.label}</Text>
               </View>
-              <Text style={s.tileLabel} numberOfLines={1}>{cat.label}</Text>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
+
+      {/* ── Cloud upload progress overlay ── */}
+      {cloudUploading && (
+        <View style={s.uploadOverlay}>
+          <View style={s.uploadCard}>
+            <ActivityIndicator size="large" color="#1ABC9C" />
+            <Text style={s.uploadCardTxt}>Cloud-ல் upload பண்றேன்...</Text>
+            <Text style={s.uploadCardCount}>{cloudProgress} / {cloudTotal}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Cloud sheet modal ── */}
+      <Modal
+        visible={!!cloudSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCloudSheet(null)}
+      >
+        <TouchableOpacity style={s.sheetOverlay} activeOpacity={1} onPress={() => setCloudSheet(null)}>
+          <TouchableOpacity activeOpacity={1} style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>
+              {cloudSheetCat?.emoji} {cloudSheetCat?.label} — Cloud ☁️
+            </Text>
+            <Text style={s.sheetSub}>
+              இந்த folder-க்கான Cloud options:
+            </Text>
+
+            {/* Option 1: Upload to cloud */}
+            <TouchableOpacity
+              style={s.sheetOption}
+              onPress={() => cloudSheet && handleCloudUpload(cloudSheet)}
+            >
+              <View style={[s.sheetOptionIcon, { backgroundColor: '#1ABC9C' }]}>
+                <Text style={s.sheetOptionEmoji}>📤</Text>
+              </View>
+              <View style={s.sheetOptionInfo}>
+                <Text style={s.sheetOptionTitle}>Cloud-ல் Upload பண்ணு</Text>
+                <Text style={s.sheetOptionSub}>Phone-லிருந்து Cloudinary-க்கு safe-ஆ save பண்ணு</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Option 2: View cloud files */}
+            <TouchableOpacity
+              style={s.sheetOption}
+              onPress={() => {
+                const route = cloudSheetCat?.route;
+                setCloudSheet(null);
+                if (route) setTimeout(() => router.push(route as any), 200);
+              }}
+            >
+              <View style={[s.sheetOptionIcon, { backgroundColor: '#2196F3' }]}>
+                <Text style={s.sheetOptionEmoji}>☁️</Text>
+              </View>
+              <View style={s.sheetOptionInfo}>
+                <Text style={s.sheetOptionTitle}>Cloud Files பார்</Text>
+                <Text style={s.sheetOptionSub}>Upload ஆன files-ஐ browse பண்ணு, delete பண்ணு</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.sheetCancel} onPress={() => setCloudSheet(null)}>
+              <Text style={s.sheetCancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Pick source modal */}
       <Modal visible={showPickModal} transparent animationType="fade" onRequestClose={() => setShowPickModal(false)}>
@@ -276,9 +447,10 @@ export default function HomeScreen() {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={s.cloudThumb}
-                  onPress={async () => {
+                  onPress={() => {
                     setShowCloudPicker(false);
-                    await saveCover(item.uri);
+                    setCoverUri(item.uri);
+                    AsyncStorage.setItem(COVER_KEY, item.uri).catch(() => {});
                   }}
                 >
                   <Image source={{ uri: item.uri }} style={s.cloudThumbImg} resizeMode="cover" />
@@ -292,11 +464,10 @@ export default function HomeScreen() {
   );
 }
 
-const THUMB = (width - 16 - 4) / 3;
+const THUMB = (width - 32) / 3;
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-
+  safe: { flex: 1, backgroundColor: '#f5f5f5' },
   compactBar: {
     backgroundColor: '#075E54',
     flexDirection: 'row', alignItems: 'center',
@@ -333,18 +504,89 @@ const s = StyleSheet.create({
     letterSpacing: 1.5, marginBottom: 16, marginLeft: 2,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+
+  // Tile — now wraps both icon and cloud badge
   tile: { width: TILE, alignItems: 'center' },
+  tileIconWrap: { width: TILE - 8, position: 'relative', marginBottom: 6 },
   tileIcon: {
     width: TILE - 8, height: TILE - 8,
     borderRadius: (TILE - 8) / 2,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 6, elevation: 2,
+    elevation: 2,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12, shadowRadius: 4,
   },
   tileEmoji: { fontSize: 28 },
   tileLabel: { fontSize: 11, color: '#333', fontWeight: '600', textAlign: 'center' },
 
+  // ☁️ cloud badge button
+  cloudBadge: {
+    position: 'absolute', top: -4, right: -4,
+    width: 22, height: 22,
+    backgroundColor: '#fff',
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#1ABC9C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#1ABC9C',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+  },
+  cloudBadgeTxt: { fontSize: 10 },
+
+  // Cloud upload overlay
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center', zIndex: 99,
+  },
+  uploadCard: {
+    backgroundColor: '#fff', borderRadius: 20,
+    paddingVertical: 32, paddingHorizontal: 40,
+    alignItems: 'center', gap: 12,
+  },
+  uploadCardTxt: { fontSize: 15, fontWeight: '700', color: '#111' },
+  uploadCardCount: { fontSize: 22, fontWeight: '800', color: '#1ABC9C' },
+
+  // ── Cloud sheet ──────────────────────────────────────────────────
+  sheetOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: 12, paddingBottom: 36, paddingHorizontal: 24,
+  },
+  sheetHandle: {
+    width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2,
+    alignSelf: 'center', marginBottom: 20,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: '#111', marginBottom: 4 },
+  sheetSub: { fontSize: 13, color: '#777', marginBottom: 20 },
+
+  sheetOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    borderWidth: 1.5, borderColor: '#e8e8e8',
+    borderRadius: 14, padding: 16, marginBottom: 12,
+  },
+  sheetOptionIcon: {
+    width: 48, height: 48, borderRadius: 24,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  sheetOptionEmoji: { fontSize: 22 },
+  sheetOptionInfo: { flex: 1 },
+  sheetOptionTitle: { fontSize: 15, fontWeight: '700', color: '#111' },
+  sheetOptionSub: { fontSize: 12, color: '#777', marginTop: 2, lineHeight: 17 },
+
+  sheetCancel: {
+    marginTop: 4, backgroundColor: '#f5f5f5',
+    borderRadius: 14, paddingVertical: 14, alignItems: 'center',
+  },
+  sheetCancelTxt: { color: '#555', fontWeight: '700', fontSize: 15 },
+
+  // Pick modal
   pickOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
@@ -386,11 +628,7 @@ const s = StyleSheet.create({
     width: THUMB, height: THUMB, margin: 2, borderRadius: 8, overflow: 'hidden',
   },
   cloudThumbImg: { width: '100%', height: '100%' },
-  renderRefreshBtn: {
-    backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 16,
-    width: 34, height: 34, justifyContent: 'center', alignItems: 'center',
-  },
-  renderRefreshIcon: { fontSize: 18, color: '#fff' },
+
   serverBanner: {
     backgroundColor: '#1a0a00', borderRadius: 12, borderWidth: 1, borderColor: '#ff5252',
     padding: 14, marginBottom: 16, alignItems: 'center',
