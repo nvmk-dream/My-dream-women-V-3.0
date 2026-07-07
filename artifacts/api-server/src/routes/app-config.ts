@@ -25,7 +25,7 @@ router.get("/app-config", (_req, res) => {
       apiSecret:  process.env["API_SECRET"] || null,
     },
     geminiKeys,
-    defaultServerUrl: "https://my-dream-women.onrender.com",
+    defaultServerUrl: "https://my-dream-women-v2.onrender.com",
   });
 });
 

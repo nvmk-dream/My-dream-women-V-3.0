@@ -82,7 +82,7 @@ async function tryOpenAICompatible(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://my-dream-women.onrender.com",
+      "HTTP-Referer": "https://my-dream-women-v2.onrender.com",
       "X-Title": "My Dream Women Tamil AI Chat",
     },
     body: JSON.stringify(body),

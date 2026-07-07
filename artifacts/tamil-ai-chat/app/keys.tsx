@@ -26,7 +26,7 @@ interface ApiKeyEntry {
   status: KeyStatus;
 }
 
-const DEFAULT_SERVER = 'https://my-dream-women.onrender.com';
+const DEFAULT_SERVER = 'https://my-dream-women-v2.onrender.com';
 
 const DEFAULT_KEYS: Omit<ApiKeyEntry, 'value' | 'expanded' | 'status'>[] = [
   { id: 'github',     label: 'GitHub Token', site: 'github.com',        enabled: false },
