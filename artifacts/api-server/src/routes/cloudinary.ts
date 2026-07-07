@@ -173,6 +173,49 @@ router.get("/cloudinary/videos", async (req, res) => {
 });
 
 
+// ── POST /api/cloudinary/track ────────────────────────────────────────────
+// Fix 1: Fire-and-forget tracking endpoint (photos already safe in Cloudinary)
+router.post("/cloudinary/track", (_req, res) => {
+  res.json({ ok: true });
+});
+
+// ── GET /api/cloudinary/meta ───────────────────────────────────────────────
+// Fix 2a: Retrieve custom folder metadata stored in Cloudinary as a raw JSON file
+router.get("/cloudinary/meta", async (req, res) => {
+  const key = (req.query["key"] as string) || "custom_chars";
+  try {
+    const cl = cfg();
+    const info = await cl.api.resource(`my-girls/meta/${key}`, { resource_type: "raw" });
+    const resp = await fetch(info.secure_url);
+    const data = await resp.json();
+    res.json({ data });
+  } catch {
+    res.json({ data: null });
+  }
+});
+
+// ── POST /api/cloudinary/meta ──────────────────────────────────────────────
+// Fix 2b: Save custom folder metadata to Cloudinary as a raw JSON file
+router.post("/cloudinary/meta", async (req, res) => {
+  const { key, data } = req.body as { key: string; data: unknown };
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
+  try {
+    const cl = cfg();
+    const json = JSON.stringify(data);
+    const b64 = Buffer.from(json).toString("base64");
+    await cl.uploader.upload(`data:application/json;base64,${b64}`, {
+      public_id: `my-girls/meta/${key}`,
+      resource_type: "raw",
+      overwrite: true,
+      invalidate: true,
+    } as any);
+    res.json({ ok: true });
+  } catch (err: any) {
+    req.log.error({ err }, "Cloudinary meta save failed");
+    res.status(500).json({ error: err?.message || "Save failed" });
+  }
+});
+
 // ── POST /api/cloudinary/create-folder ────────────────────────────────────
 // Creates a Cloudinary folder using Admin API (requires api_key + api_secret)
 // PLACEHOLDER_PNG: 1x1 transparent PNG (base64)

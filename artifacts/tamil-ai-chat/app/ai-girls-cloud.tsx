@@ -17,6 +17,8 @@ import {
   uploadUriToCloudinary,
   deleteFromCloudinary,
   createCloudinaryFolder,
+  getCloudinaryMeta,
+  setCloudinaryMeta,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -86,10 +88,43 @@ export default function AIGirlsCloudScreen() {
   const [uploadTotal, setUploadTotal] = useState(0);
 
 
-  // Load custom folders from storage
+  // Load custom folders — AsyncStorage first (instant), then merge from Cloudinary (survives reinstall)
   useEffect(() => {
-    AsyncStorage.getItem(CUSTOM_CHARS_KEY).then(v => { if (v) setCustomChars(JSON.parse(v)); });
-    AsyncStorage.getItem(CUSTOM_STYLES_KEY).then(v => { if (v) setCustomStyles(JSON.parse(v)); });
+    const loadFolders = async () => {
+      // Step 1: Load from AsyncStorage immediately (fast, works offline)
+      const localCharsRaw = await AsyncStorage.getItem(CUSTOM_CHARS_KEY).catch(() => null);
+      const localStylesRaw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY).catch(() => null);
+      const localChars = localCharsRaw ? JSON.parse(localCharsRaw) : [];
+      const localStyles = localStylesRaw ? JSON.parse(localStylesRaw) : [];
+      if (localChars.length) setCustomChars(localChars);
+      if (localStyles.length) setCustomStyles(localStyles);
+
+      // Step 2: Fetch from Cloudinary meta in background and merge (restores after reinstall)
+      try {
+        const [cloudChars, cloudStyles] = await Promise.all([
+          getCloudinaryMeta('custom_chars'),
+          getCloudinaryMeta('custom_styles'),
+        ]);
+        if (Array.isArray(cloudChars) && cloudChars.length > 0) {
+          // Merge: add cloud-only entries that are missing locally
+          const merged = [...localChars];
+          for (const cc of cloudChars) {
+            if (!merged.some((c: any) => c.id === cc.id)) merged.push(cc);
+          }
+          setCustomChars(merged);
+          await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(merged)).catch(() => {});
+        }
+        if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
+          const merged = [...localStyles];
+          for (const cs of cloudStyles) {
+            if (!merged.some((s: any) => s.id === cs.id)) merged.push(cs);
+          }
+          setCustomStyles(merged);
+          await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(merged)).catch(() => {});
+        }
+      } catch { /* cloud fetch failed — local data still shown */ }
+    };
+    loadFolders();
   }, []);
 
   // Base personas
@@ -311,6 +346,7 @@ export default function AIGirlsCloudScreen() {
       const updated = [...customChars, newChar];
       setCustomChars(updated);
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_chars', updated).catch(() => {}); // sync to cloud
     } else if (depth === 1) {
       // Add custom style folder
       const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
@@ -318,6 +354,7 @@ export default function AIGirlsCloudScreen() {
       const updated = [...customStyles, newStyle];
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
     }
     Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
@@ -463,6 +500,7 @@ export default function AIGirlsCloudScreen() {
       const updated = customChars.filter(c => c.id !== id);
       setCustomChars(updated);
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_chars', updated).catch(() => {}); // sync to cloud
       // Delete all Cloudinary photos in each style subfolder
       try {
         const allStyles = [...PHOTO_STYLES, ...customStyles];
@@ -475,6 +513,7 @@ export default function AIGirlsCloudScreen() {
       const updated = customStyles.filter(s => s.id !== id);
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
+      setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
       // Delete all Cloudinary photos in this style folder (for current character)
       if (selectedChar) {
         try {

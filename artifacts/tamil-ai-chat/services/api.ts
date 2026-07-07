@@ -460,6 +460,29 @@ export async function trackCloudinaryUpload(
   } catch { /* fire-and-forget — upload already succeeded */ }
 }
 
+// Fetch custom folder metadata stored in Cloudinary (survives reinstall)
+export async function getCloudinaryMeta(key: string): Promise<unknown> {
+  try {
+    const res = await fetch(`${REPLIT_API}/api/cloudinary/meta?key=${encodeURIComponent(key)}`);
+    if (!res.ok) return null;
+    const json = await res.json() as { data: unknown };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Save custom folder metadata to Cloudinary (so it survives reinstall)
+export async function setCloudinaryMeta(key: string, data: unknown): Promise<void> {
+  try {
+    await fetch(`${REPLIT_API}/api/cloudinary/meta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, data }),
+    });
+  } catch { /* fire-and-forget */ }
+}
+
 
 export async function listCloudinaryVideos(
   characterName: string,
