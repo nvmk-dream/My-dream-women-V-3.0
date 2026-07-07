@@ -407,25 +407,42 @@ export async function uploadToCloudinary(
 
 export async function listCloudinaryImages(
   folder: string = 'my-girls',
-
-
 ): Promise<{ url: string; public_id: string }[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  // Primary: backend track store (fastest, has created_at)
   try {
-    const res = await fetch(
-      `${REPLIT_API}/api/cloudinary/list?folder=${encodeURIComponent(folder)}`,
-      { signal: controller.signal },
-    );
-    if (!res.ok) {
-      const err = await res.json() as any;
-      throw new Error(err?.error || `List failed: ${res.status}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(
+        `${REPLIT_API}/api/cloudinary/list?folder=${encodeURIComponent(folder)}`,
+        { signal: controller.signal },
+      );
+      if (res.ok) {
+        const data = await res.json() as any;
+        if ((data.images || []).length > 0) return data.images;
+      }
+    } finally {
+      clearTimeout(timer);
     }
-    const data = await res.json() as any;
-    return data.images || [];
-  } finally {
-    clearTimeout(timer);
-  }
+  } catch {}
+
+  // Fallback: Cloudinary public tag list — survives Render redeploys & app reinstalls.
+  // Works because every upload is tagged with folderToTag(folder).
+  try {
+    const tag = folderToTag(folder);
+    const res = await fetch(
+      `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/list/${encodeURIComponent(tag)}.json`,
+    );
+    if (res.ok) {
+      const data = await res.json() as any;
+      return (data.resources || []).map((r: any) => ({
+        url: `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/${r.public_id}`,
+        public_id: r.public_id,
+      }));
+    }
+  } catch {}
+
+  return [];
 }
 
 // Server stores the metadata so photos survive app reinstall.
