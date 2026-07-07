@@ -318,6 +318,14 @@ const CLOUDINARY_PRESET = 'my_girls_upload';
 // URI-based upload — expo-file-system/legacy uploadAsync (required for v19+).
 // Handles content://, file://, ph:// URIs natively on Android/iOS.
 // Falls back to fetch FormData for edge cases.
+// Encode folder path as safe Cloudinary tag (UTF-8 hex) — matches Node.js Buffer.from(f).toString('hex')
+function folderToTag(folder: string): string {
+  let hex = '';
+  const bytes = new TextEncoder().encode(folder);
+  bytes.forEach(b => { hex += b.toString(16).padStart(2, '0'); });
+  return 'cfl_' + hex;
+}
+
 export async function uploadUriToCloudinary(
   uri: string,
   mimeType: string = 'image/jpeg',
@@ -337,7 +345,7 @@ export async function uploadUriToCloudinary(
       uploadType: Legacy.FileSystemUploadType.MULTIPART,
       fieldName: 'file',
       mimeType,
-      parameters: { upload_preset: CLOUDINARY_PRESET, folder },
+      parameters: { upload_preset: CLOUDINARY_PRESET, folder, tags: folderToTag(folder) },
     });
     if (res.status < 200 || res.status >= 300) {
       let msg = `Upload failed: HTTP ${res.status}`;
@@ -352,6 +360,7 @@ export async function uploadUriToCloudinary(
     form.append('file', { uri, type: mimeType, name: `upload.${ext}` } as any);
     form.append('upload_preset', CLOUDINARY_PRESET);
     form.append('folder', folder);
+  form.append('tags', folderToTag(folder));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
     try {
