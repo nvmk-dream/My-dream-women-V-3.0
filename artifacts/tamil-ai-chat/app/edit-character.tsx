@@ -784,54 +784,29 @@ ATTIRE: ...`;
             {/* MODE AVATARS */}
             <View style={styles.card}>
               <Text style={styles.sectionLabel}>MODE AVATARS</Text>
-              <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Normal mode-ல் வேற photo, Presana mode-ல் வேற photo. Empty விட்டா main avatar use ஆகும்.</Text>
-              <View style={styles.modeAvatarRow}>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={[styles.sectionLabel, { color: '#075E54', marginBottom: 8 }]}>😇 NORMAL</Text>
-                  <TouchableOpacity onPress={() => pickModeAvatar('normal')}>
-                    {normalAvatarUri
-                      ? <Image source={{ uri: normalAvatarUri }} style={styles.modeAvatarImg} />
-                      : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#075E54' }]}>
-                          <Text style={{ fontSize: 28 }}>😇</Text>
-                          <Text style={{ fontSize: 10, color: '#075E54', marginTop: 4 }}>Tap to set</Text>
-                        </View>
-                    }
+              <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
+                <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
+                  {presanaAvatarUri
+                    ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
+                    : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
+                        <Text style={{ fontSize: 28 }}>😈</Text>
+                        <Text style={{ fontSize: 10, color: '#E91E63', marginTop: 4 }}>Tap to set</Text>
+                      </View>
+                  }
+                </TouchableOpacity>
+                {presanaAvatarUri && (
+                  <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
+                    <Text style={{ color: '#E91E63', fontSize: 12 }}>🗑️ Remove</Text>
                   </TouchableOpacity>
-                  {normalAvatarUri && (
-                    <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#075E54' }]} onPress={() => setNormalAvatarUri(undefined)}>
-                      <Text style={{ color: '#075E54', fontSize: 12 }}>🗑️ Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#E3F2FD', borderRadius: 12 }}
-                    onPress={() => { setModeCloudInput(''); setShowModeCloud('normal'); }}
-                  >
-                    <Text style={{ color: '#1565C0', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
-                  <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
-                    {presanaAvatarUri
-                      ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
-                      : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
-                          <Text style={{ fontSize: 28 }}>😈</Text>
-                          <Text style={{ fontSize: 10, color: '#E91E63', marginTop: 4 }}>Tap to set</Text>
-                        </View>
-                    }
-                  </TouchableOpacity>
-                  {presanaAvatarUri && (
-                    <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
-                      <Text style={{ color: '#E91E63', fontSize: 12 }}>🗑️ Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#FCE4EC', borderRadius: 12 }}
-                    onPress={() => { setModeCloudInput(''); setShowModeCloud('presana'); }}
-                  >
-                    <Text style={{ color: '#C62828', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
-                  </TouchableOpacity>
-                </View>
+                )}
+                <TouchableOpacity
+                  style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#FCE4EC', borderRadius: 12 }}
+                  onPress={() => { setModeCloudInput(''); setShowModeCloud('presana'); }}
+                >
+                  <Text style={{ color: '#C62828', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
