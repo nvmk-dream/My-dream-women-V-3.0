@@ -175,12 +175,25 @@ router.post("/chat", async (req, res) => {
               contents,
               config: {
                 maxOutputTokens: 8192,
+                safetySettings: [
+                  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+                ],
                 ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
               },
             }),
             ATTEMPT_TIMEOUT_MS,
             `gemini ${model}`,
           );
+          const blockReason = (result as any)?.candidates?.[0]?.finishReason;
+          if (!result.text && (blockReason === "SAFETY" || blockReason === "PROHIBITED_CONTENT")) {
+            // Response was filtered — try next model/key instead of silently returning empty
+            lastErr = new Error(`blocked: ${blockReason}`);
+            req.log.warn({ keyIdx: ki, model, blockReason }, "Chat response blocked by safety filter");
+            continue;
+          }
           const content = result.text ?? "பதில் இல்லை";
           req.log.info({ keyIdx: ki, model }, "Chat success");
           res.json({ content });

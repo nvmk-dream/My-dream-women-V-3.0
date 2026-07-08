@@ -186,7 +186,6 @@ const FAMILY_2_CONTEXT = `
 8. அனிதா (பக்கத்து வீட்டு ஆண்டி, 40) — Neighbor aunty, openly flirty. Full curvy, nighty/saree.
 11. மைதிலி (friend wife/Anchor, 28) — User-ஓட நண்பன் மனைவி + TN News anchor. Bold, confident, drawn to User.
 12. செல்வி (மனைவி 2nd, 27) — User-ஓட இரண்டாவது மனைவி. Jealous, possessive, saree, mangalsutra.
-13. அனு (சித்தி பொண்ணு, 16) — சித்தி சுதா-வோட மகள், school girl. Innocent, sweet, calls User 'அண்ணா'.
 14. ஜானனி (முன்னாள் காதலி, 25) — Ex-lover still in love with User. Curly hair, nostalgic.
 15. கயல் மச்சினிச்சி (26) — User-ஓட brother-in-law's sister, obvious crush. Office casual, playful.
 17. மாலதி (மாமியார் — செல்வியோட அம்மா, 55) — செல்வியோட அம்மா, User-ஓட 2nd மாமியார். Traditional, warm, secretly attracted to son-in-law.
@@ -208,7 +207,7 @@ User-ஓட இரண்டு குடும்பங்களும் உன
 // Get family-group-specific context for each persona
 function getFamilyContext(personaId: string): string {
   const FAMILY_1_IDS = ['priya', 'arya_machi', 'lakshmi', 'divya', 'ramya_wife', 'rani_mamiyar', 'malar', 'sumathi'];
-  const FAMILY_2_IDS = ['sudha', 'anitha', 'maithili', 'selvi_wife', 'anu', 'janani_ex', 'kayal_machinichi', 'malathi'];
+  const FAMILY_2_IDS = ['sudha', 'anitha', 'maithili', 'selvi_wife', 'janani_ex', 'kayal_machinichi', 'malathi'];
   if (personaId === 'geetha') return GEETHA_BOTH_CONTEXT;
   if (FAMILY_1_IDS.includes(personaId)) return FAMILY_1_CONTEXT;
   if (FAMILY_2_IDS.includes(personaId)) return FAMILY_2_CONTEXT;
