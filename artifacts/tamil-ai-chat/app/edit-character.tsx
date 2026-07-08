@@ -170,36 +170,66 @@ export default function EditCharacterScreen() {
     else Alert.alert('Default இல்லை', 'முதலில் ஒரு prompt-ஐ ⭐ Default Save பண்ணுங்க.');
   };
 
-  // Auto-analyze uploaded avatar → fill Face/Body/Attire fields using Gemini
-  const analyzeAndFillFields = async (base64: string) => {
+  // Same PROFILE_PROMPT as chat.tsx analyzeAvatar — exact match
+  const AVATAR_PROFILE_PROMPT = `Analyze this avatar image and generate a short profile. Use these exact labels:
+
+AGE RANGE: (18-25 / 25-35 / 35-45 / 45+)
+FACE SHAPE: (oval/round/square/heart/diamond)
+HAIRSTYLE: (length, color, texture, style)
+CLOTHING STYLE: (traditional saree / modern / casual / describe exactly)
+UNCOVERED BODY PARTS: (what skin is visible — arms, midriff, legs, neckline, etc.)
+EXPRESSION: (smile/serious/playful/confident/shy)
+BODY LANGUAGE: (posture, stance, energy)
+OVERALL VIBE: (5-8 word characterization)
+PERSONALITY IMPRESSION: (what this person projects)
+COMMUNICATION STYLE: (formal/casual/warm/direct/playful)
+
+Each label: 1 sentence max.`;
+
+  // Map chat's profile labels → FACE / BODY / ATTIRE boxes
+  const fillBoxesFromProfile = (out: string) => {
+    const age   = out.match(/AGE RANGE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const face  = out.match(/FACE SHAPE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const hair  = out.match(/HAIRSTYLE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const cloth = out.match(/CLOTHING STYLE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const skin  = out.match(/UNCOVERED BODY PARTS:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const body  = out.match(/BODY LANGUAGE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const vibe  = out.match(/OVERALL VIBE:\s*(.+)/i)?.[1]?.trim() ?? '';
+    const faceVal   = [age, face, hair].filter(Boolean).join(', ');
+    const bodyVal   = [skin, body].filter(Boolean).join(', ');
+    const attireVal = [cloth, vibe].filter(Boolean).join(', ');
+    if (faceVal)   setFaceDesc(faceVal);
+    if (bodyVal)   setBodyDesc(bodyVal);
+    if (attireVal) setAttireDesc(attireVal);
+  };
+
+  // Auto-analyze uploaded avatar → same logic as chat.tsx analyzeAvatar
+  // cacheUri: cloudinary URL used as cache key (matches chat's avprofile_chpres_... key)
+  const analyzeAndFillFields = async (base64: string, cacheUri?: string) => {
     try {
       const keysRaw = await AsyncStorage.getItem('api_keys_store');
       const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-      // Avatar field analysis: Multimedia Gemini keys ONLY (multimedia_gemini_1…5)
-      // Chat keys (gemini_1…13) reserved for chat — not used here
+      // multimedia_gemini_1..5 ONLY — same as chat.tsx (no fallback to chat keys)
       const geminiKeys: string[] = [];
       for (let k = 1; k <= 5; k++) {
         const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
         if (v) geminiKeys.push(v);
       }
-      // Fallback: use regular chat gemini keys if multimedia keys not configured
       if (geminiKeys.length === 0) {
-        for (let k = 1; k <= 13; k++) {
-          const v = (parsed[`gemini_${k}`] ?? '').trim();
-          if (v) geminiKeys.push(v);
-        }
+        Alert.alert('⚠️ Multimedia Key இல்லை', 'Settings → API Keys → Multimedia Gemini 1-5 -ல் key add பண்ணுங்க. Analysis-க்கு அது வேணும்.');
+        return;
       }
-      if (geminiKeys.length === 0) return;
 
-      const prompt = `Look at this photo and describe the person in three short English phrases (each under 15 words):
-FACE: [age, skin tone, face shape, eye type, hair length/color/style]
-BODY: [build/figure type, height impression, proportions]
-ATTIRE: [exactly what clothing is worn — color, type, style]
+      // Cache key matching chat.tsx pattern: avprofile_chpres_<uri tail>
+      const cKey = cacheUri
+        ? 'avprofile_chpres_' + cacheUri.replace(/[^a-zA-Z0-9]/g, '').slice(-24)
+        : null;
 
-Reply ONLY in this format, nothing else:
-FACE: ...
-BODY: ...
-ATTIRE: ...`;
+      // Check cache first (same as chat.tsx)
+      if (cKey) {
+        const cached = await AsyncStorage.getItem(cKey);
+        if (cached) { fillBoxesFromProfile(cached); return; }
+      }
 
       for (const gKey of geminiKeys) {
         try {
@@ -209,25 +239,23 @@ ATTIRE: ...`;
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [
                 { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-                { text: prompt }
+                { text: AVATAR_PROFILE_PROMPT }
               ]}]}),
               signal: AbortSignal.timeout(30000) }
           );
           if (res.ok) {
             const j = await res.json() as any;
             const out: string = j?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-            if (out.length > 10) {
-              const faceMatch = out.match(/FACE:\s*(.+)/i);
-              const bodyMatch = out.match(/BODY:\s*(.+)/i);
-              const attireMatch = out.match(/ATTIRE:\s*(.+)/i);
-              if (faceMatch?.[1]) setFaceDesc(faceMatch[1].trim());
-              if (bodyMatch?.[1]) setBodyDesc(bodyMatch[1].trim());
-              if (attireMatch?.[1]) setAttireDesc(attireMatch[1].trim());
+            if (out.length > 30) {
+              // Cache result — same as chat.tsx
+              if (cKey) await AsyncStorage.setItem(cKey, out.slice(0, 800));
+              fillBoxesFromProfile(out);
               return;
             }
           }
         } catch {}
       }
+      Alert.alert('⚠️ Analysis தோல்வி', 'Gemini key quota முடிஞ்சிருக்கலாம் — வேற key try பண்ணுங்க.');
     } catch {}
   };
 
@@ -246,9 +274,9 @@ ATTIRE: ...`;
           const mime = asset.mimeType || 'image/jpeg';
           const cloudUrl = await uploadToCloudinary(asset.base64, mime, 'my-girls/avatars');
           setAvatarPhotoUri(cloudUrl.url);
-          // Auto-analyze: fill Face/Body/Attire fields from photo
+          // Auto-analyze: fill Face/Body/Attire fields from photo (same as chat.tsx analyzeAvatar)
           setAnalyzingFields(true);
-          await analyzeAndFillFields(asset.base64).finally(() => setAnalyzingFields(false));
+          await analyzeAndFillFields(asset.base64, cloudUrl.url).finally(() => setAnalyzingFields(false));
         } catch {
           Alert.alert('Upload failed', 'Cloud upload தோல்வி — ☁️ Cloud URL option use பண்ணுங்க');
         } finally {
@@ -290,9 +318,9 @@ ATTIRE: ...`;
           const cloudUrl = await uploadToCloudinary(asset.base64, mime, 'my-girls/avatars');
           if (mode === 'normal') setNormalAvatarUri(cloudUrl.url);
           else setPresanaAvatarUri(cloudUrl.url);
-          // Auto-analyze: update Face/Body/Attire fields from mode photo
+          // Auto-analyze presana: same as chat.tsx analyzeAvatar — pass cloudUrl for caching
           setAnalyzingFields(true);
-          await analyzeAndFillFields(asset.base64).finally(() => setAnalyzingFields(false));
+          await analyzeAndFillFields(asset.base64, cloudUrl.url).finally(() => setAnalyzingFields(false));
         } catch {
           Alert.alert('Upload Failed', 'Cloud upload தோல்வி — ☁️ Cloud URL option use பண்ணுங்க');
         } finally { setUploadingAvatar(false); }

@@ -433,7 +433,7 @@ AsyncStorage-ல் save ஆச்சு!`
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85, allowsEditing: false,
+      quality: 0.85, allowsEditing: false, base64: true,
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
@@ -445,10 +445,50 @@ AsyncStorage-ல் save ஆச்சு!`
         setUserPrasanaPhoto(url);
         await AsyncStorage.setItem('user_prasana_photo', url);
         setCloudinaryMeta('user_prasana_photo', url).catch(() => {}); // cloud backup
-        const keys = await AsyncStorage.getAllKeys();
-        const toRemove = keys.filter(k=>k.startsWith('avprofile_usrpres'));
-        if(toRemove.length) await AsyncStorage.multiRemove(toRemove);
+        // Clear old cache, then fire-and-forget analysis — same logic as chat.tsx analyzeAvatar
+        const allKeys = await AsyncStorage.getAllKeys();
+        const toRemove = allKeys.filter(k => k.startsWith('avprofile_usrpres'));
+        if (toRemove.length) await AsyncStorage.multiRemove(toRemove);
         Alert.alert('✅ Prasana Avatar Saved!', 'Chat-ல் Prasana mode-ல் இந்த photo profile use ஆகும்.');
+        // Analyze in background — result cached for chat to pick up automatically
+        (async () => {
+          try {
+            const keysRaw = await AsyncStorage.getItem('api_keys_store');
+            const parsed = keysRaw ? JSON.parse(keysRaw) : {};
+            // multimedia_gemini_1..5 ONLY — same as chat.tsx analyzeAvatar
+            const geminiKeys: string[] = [];
+            for (let k = 1; k <= 5; k++) {
+              const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
+              if (v) geminiKeys.push(v);
+            }
+            if (geminiKeys.length === 0) return;
+            const PROFILE_PROMPT = `Analyze this avatar image and generate a short profile. Use these exact labels:\n\nAGE RANGE: (18-25 / 25-35 / 35-45 / 45+)\nFACE SHAPE: (oval/round/square/heart/diamond)\nHAIRSTYLE: (length, color, texture, style)\nCLOTHING STYLE: (traditional saree / modern / casual / describe exactly)\nUNCOVERED BODY PARTS: (what skin is visible — arms, midriff, legs, neckline, etc.)\nEXPRESSION: (smile/serious/playful/confident/shy)\nBODY LANGUAGE: (posture, stance, energy)\nOVERALL VIBE: (5-8 word characterization)\nPERSONALITY IMPRESSION: (what this person projects)\nCOMMUNICATION STYLE: (formal/casual/warm/direct/playful)\n\nEach label: 1 sentence max.`;
+            for (const gKey of geminiKeys) {
+              try {
+                const res = await fetch(
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
+                  { method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [
+                      { inlineData: { mimeType: 'image/jpeg', data: b64 } },
+                      { text: PROFILE_PROMPT }
+                    ]}]}),
+                    signal: AbortSignal.timeout(30000) }
+                );
+                if (res.ok) {
+                  const j = await res.json() as any;
+                  const out: string = j?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+                  if (out.length > 30) {
+                    // Cache with chat.tsx slot pattern: avprofile_usrpres_<url tail>
+                    const cKey = 'avprofile_usrpres_' + url.replace(/[^a-zA-Z0-9]/g, '').slice(-24);
+                    await AsyncStorage.setItem(cKey, out.slice(0, 800));
+                    return;
+                  }
+                }
+              } catch {}
+            }
+          } catch {}
+        })();
       } catch {
         setUserPrasanaPhoto(asset.uri);
         await AsyncStorage.setItem('user_prasana_photo', asset.uri);
