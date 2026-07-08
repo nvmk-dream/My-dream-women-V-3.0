@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary } from '../services/api';
+import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -933,16 +933,27 @@ Each label: 1 sentence max.`;
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85, allowsEditing: true, aspect: [1, 1],
+      quality: 0.85, allowsEditing: true, aspect: [1, 1], base64: true,
     });
     if (!result.canceled && result.assets[0] && persona) {
-      const uri = result.assets[0].uri;
-      setAvatarUri(uri);
+      const asset = result.assets[0];
+      let photoUrl = asset.uri; // fallback: local URI
+      try {
+        // Upload to Cloudinary so photo survives reinstall
+        const mime = asset.mimeType || 'image/jpeg';
+        const b64 = asset.base64 ?? '';
+        if (b64) {
+          const uploaded = await uploadToCloudinary(b64, mime, 'my-girls/avatars');
+          photoUrl = uploaded.url;
+        }
+      } catch { /* keep local URI as fallback */ }
+      setAvatarUri(photoUrl);
       try {
         const saved = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
         const data = saved ? JSON.parse(saved) : {};
-        data.avatarPhotoUri = uri;
+        data.avatarPhotoUri = photoUrl;
         await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
+        setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       } catch {}
     }
   };

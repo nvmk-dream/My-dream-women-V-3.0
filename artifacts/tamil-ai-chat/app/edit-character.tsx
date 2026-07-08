@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
-import { uploadToCloudinary } from '../services/api';
+import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -78,7 +78,17 @@ export default function EditCharacterScreen() {
           `persona_edit_${base.id}`,
           `mood_mode_${base.id}`,
         ]);
-        const data = saved[1] ? JSON.parse(saved[1]) : {};
+        let data: Record<string, any> = saved[1] ? JSON.parse(saved[1]) : {};
+        // Restore from cloud if local data missing (reinstall recovery)
+        if (!saved[1]) {
+          try {
+            const cloudData = await getCloudinaryMeta(`persona_edit_${base.id}`);
+            if (cloudData && typeof cloudData === 'object' && !Array.isArray(cloudData)) {
+              data = cloudData as Record<string, any>;
+              await AsyncStorage.setItem(`persona_edit_${base.id}`, JSON.stringify(data)).catch(() => {});
+            }
+          } catch {}
+        }
         setPersona(base);
         setName(data.name ?? base.name);
         setAvatarLetter(data.avatarLetter ?? base.avatarLetter ?? base.emoji);
@@ -137,6 +147,7 @@ export default function EditCharacterScreen() {
         imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
+      setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
       router.back();
     } catch {

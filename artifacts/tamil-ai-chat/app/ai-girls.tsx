@@ -23,7 +23,7 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
@@ -344,6 +344,7 @@ AsyncStorage-ல் save ஆச்சு!`
         const { url: cloudUrl } = await uploadToCloudinary(b64, mime, 'my-girls/user');
         setUserPhoto(cloudUrl);
         AsyncStorage.setItem('user_profile_photo', cloudUrl).catch(() => {});
+        setCloudinaryMeta('user_profile_photo', cloudUrl).catch(() => {}); // cloud backup
       } catch {
         // Fallback: save local URI (works this session but not after reload)
         setUserPhoto(asset.uri);
@@ -359,6 +360,7 @@ AsyncStorage-ல் save ஆச்சு!`
     if (!url) { Alert.alert('URL enter பண்ணுங்க'); return; }
     setUserPhoto(url);
     AsyncStorage.setItem('user_profile_photo', url).catch(() => {});
+    setCloudinaryMeta('user_profile_photo', url).catch(() => {}); // cloud backup
     setUserPhotoCloudInput('');
     setShowUserPhotoModal(false);
   };
@@ -368,12 +370,31 @@ AsyncStorage-ல் save ஆச்சு!`
     AsyncStorage.removeItem('user_profile_photo').catch(() => {});
   };
 
-  // Load user normal/prasana photos
+  // Load user normal/prasana photos — AsyncStorage first, then Cloudinary restore
   React.useEffect(() => {
-    AsyncStorage.multiGet(['user_normal_photo', 'user_prasana_photo']).then(pairs => {
-      if (pairs[0][1]) setUserNormalPhoto(pairs[0][1]);
-      if (pairs[1][1]) setUserPrasanaPhoto(pairs[1][1]);
-    }).catch(() => {});
+    const loadUserModePhotos = async () => {
+      const pairs = await AsyncStorage.multiGet(['user_normal_photo', 'user_prasana_photo']).catch(() => [] as [string, string | null][]);
+      const normalVal = pairs[0]?.[1] ?? null;
+      const prasanaVal = pairs[1]?.[1] ?? null;
+      if (normalVal) setUserNormalPhoto(normalVal);
+      if (prasanaVal) setUserPrasanaPhoto(prasanaVal);
+      // Restore missing photos from Cloudinary meta (survives reinstall)
+      try {
+        const [cloudNormal, cloudPrasana] = await Promise.all([
+          normalVal ? null : getCloudinaryMeta('user_normal_photo'),
+          prasanaVal ? null : getCloudinaryMeta('user_prasana_photo'),
+        ]);
+        if (typeof cloudNormal === 'string' && cloudNormal) {
+          setUserNormalPhoto(cloudNormal);
+          AsyncStorage.setItem('user_normal_photo', cloudNormal).catch(() => {});
+        }
+        if (typeof cloudPrasana === 'string' && cloudPrasana) {
+          setUserPrasanaPhoto(cloudPrasana);
+          AsyncStorage.setItem('user_prasana_photo', cloudPrasana).catch(() => {});
+        }
+      } catch {}
+    };
+    loadUserModePhotos();
   }, []);
 
   // Pick User Normal avatar photo
@@ -393,6 +414,7 @@ AsyncStorage-ல் save ஆச்சு!`
         const { url } = await uploadToCloudinary(b64, mime, 'my-girls/user');
         setUserNormalPhoto(url);
         await AsyncStorage.setItem('user_normal_photo', url);
+        setCloudinaryMeta('user_normal_photo', url).catch(() => {}); // cloud backup
         // Clear cached profile so it re-analyzes
         const keys = await AsyncStorage.getAllKeys();
         const toRemove = keys.filter(k=>k.startsWith('avprofile_usrnorm'));
@@ -422,6 +444,7 @@ AsyncStorage-ல் save ஆச்சு!`
         const { url } = await uploadToCloudinary(b64, mime, 'my-girls/user');
         setUserPrasanaPhoto(url);
         await AsyncStorage.setItem('user_prasana_photo', url);
+        setCloudinaryMeta('user_prasana_photo', url).catch(() => {}); // cloud backup
         const keys = await AsyncStorage.getAllKeys();
         const toRemove = keys.filter(k=>k.startsWith('avprofile_usrpres'));
         if(toRemove.length) await AsyncStorage.multiRemove(toRemove);
@@ -467,7 +490,18 @@ AsyncStorage-ல் save ஆச்சு!`
         AsyncStorage.getItem('user_name'),
         AsyncStorage.getItem('user_behaviour'),
       ]);
-      if (userPhotoVal) setUserPhoto(userPhotoVal);
+      if (userPhotoVal) {
+        setUserPhoto(userPhotoVal);
+      } else {
+        // Restore from Cloudinary meta if missing locally (reinstall recovery)
+        try {
+          const cloudPhoto = await getCloudinaryMeta('user_profile_photo');
+          if (typeof cloudPhoto === 'string' && cloudPhoto) {
+            setUserPhoto(cloudPhoto);
+            AsyncStorage.setItem('user_profile_photo', cloudPhoto).catch(() => {});
+          }
+        } catch {}
+      }
       if (onlineVal !== null) setIsOnline(onlineVal === 'true');
       const autoEnabled = autoVal === 'true';
       setAutoMsgEnabled(autoEnabled);
