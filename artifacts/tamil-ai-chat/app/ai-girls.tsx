@@ -450,19 +450,23 @@ AsyncStorage-ல் save ஆச்சு!`
         const toRemove = allKeys.filter(k => k.startsWith('avprofile_usrpres'));
         if (toRemove.length) await AsyncStorage.multiRemove(toRemove);
         Alert.alert('✅ Prasana Avatar Saved!', 'Chat-ல் Prasana mode-ல் இந்த photo profile use ஆகும்.');
-        // Analyze in background — result cached for chat to pick up automatically
+        // Analyze in background — multimedia keys rotate 1→5, then OpenRouter fallback
         (async () => {
           try {
             const keysRaw = await AsyncStorage.getItem('api_keys_store');
             const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-            // multimedia_gemini_1..5 ONLY — same as chat.tsx analyzeAvatar
+            // multimedia_gemini_1..5 ONLY — chat keys (gemini_1..13) NOT touched
             const geminiKeys: string[] = [];
             for (let k = 1; k <= 5; k++) {
               const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
               if (v) geminiKeys.push(v);
             }
-            if (geminiKeys.length === 0) return;
+            const openrouterKey = (parsed['openrouter'] ?? '').trim();
+            if (geminiKeys.length === 0 && !openrouterKey) return;
             const PROFILE_PROMPT = `Analyze this avatar image and generate a short profile. Use these exact labels:\n\nAGE RANGE: (18-25 / 25-35 / 35-45 / 45+)\nFACE SHAPE: (oval/round/square/heart/diamond)\nHAIRSTYLE: (length, color, texture, style)\nCLOTHING STYLE: (traditional saree / modern / casual / describe exactly)\nUNCOVERED BODY PARTS: (what skin is visible — arms, midriff, legs, neckline, etc.)\nEXPRESSION: (smile/serious/playful/confident/shy)\nBODY LANGUAGE: (posture, stance, energy)\nOVERALL VIBE: (5-8 word characterization)\nPERSONALITY IMPRESSION: (what this person projects)\nCOMMUNICATION STYLE: (formal/casual/warm/direct/playful)\n\nEach label: 1 sentence max.`;
+            const cKey = 'avprofile_usrpres_' + url.replace(/[^a-zA-Z0-9]/g, '').slice(-24);
+
+            // Step 1: multimedia_gemini_1..5 rotate
             for (const gKey of geminiKeys) {
               try {
                 const res = await fetch(
@@ -479,11 +483,33 @@ AsyncStorage-ல் save ஆச்சு!`
                   const j = await res.json() as any;
                   const out: string = j?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
                   if (out.length > 30) {
-                    // Cache with chat.tsx slot pattern: avprofile_usrpres_<url tail>
-                    const cKey = 'avprofile_usrpres_' + url.replace(/[^a-zA-Z0-9]/g, '').slice(-24);
                     await AsyncStorage.setItem(cKey, out.slice(0, 800));
                     return;
                   }
+                }
+              } catch {}
+            }
+
+            // Step 2: all multimedia keys failed → OpenRouter fallback
+            if (openrouterKey) {
+              try {
+                const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-exp:free',
+                    max_tokens: 512,
+                    messages: [{ role: 'user', content: [
+                      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } },
+                      { type: 'text', text: PROFILE_PROMPT },
+                    ]}],
+                  }),
+                  signal: AbortSignal.timeout(45000),
+                });
+                if (res.ok) {
+                  const j = await res.json() as any;
+                  const out: string = (j?.choices?.[0]?.message?.content ?? '').trim();
+                  if (out.length > 30) { await AsyncStorage.setItem(cKey, out.slice(0, 800)); return; }
                 }
               } catch {}
             }

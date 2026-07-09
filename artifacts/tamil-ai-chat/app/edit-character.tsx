@@ -203,20 +203,22 @@ Each label: 1 sentence max.`;
     if (attireVal) setAttireDesc(attireVal);
   };
 
-  // Auto-analyze uploaded avatar → same logic as chat.tsx analyzeAvatar
+  // Auto-analyze uploaded avatar → multimedia keys rotate 1→5, then OpenRouter fallback
   // cacheUri: cloudinary URL used as cache key (matches chat's avprofile_chpres_... key)
   const analyzeAndFillFields = async (base64: string, cacheUri?: string) => {
     try {
       const keysRaw = await AsyncStorage.getItem('api_keys_store');
       const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-      // multimedia_gemini_1..5 ONLY — same as chat.tsx (no fallback to chat keys)
+      // multimedia_gemini_1..5 ONLY — chat keys (gemini_1..13) NOT touched
       const geminiKeys: string[] = [];
       for (let k = 1; k <= 5; k++) {
         const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
         if (v) geminiKeys.push(v);
       }
-      if (geminiKeys.length === 0) {
-        Alert.alert('⚠️ Multimedia Key இல்லை', 'Settings → API Keys → Multimedia Gemini 1-5 -ல் key add பண்ணுங்க. Analysis-க்கு அது வேணும்.');
+      const openrouterKey = (parsed['openrouter'] ?? '').trim();
+
+      if (geminiKeys.length === 0 && !openrouterKey) {
+        Alert.alert('⚠️ Key இல்லை', 'Settings → API Keys → Multimedia Gemini (1-5) அல்லது OpenRouter key add பண்ணுங்க. Analysis-க்கு அது வேணும்.');
         return;
       }
 
@@ -231,6 +233,7 @@ Each label: 1 sentence max.`;
         if (cached) { fillBoxesFromProfile(cached); return; }
       }
 
+      // ── Step 1: multimedia_gemini_1..5 — rotate one by one ──
       for (const gKey of geminiKeys) {
         try {
           const res = await fetch(
@@ -247,7 +250,6 @@ Each label: 1 sentence max.`;
             const j = await res.json() as any;
             const out: string = j?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
             if (out.length > 30) {
-              // Cache result — same as chat.tsx
               if (cKey) await AsyncStorage.setItem(cKey, out.slice(0, 800));
               fillBoxesFromProfile(out);
               return;
@@ -255,7 +257,36 @@ Each label: 1 sentence max.`;
           }
         } catch {}
       }
-      Alert.alert('⚠️ Analysis தோல்வி', 'Gemini key quota முடிஞ்சிருக்கலாம் — வேற key try பண்ணுங்க.');
+
+      // ── Step 2: all multimedia keys failed → OpenRouter (Gemini via OpenRouter) fallback ──
+      if (openrouterKey) {
+        try {
+          const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'google/gemini-2.0-flash-exp:free',
+              max_tokens: 512,
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                { type: 'text', text: AVATAR_PROFILE_PROMPT },
+              ]}],
+            }),
+            signal: AbortSignal.timeout(45000),
+          });
+          if (res.ok) {
+            const j = await res.json() as any;
+            const out: string = (j?.choices?.[0]?.message?.content ?? '').trim();
+            if (out.length > 30) {
+              if (cKey) await AsyncStorage.setItem(cKey, out.slice(0, 800));
+              fillBoxesFromProfile(out);
+              return;
+            }
+          }
+        } catch {}
+      }
+
+      Alert.alert('⚠️ Analysis தோல்வி', 'எல்லா Multimedia keys-உம் OpenRouter-உம் fail ஆச்சு. Key quota check பண்ணுங்க.');
     } catch {}
   };
 
