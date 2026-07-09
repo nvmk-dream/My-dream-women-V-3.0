@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
@@ -203,6 +204,21 @@ Each label: 1 sentence max.`;
     if (attireVal) setAttireDesc(attireVal);
   };
 
+  // Downscale a picked photo to a small JPEG before sending to Gemini/OpenRouter vision.
+  // Gallery photos picked without crop (allowsEditing:false) can be 4000px+ / several MB —
+  // that base64 payload times out or gets rejected by the vision APIs. A ~800px, compressed
+  // copy is plenty for a profile description and keeps the request fast & reliable.
+  const resizeForAnalysis = async (uri: string): Promise<string | null> => {
+    try {
+      const out = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      return out.base64 ?? null;
+    } catch { return null; }
+  };
+
   // Auto-analyze uploaded avatar → multimedia keys rotate 1→5, then OpenRouter fallback
   // cacheUri: cloudinary URL used as cache key (matches chat's avprofile_chpres_... key)
   const analyzeAndFillFields = async (base64: string, cacheUri?: string) => {
@@ -306,8 +322,11 @@ Each label: 1 sentence max.`;
           const cloudUrl = await uploadToCloudinary(asset.base64, mime, 'my-girls/avatars');
           setAvatarPhotoUri(cloudUrl.url);
           // Auto-analyze: fill Face/Body/Attire fields from photo (same as chat.tsx analyzeAvatar)
+          // Resize/compress FIRST — full-res gallery photos (no crop) make the base64 payload huge
+          // and time out the Gemini vision call. Downscale to a small copy just for analysis.
           setAnalyzingFields(true);
-          await analyzeAndFillFields(asset.base64, cloudUrl.url).finally(() => setAnalyzingFields(false));
+          const analysisB64 = await resizeForAnalysis(asset.uri) ?? asset.base64;
+          await analyzeAndFillFields(analysisB64, cloudUrl.url).finally(() => setAnalyzingFields(false));
         } catch {
           Alert.alert('Upload failed', 'Cloud upload தோல்வி — ☁️ Cloud URL option use பண்ணுங்க');
         } finally {
@@ -350,8 +369,10 @@ Each label: 1 sentence max.`;
           if (mode === 'normal') setNormalAvatarUri(cloudUrl.url);
           else setPresanaAvatarUri(cloudUrl.url);
           // Auto-analyze presana: same as chat.tsx analyzeAvatar — pass cloudUrl for caching
+          // Resize/compress FIRST — see note in pickAvatar above
           setAnalyzingFields(true);
-          await analyzeAndFillFields(asset.base64, cloudUrl.url).finally(() => setAnalyzingFields(false));
+          const analysisB64m = await resizeForAnalysis(asset.uri) ?? asset.base64;
+          await analyzeAndFillFields(analysisB64m, cloudUrl.url).finally(() => setAnalyzingFields(false));
         } catch {
           Alert.alert('Upload Failed', 'Cloud upload தோல்வி — ☁️ Cloud URL option use பண்ணுங்க');
         } finally { setUploadingAvatar(false); }

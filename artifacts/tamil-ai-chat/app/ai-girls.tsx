@@ -6,6 +6,7 @@ import {
   StatusBar,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -453,6 +454,17 @@ AsyncStorage-ல் save ஆச்சு!`
         // Analyze in background — multimedia keys rotate 1→5, then OpenRouter fallback
         (async () => {
           try {
+            // Downscale first — full-res gallery photo (no crop) makes the base64 payload
+            // huge and times out the vision API for every key. ~800px copy is enough.
+            let analysisB64 = b64;
+            try {
+              const manip = await ImageManipulator.manipulateAsync(
+                asset.uri,
+                [{ resize: { width: 800 } }],
+                { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+              );
+              if (manip.base64) analysisB64 = manip.base64;
+            } catch {}
             const keysRaw = await AsyncStorage.getItem('api_keys_store');
             const parsed = keysRaw ? JSON.parse(keysRaw) : {};
             // multimedia_gemini_1..5 ONLY — chat keys (gemini_1..13) NOT touched
@@ -474,7 +486,7 @@ AsyncStorage-ல் save ஆச்சு!`
                   { method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [
-                      { inlineData: { mimeType: 'image/jpeg', data: b64 } },
+                      { inlineData: { mimeType: 'image/jpeg', data: analysisB64 } },
                       { text: PROFILE_PROMPT }
                     ]}]}),
                     signal: AbortSignal.timeout(30000) }
@@ -500,7 +512,7 @@ AsyncStorage-ல் save ஆச்சு!`
                     model: 'google/gemini-2.0-flash-exp:free',
                     max_tokens: 512,
                     messages: [{ role: 'user', content: [
-                      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } },
+                      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${analysisB64}` } },
                       { type: 'text', text: PROFILE_PROMPT },
                     ]}],
                   }),
