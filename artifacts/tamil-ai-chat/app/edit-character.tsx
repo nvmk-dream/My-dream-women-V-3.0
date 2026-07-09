@@ -249,8 +249,13 @@ Each label: 1 sentence max.`;
         if (cached) { fillBoxesFromProfile(cached); return; }
       }
 
+      // Diagnostics: collect exactly why each attempt failed (status code / error text)
+      // so we can show the REAL reason instead of a generic message.
+      const attemptLog: string[] = [];
+
       // ── Step 1: multimedia_gemini_1..5 — rotate one by one ──
-      for (const gKey of geminiKeys) {
+      for (let idx = 0; idx < geminiKeys.length; idx++) {
+        const gKey = geminiKeys[idx];
         try {
           const res = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
@@ -270,8 +275,15 @@ Each label: 1 sentence max.`;
               fillBoxesFromProfile(out);
               return;
             }
+            attemptLog.push(`Key${idx + 1}: 200 but empty/short output`);
+          } else {
+            let bodyTxt = '';
+            try { bodyTxt = (await res.text()).slice(0, 120); } catch {}
+            attemptLog.push(`Key${idx + 1}: HTTP ${res.status} ${bodyTxt}`);
           }
-        } catch {}
+        } catch (e: any) {
+          attemptLog.push(`Key${idx + 1}: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'timeout' : (e?.message ?? 'network error')}`);
+        }
       }
 
       // ── Step 2: all multimedia keys failed → OpenRouter (Gemini via OpenRouter) fallback ──
@@ -298,12 +310,23 @@ Each label: 1 sentence max.`;
               fillBoxesFromProfile(out);
               return;
             }
+            attemptLog.push('OpenRouter: 200 but empty/short output');
+          } else {
+            let bodyTxt = '';
+            try { bodyTxt = (await res.text()).slice(0, 120); } catch {}
+            attemptLog.push(`OpenRouter: HTTP ${res.status} ${bodyTxt}`);
           }
-        } catch {}
+        } catch (e: any) {
+          attemptLog.push(`OpenRouter: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'timeout' : (e?.message ?? 'network error')}`);
+        }
+      } else {
+        attemptLog.push('OpenRouter: key இல்லை');
       }
 
-      Alert.alert('⚠️ Analysis தோல்வி', 'எல்லா Multimedia keys-உம் OpenRouter-உம் fail ஆச்சு. Key quota check பண்ணுங்க.');
-    } catch {}
+      Alert.alert('⚠️ Analysis தோல்வி', attemptLog.join('\n').slice(0, 900));
+    } catch (e: any) {
+      Alert.alert('⚠️ Analysis Error', String(e?.message ?? e).slice(0, 300));
+    }
   };
 
   const pickAvatar = async () => {
