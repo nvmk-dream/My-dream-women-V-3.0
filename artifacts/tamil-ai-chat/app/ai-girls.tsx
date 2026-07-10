@@ -453,6 +453,13 @@ AsyncStorage-ல் save ஆச்சு!`
         Alert.alert('✅ Prasana Avatar Saved!', 'Chat-ல் Prasana mode-ல் இந்த photo profile use ஆகும்.');
         // Analyze in background — multimedia keys rotate 1→5, then OpenRouter fallback
         (async () => {
+          // AbortSignal.timeout() isn't implemented on Hermes on some devices — it throws
+          // synchronously before the fetch even fires. Manual AbortController instead.
+          const timeoutSignal = (ms: number) => {
+            const ctrl = new AbortController();
+            setTimeout(() => ctrl.abort(), ms);
+            return ctrl.signal;
+          };
           try {
             // Downscale first — full-res gallery photo (no crop) makes the base64 payload
             // huge and times out the vision API for every key. ~800px copy is enough.
@@ -489,7 +496,7 @@ AsyncStorage-ல் save ஆச்சு!`
                       { inlineData: { mimeType: 'image/jpeg', data: analysisB64 } },
                       { text: PROFILE_PROMPT }
                     ]}]}),
-                    signal: AbortSignal.timeout(30000) }
+                    signal: timeoutSignal(30000) }
                 );
                 if (res.ok) {
                   const j = await res.json() as any;
@@ -516,7 +523,7 @@ AsyncStorage-ல் save ஆச்சு!`
                       { type: 'text', text: PROFILE_PROMPT },
                     ]}],
                   }),
-                  signal: AbortSignal.timeout(45000),
+                  signal: timeoutSignal(45000),
                 });
                 if (res.ok) {
                   const j = await res.json() as any;

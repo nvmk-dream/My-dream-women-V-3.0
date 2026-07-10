@@ -221,6 +221,15 @@ Each label: 1 sentence max.`;
 
   // Auto-analyze uploaded avatar → multimedia keys rotate 1→5, then OpenRouter fallback
   // cacheUri: cloudinary URL used as cache key (matches chat's avprofile_chpres_... key)
+  // AbortSignal.timeout() isn't implemented on Hermes on some devices — it throws
+  // "AbortSignal.timeout is not a function" synchronously, before the fetch even fires.
+  // Use a manual AbortController + setTimeout instead, which works everywhere.
+  const timeoutSignal = (ms: number) => {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), ms);
+    return ctrl.signal;
+  };
+
   const analyzeAndFillFields = async (base64: string, cacheUri?: string) => {
     try {
       const keysRaw = await AsyncStorage.getItem('api_keys_store');
@@ -265,7 +274,7 @@ Each label: 1 sentence max.`;
                 { inlineData: { mimeType: 'image/jpeg', data: base64 } },
                 { text: AVATAR_PROFILE_PROMPT }
               ]}]}),
-              signal: AbortSignal.timeout(30000) }
+              signal: timeoutSignal(30000) }
           );
           if (res.ok) {
             const j = await res.json() as any;
@@ -300,7 +309,7 @@ Each label: 1 sentence max.`;
                 { type: 'text', text: AVATAR_PROFILE_PROMPT },
               ]}],
             }),
-            signal: AbortSignal.timeout(45000),
+            signal: timeoutSignal(45000),
           });
           if (res.ok) {
             const j = await res.json() as any;
