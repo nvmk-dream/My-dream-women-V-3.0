@@ -703,6 +703,42 @@ export async function analyzeFile(params: {
   }
 }
 
+// ── Avatar profile analysis — server-side Gemini keys (stable, no app setup) ──
+// Replaces the old client-side flow that rotated through user-entered
+// multimedia_gemini_1..5 keys (often empty/unset) and a fragile 30s timeout.
+// The server holds its own key pool + OpenRouter fallback, same as media-chat.
+export interface AvatarProfile {
+  face: string;
+  body: string;
+  attire: string;
+  personality: string;
+  communicationStyle: string;
+  raw: string;
+  provider: string;
+}
+
+export async function analyzeAvatarProfile(base64: string, mimeType: string = 'image/jpeg'): Promise<AvatarProfile> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  try {
+    const res = await fetch(`${REPLIT_API}/api/avatar-profile/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, mimeType }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as any;
+      throw new Error(err?.error || `Avatar analysis failed: HTTP ${res.status}`);
+    }
+    return await res.json() as AvatarProfile;
+  } catch (e: any) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
 // ── Create Cloudinary folder via server Admin API ──────────────────────────
 export async function createCloudinaryFolder(folderPath: string): Promise<boolean> {
   try {

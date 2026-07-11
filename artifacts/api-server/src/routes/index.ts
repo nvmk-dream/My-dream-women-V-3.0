@@ -11,6 +11,7 @@ import generateImageRouter from "./generate-image";
 import analyzeFileRouter from "./analyze-file";
 import mediaChatRouter from "./media-chat";
 import appConfigRouter from "./app-config";
+import avatarProfileRouter from "./avatar-profile";
 
 const router: IRouter = Router();
 
@@ -25,6 +26,7 @@ router.use(generateImageRouter);
 router.use(analyzeFileRouter);
 router.use(mediaChatRouter);
 router.use(appConfigRouter);
+router.use(avatarProfileRouter);
 
 // Temporary backup download route
 router.get("/download/backup", (_req, res) => {

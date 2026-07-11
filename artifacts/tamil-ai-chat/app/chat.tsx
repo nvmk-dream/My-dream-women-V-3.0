@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta } from '../services/api';
+import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -311,7 +311,11 @@ export default function ChatScreen() {
   // Reload persona when returning from edit-character screen
   useFocusEffect(useCallback(() => { reloadPersona(); }, [reloadPersona]));
 
-  // ── Avatar Profile Analysis — Qwen2-VL → Florence-2 → LLaVA (no Gemini) ──
+  // ── Avatar Profile Analysis — server-side Gemini keys + OpenRouter fallback ──
+  // Was previously client-side (app-entered multimedia_gemini_1..5 keys, often
+  // empty) with a fragile HF fallback chain. Now delegates to the same
+  // /api/avatar-profile/analyze endpoint edit-character.tsx uses, which holds
+  // its own stable server keys and a robust prompt/parsing fallback.
   useEffect(() => {
     // Convert any URI (file / http) to base64 string
     const toBase64 = async (uri: string): Promise<string> => {
@@ -331,8 +335,6 @@ export default function ChatScreen() {
     };
 
     // Analyze one image → structured profile (caches per URI, respects user edits)
-    // Primary: Gemini Flash (uses user's existing Gemini keys — no extra setup needed)
-    // Fallback: HuggingFace Qwen2-VL / Florence-2 / LLaVA (if HF key set)
     const analyzeAvatar = async (uri: string, slot: string): Promise<string | null> => {
       if (!uri) return null;
       const cKey = 'avprofile_' + slot + '_' + uri.replace(/[^a-zA-Z0-9]/g,'').slice(-24);
@@ -344,121 +346,15 @@ export default function ChatScreen() {
         const cached = await AsyncStorage.getItem(cKey);
         if (cached) return cached;
 
-        const keysRaw = await AsyncStorage.getItem('api_keys_store');
-        const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-        const hfKey = (parsed['hf'] ?? '').trim();
-        // Avatar analysis: Multimedia Gemini keys ONLY (multimedia_gemini_1…5)
-        // Chat keys (gemini_1…13) reserved for chat — not used here
-        const geminiKeys: string[] = [];
-        for (let k = 1; k <= 5; k++) {
-          const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
-          if (v) geminiKeys.push(v);
-        }
-
         const base64 = await toBase64(uri);
         if (!base64) return null;
 
-        const PROFILE_PROMPT = `Analyze this avatar image and generate a short profile. Use these exact labels:
-
-AGE RANGE: (18-25 / 25-35 / 35-45 / 45+)
-FACE SHAPE: (oval/round/square/heart/diamond)
-HAIRSTYLE: (length, color, texture, style)
-CLOTHING STYLE: (traditional saree / modern / casual / describe exactly)
-UNCOVERED BODY PARTS: (what skin is visible — arms, midriff, legs, neckline, etc.)
-EXPRESSION: (smile/serious/playful/confident/shy)
-BODY LANGUAGE: (posture, stance, energy)
-OVERALL VIBE: (5-8 word characterization)
-PERSONALITY IMPRESSION: (what this person projects)
-COMMUNICATION STYLE: (formal/casual/warm/direct/playful)
-
-Each label: 1 sentence max.`;
-
-        // ── Gemini Flash (PRIMARY — uses user's chat Gemini keys) ──────────
-        for (const gKey of geminiKeys) {
-          try {
-            const gRes = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
-              { method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [
-                  { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-                  { text: PROFILE_PROMPT }
-                ]}]}),
-                signal: AbortSignal.timeout(30000) }
-            );
-            if (gRes.ok) {
-              const gj = await gRes.json() as any;
-              const out: string = gj?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-              if (out.length > 30) {
-                await AsyncStorage.setItem(cKey, out.slice(0, 800));
-                return out.slice(0, 800);
-              }
-            }
-          } catch {}
+        const profile = await analyzeAvatarProfile(base64, 'image/jpeg');
+        const out = profile.raw?.trim();
+        if (out && out.length > 20) {
+          await AsyncStorage.setItem(cKey, out.slice(0, 800));
+          return out.slice(0, 800);
         }
-
-        // ── HuggingFace fallback (only if hfKey set) ───────────────────────
-        if (!hfKey) return null;
-
-        const imgContent = { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } };
-
-        // ── Qwen2-VL ──────────────────────────────────────────────────────
-        try {
-          const r1 = await fetch(
-            'https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct/v1/chat/completions',
-            { method:'POST', headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-              body: JSON.stringify({ model:'Qwen/Qwen2-VL-7B-Instruct', max_tokens:400,
-                messages:[{role:'user',content:[imgContent,{type:'text',text:PROFILE_PROMPT}]}] }),
-              signal: AbortSignal.timeout(60000) }
-          );
-          if (r1.ok) {
-            const j1 = await r1.json() as any;
-            const out: string = j1?.choices?.[0]?.message?.content?.trim() ?? '';
-            if (out.length > 30) {
-              await AsyncStorage.setItem(cKey, out.slice(0,800));
-              return out.slice(0,800);
-            }
-          }
-        } catch {}
-
-        // ── Florence-2 ────────────────────────────────────────────────────
-        try {
-          const r2 = await fetch(
-            'https://api-inference.huggingface.co/models/microsoft/Florence-2-large',
-            { method:'POST', headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-              body: JSON.stringify({ inputs:'<MORE_DETAILED_CAPTION>' }),
-              signal: AbortSignal.timeout(45000) }
-          );
-          if (r2.ok) {
-            const j2 = await r2.json() as any;
-            const cap: string = (Array.isArray(j2)?j2[0]?.generated_text:j2?.generated_text) ?? '';
-            if (cap.length > 20) {
-              const out = 'OVERALL VIBE: ' + cap.slice(0,400);
-              await AsyncStorage.setItem(cKey, out);
-              return out;
-            }
-          }
-        } catch {}
-
-        // ── LLaVA ─────────────────────────────────────────────────────────
-        try {
-          const r3 = await fetch(
-            'https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf/v1/chat/completions',
-            { method:'POST', headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-              body: JSON.stringify({ model:'llava-hf/llava-1.5-7b-hf', max_tokens:400,
-                messages:[{role:'user',content:[imgContent,{type:'text',text:PROFILE_PROMPT}]}] }),
-              signal: AbortSignal.timeout(60000) }
-          );
-          if (r3.ok) {
-            const j3 = await r3.json() as any;
-            const out: string = j3?.choices?.[0]?.message?.content?.trim() ?? '';
-            if (out.length > 30) {
-              await AsyncStorage.setItem(cKey, out.slice(0,800));
-              return out.slice(0,800);
-            }
-          }
-        } catch {}
-
         return null;
       } catch { return null; }
     };
@@ -482,7 +378,7 @@ Each label: 1 sentence max.`;
 
 
   const welcome = persona
-    ? (persona.greeting?.trim() || `வணக்கம்! நான் ${persona.name}. என்ன கதைக்கணும்? 😊`)
+    ? (persona.greeting?.trim() || `வணக்கம்!  ${persona.name}. ? 😊`)
     : 'வணக்கம்! நான் Tamil AI. என்ன உதவி செய்யட்டும்? 😊';
 
   const [messages, setMessages] = useState<Message[]>([]);

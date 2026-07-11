@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
-import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -171,40 +171,16 @@ export default function EditCharacterScreen() {
     else Alert.alert('Default இல்லை', 'முதலில் ஒரு prompt-ஐ ⭐ Default Save பண்ணுங்க.');
   };
 
-  // Same PROFILE_PROMPT as chat.tsx analyzeAvatar — exact match
-  const AVATAR_PROFILE_PROMPT = `Analyze this avatar image and generate a short profile. Use these exact labels:
-
-AGE RANGE: (18-25 / 25-35 / 35-45 / 45+)
-FACE SHAPE: (oval/round/square/heart/diamond)
-HAIRSTYLE: (length, color, texture, style)
-CLOTHING STYLE: (traditional saree / modern / casual / describe exactly)
-UNCOVERED BODY PARTS: (what skin is visible — arms, midriff, legs, neckline, etc.)
-EXPRESSION: (smile/serious/playful/confident/shy)
-BODY LANGUAGE: (posture, stance, energy)
-OVERALL VIBE: (5-8 word characterization)
-PERSONALITY IMPRESSION: (what this person projects)
-COMMUNICATION STYLE: (formal/casual/warm/direct/playful)
-
-Each label: 1 sentence max.`;
-
-  // Map chat's profile labels → FACE / BODY / ATTIRE boxes
-  const fillBoxesFromProfile = (out: string) => {
-    const age   = out.match(/AGE RANGE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const face  = out.match(/FACE SHAPE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const hair  = out.match(/HAIRSTYLE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const cloth = out.match(/CLOTHING STYLE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const skin  = out.match(/UNCOVERED BODY PARTS:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const body  = out.match(/BODY LANGUAGE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const vibe  = out.match(/OVERALL VIBE:\s*(.+)/i)?.[1]?.trim() ?? '';
-    const faceVal   = [age, face, hair].filter(Boolean).join(', ');
-    const bodyVal   = [skin, body].filter(Boolean).join(', ');
-    const attireVal = [cloth, vibe].filter(Boolean).join(', ');
-    if (faceVal)   setFaceDesc(faceVal);
-    if (bodyVal)   setBodyDesc(bodyVal);
-    if (attireVal) setAttireDesc(attireVal);
+  // Map backend's structured profile response → FACE / BODY / ATTIRE boxes.
+  // Parsing now happens server-side (avatar-profile.ts) with a looser regex and
+  // a raw-text fallback, so this just applies whatever came back.
+  const fillBoxesFromProfile = (profile: { face: string; body: string; attire: string }) => {
+    if (profile.face)   setFaceDesc(profile.face);
+    if (profile.body)   setBodyDesc(profile.body);
+    if (profile.attire) setAttireDesc(profile.attire);
   };
 
-  // Downscale a picked photo to a small JPEG before sending to Gemini/OpenRouter vision.
+  // Downscale a picked photo to a small JPEG before sending to the vision API.
   // Gallery photos picked without crop (allowsEditing:false) can be 4000px+ / several MB —
   // that base64 payload times out or gets rejected by the vision APIs. A ~800px, compressed
   // copy is plenty for a profile description and keeps the request fast & reliable.
@@ -219,34 +195,14 @@ Each label: 1 sentence max.`;
     } catch { return null; }
   };
 
-  // Auto-analyze uploaded avatar → multimedia keys rotate 1→5, then OpenRouter fallback
+  // Auto-analyze uploaded avatar via the server's /api/avatar-profile/analyze
+  // endpoint — server holds its own stable Gemini key pool (GEMINI_API_KEY_1-5)
+  // and an OpenRouter fallback, same infra media-chat.ts already uses for chat
+  // images. This replaces the old client-side flow that depended on the user
+  // having entered app-local "Multimedia Gemini" keys.
   // cacheUri: cloudinary URL used as cache key (matches chat's avprofile_chpres_... key)
-  // AbortSignal.timeout() isn't implemented on Hermes on some devices — it throws
-  // "AbortSignal.timeout is not a function" synchronously, before the fetch even fires.
-  // Use a manual AbortController + setTimeout instead, which works everywhere.
-  const timeoutSignal = (ms: number) => {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), ms);
-    return ctrl.signal;
-  };
-
   const analyzeAndFillFields = async (base64: string, cacheUri?: string) => {
     try {
-      const keysRaw = await AsyncStorage.getItem('api_keys_store');
-      const parsed = keysRaw ? JSON.parse(keysRaw) : {};
-      // multimedia_gemini_1..5 ONLY — chat keys (gemini_1..13) NOT touched
-      const geminiKeys: string[] = [];
-      for (let k = 1; k <= 5; k++) {
-        const v = (parsed[`multimedia_gemini_${k}`] ?? '').trim();
-        if (v) geminiKeys.push(v);
-      }
-      const openrouterKey = (parsed['openrouter'] ?? '').trim();
-
-      if (geminiKeys.length === 0 && !openrouterKey) {
-        Alert.alert('⚠️ Key இல்லை', 'Settings → API Keys → Multimedia Gemini (1-5) அல்லது OpenRouter key add பண்ணுங்க. Analysis-க்கு அது வேணும்.');
-        return;
-      }
-
       // Cache key matching chat.tsx pattern: avprofile_chpres_<uri tail>
       const cKey = cacheUri
         ? 'avprofile_chpres_' + cacheUri.replace(/[^a-zA-Z0-9]/g, '').slice(-24)
@@ -254,85 +210,19 @@ Each label: 1 sentence max.`;
 
       // Check cache first (same as chat.tsx)
       if (cKey) {
-        const cached = await AsyncStorage.getItem(cKey);
-        if (cached) { fillBoxesFromProfile(cached); return; }
-      }
-
-      // Diagnostics: collect exactly why each attempt failed (status code / error text)
-      // so we can show the REAL reason instead of a generic message.
-      const attemptLog: string[] = [];
-
-      // ── Step 1: multimedia_gemini_1..5 — rotate one by one ──
-      for (let idx = 0; idx < geminiKeys.length; idx++) {
-        const gKey = geminiKeys[idx];
-        try {
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gKey}`,
-            { method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [
-                { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-                { text: AVATAR_PROFILE_PROMPT }
-              ]}]}),
-              signal: timeoutSignal(30000) }
-          );
-          if (res.ok) {
-            const j = await res.json() as any;
-            const out: string = j?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-            if (out.length > 30) {
-              if (cKey) await AsyncStorage.setItem(cKey, out.slice(0, 800));
-              fillBoxesFromProfile(out);
-              return;
-            }
-            attemptLog.push(`Key${idx + 1}: 200 but empty/short output`);
-          } else {
-            let bodyTxt = '';
-            try { bodyTxt = (await res.text()).slice(0, 120); } catch {}
-            attemptLog.push(`Key${idx + 1}: HTTP ${res.status} ${bodyTxt}`);
-          }
-        } catch (e: any) {
-          attemptLog.push(`Key${idx + 1}: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'timeout' : (e?.message ?? 'network error')}`);
+        const cachedRaw = await AsyncStorage.getItem(cKey);
+        if (cachedRaw) {
+          try { fillBoxesFromProfile(JSON.parse(cachedRaw)); return; } catch {}
         }
       }
 
-      // ── Step 2: all multimedia keys failed → OpenRouter (Gemini via OpenRouter) fallback ──
-      if (openrouterKey) {
-        try {
-          const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'google/gemini-2.0-flash-exp:free',
-              max_tokens: 512,
-              messages: [{ role: 'user', content: [
-                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                { type: 'text', text: AVATAR_PROFILE_PROMPT },
-              ]}],
-            }),
-            signal: timeoutSignal(45000),
-          });
-          if (res.ok) {
-            const j = await res.json() as any;
-            const out: string = (j?.choices?.[0]?.message?.content ?? '').trim();
-            if (out.length > 30) {
-              if (cKey) await AsyncStorage.setItem(cKey, out.slice(0, 800));
-              fillBoxesFromProfile(out);
-              return;
-            }
-            attemptLog.push('OpenRouter: 200 but empty/short output');
-          } else {
-            let bodyTxt = '';
-            try { bodyTxt = (await res.text()).slice(0, 120); } catch {}
-            attemptLog.push(`OpenRouter: HTTP ${res.status} ${bodyTxt}`);
-          }
-        } catch (e: any) {
-          attemptLog.push(`OpenRouter: ${e?.name === 'AbortError' || e?.name === 'TimeoutError' ? 'timeout' : (e?.message ?? 'network error')}`);
-        }
-      } else {
-        attemptLog.push('OpenRouter: key இல்லை');
+      const profile = await analyzeAvatarProfile(base64, 'image/jpeg');
+      if (!profile.face && !profile.body && !profile.attire) {
+        Alert.alert('⚠️ Analysis தோல்வி', 'AI response-ல் expected fields வரல். மீண்டும் try பண்ணுங்க.');
+        return;
       }
-
-      Alert.alert('⚠️ Analysis தோல்வி', attemptLog.join('\n').slice(0, 900));
+      if (cKey) await AsyncStorage.setItem(cKey, JSON.stringify(profile));
+      fillBoxesFromProfile(profile);
     } catch (e: any) {
       Alert.alert('⚠️ Analysis Error', String(e?.message ?? e).slice(0, 300));
     }
