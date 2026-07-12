@@ -100,7 +100,7 @@ jobs:
       - name: Expo Prebuild
         working-directory: artifacts/tamil-ai-chat
         env:
-          EXPO_PUBLIC_API_URL: https://my-dream-women.onrender.com
+          EXPO_PUBLIC_API_URL: https://my-dream-women-v-3-0.onrender.com
           EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
           EXPO_NO_TELEMETRY: 1
           CI: 1
@@ -144,7 +144,7 @@ jobs:
       - name: Bundle JS with expo export:embed
         working-directory: artifacts/tamil-ai-chat
         env:
-          EXPO_PUBLIC_API_URL: https://my-dream-women.onrender.com
+          EXPO_PUBLIC_API_URL: https://my-dream-women-v-3-0.onrender.com
           EXPO_NO_TELEMETRY: 1
           NODE_ENV: production
         run: |
@@ -201,7 +201,7 @@ jobs:
         run: |
           echo "Triggering Render API server redeploy..."
           RESP=$(curl -s -o /tmp/render_resp.json -w "%{http_code}" \
-            "https://api.render.com/deploy/srv-d8oe990k1i2s738h0uhg?key=${{ secrets.RENDER_KEY }}")
+            "https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}")
           echo "Render deploy status: $RESP"
           cat /tmp/render_resp.json || true
           echo "Render redeploy triggered — server will update in ~2 min"
