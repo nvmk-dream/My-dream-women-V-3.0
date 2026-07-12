@@ -64,6 +64,8 @@ export default function EditCharacterScreen() {
   const [userNormalBeh, setUserNormalBeh] = useState('');
   const [userPresanaBeh, setUserPresanaBeh] = useState('');
   const [userBodyDesc, setUserBodyDesc] = useState('');
+  const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | undefined>(undefined);
+  const [uploadingUserPrasanaPhoto, setUploadingUserPrasanaPhoto] = useState(false);
 
   // Section B expand state
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -118,6 +120,10 @@ export default function EditCharacterScreen() {
         setUserNormalBeh(data.userNormalBeh ?? '');
         setUserPresanaBeh(data.userPresanaBeh ?? '');
         setUserBodyDesc(data.userBodyDesc ?? '');
+        // Load per-character user prasana photo
+        const userPrasanaKey = `user_prasana_photo_${base.id}`;
+        const savedUserPrasana = await AsyncStorage.getItem(userPrasanaKey).catch(() => null);
+        if (savedUserPrasana) setUserPrasanaPhotoUri(savedUserPrasana);
         setBasePromptEdit(data.basePromptEdit ?? BASE_PROMPT);
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
@@ -131,6 +137,34 @@ export default function EditCharacterScreen() {
     setNormalMode(val);
     if (base) {
       await AsyncStorage.setItem(`mood_mode_${base.id}`, val ? 'normal' : 'presana');
+    }
+  };
+
+  const pickUserPrasanaPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setUploadingUserPrasanaPhoto(true);
+      try {
+        const mime = asset.mimeType || 'image/jpeg';
+        const b64 = asset.base64 ?? await (async () => {
+          const r = await ImageManipulator.manipulateAsync(asset.uri, [], { base64: true });
+          return r.base64 ?? '';
+        })();
+        const { url } = await uploadToCloudinary(b64, mime, 'my-girls/user');
+        setUserPrasanaPhotoUri(url);
+        // Clear old analysis cache for this character
+        const allKeys = await AsyncStorage.getAllKeys();
+        const toRemove = allKeys.filter(k => k.startsWith('avprofile_usrpres_'));
+        if (toRemove.length) await AsyncStorage.multiRemove(toRemove);
+        Alert.alert('✅ User Photo Saved!', 'Chat-ல் Prasana mode-ல் இந்த photo use ஆகும்.');
+      } catch {
+        setUserPrasanaPhotoUri(asset.uri);
+      } finally { setUploadingUserPrasanaPhoto(false); }
     }
   };
 
@@ -149,6 +183,10 @@ export default function EditCharacterScreen() {
         imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
+      // Save per-character user prasana photo separately
+      const userPrasanaKey = `user_prasana_photo_${persona.id}`;
+      if (userPrasanaPhotoUri) await AsyncStorage.setItem(userPrasanaKey, userPrasanaPhotoUri).catch(() => {});
+      else await AsyncStorage.removeItem(userPrasanaKey).catch(() => {});
       setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
       router.back();
@@ -579,6 +617,41 @@ export default function EditCharacterScreen() {
           </View>
           {avatarReflectionEnabled && (
             <View>
+          {/* User Prasana Photo inside Avatar Reflection */}
+          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#ede9ff' }}>
+            <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 4 }]}>📸 உன் Photo (Prasana Mode)</Text>
+            <Text style={{ color: '#888', fontSize: 11, marginBottom: 10 }}>இந்த character-கிட்ட Prasana mode-ல் chat பண்ணும்போது AI உன் தோற்றம் mention பண்ண இந்த photo use ஆகும்.</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {uploadingUserPrasanaPhoto
+                ? <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: '#FCE4EC', justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color="#E91E63" /></View>
+                : userPrasanaPhotoUri
+                  ? <TouchableOpacity onPress={pickUserPrasanaPhoto}>
+                      <Image source={{ uri: userPrasanaPhotoUri }} style={{ width: 70, height: 70, borderRadius: 35 }} />
+                    </TouchableOpacity>
+                  : <TouchableOpacity onPress={pickUserPrasanaPhoto}
+                      style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: '#FCE4EC', justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28 }}>😈</Text>
+                    </TouchableOpacity>
+              }
+              <View style={{ flex: 1, gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.uploadBtn, { backgroundColor: '#E91E63' }]}
+                  onPress={pickUserPrasanaPhoto}
+                >
+                  <Text style={styles.uploadBtnText}>📱 Gallery</Text>
+                </TouchableOpacity>
+                {userPrasanaPhotoUri && (
+                  <TouchableOpacity
+                    style={[styles.uploadBtn, { backgroundColor: '#B71C1C' }]}
+                    onPress={() => setUserPrasanaPhotoUri(undefined)}
+                  >
+                    <Text style={styles.uploadBtnText}>🗑️ Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+
               <Text style={[styles.sectionLabel, { color: '#6C63FF', marginTop: 8, marginBottom: 4 }]}>✏️ Reflection Instruction (திருத்தலாம்)</Text>
               <Text style={{ color: '#aaa', fontSize: 10, marginBottom: 6 }}>
                 {'Empty-ஆ விட்டால் default instruction use ஆகும். Custom instruction போட்டால் அது use ஆகும்.'}

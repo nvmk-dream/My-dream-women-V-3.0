@@ -258,7 +258,6 @@ export default function ChatScreen() {
   const [normalAvatarUri, setNormalAvatarUri] = useState<string | undefined>(undefined);
   const [presanaAvatarUri, setPresanaAvatarUri] = useState<string | undefined>(undefined);
   const [userPhotoUri, setUserPhotoUri] = useState<string | null>(null);
-  const [userNormalPhotoUri, setUserNormalPhotoUri] = useState<string | null>(null);
   const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | null>(null);
   const [userName, setUserName]           = useState('');
   const [userBehaviour, setUserBehaviour] = useState('');
@@ -367,13 +366,12 @@ export default function ChatScreen() {
       if (presanaAvatarUri)    { const d=await analyzeAvatar(presanaAvatarUri, 'chpres'); if(d) desc.presana=d; }
       // User avatars
       if (userPhotoUri)        { const d=await analyzeAvatar(userPhotoUri,     'usrmain'); if(d) desc.user=d; }
-      if (userNormalPhotoUri)  { const d=await analyzeAvatar(userNormalPhotoUri,'usrnorm'); if(d) desc.userNormal=d; }
       if (userPrasanaPhotoUri) { const d=await analyzeAvatar(userPrasanaPhotoUri,'usrpres'); if(d) desc.userPrasana=d; }
       if (Object.keys(desc).length > 0) setAvatarDescriptions(desc);
     };
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [avatarUri, normalAvatarUri, presanaAvatarUri, userPhotoUri, userNormalPhotoUri, userPrasanaPhotoUri]);
+  }, [avatarUri, normalAvatarUri, presanaAvatarUri, userPhotoUri, userPrasanaPhotoUri]);
 
 
 
@@ -427,7 +425,7 @@ export default function ChatScreen() {
   const [avatarReflectionEnabled, setAvatarReflectionEnabled] = useState(true);
   const [avatarReflectionPrompt, setAvatarReflectionPrompt] = useState('');
   const [imageVideoSystemPrompt, setImageVideoSystemPrompt] = useState('');
-  const [avatarDescriptions, setAvatarDescriptions] = useState<{main?: string; normal?: string; presana?: string; user?: string; userNormal?: string; userPrasana?: string}>({});
+  const [avatarDescriptions, setAvatarDescriptions] = useState<{main?: string; normal?: string; presana?: string; user?: string; userPrasana?: string}>({});
 
   // ── Chat Style (wallpaper + bubble) ──
   const [chatWallpaper, setChatWallpaper] = useState('default');
@@ -655,13 +653,17 @@ export default function ChatScreen() {
   const webGPU = isWebGPUSupported();
 
   useEffect(() => {
-    AsyncStorage.multiGet(['user_profile_photo', 'user_normal_photo', 'user_prasana_photo', 'user_name', 'user_behaviour']).then(pairs => {
+    AsyncStorage.multiGet(['user_profile_photo', 'user_name', 'user_behaviour']).then(pairs => {
       if (pairs[0][1]) setUserPhotoUri(pairs[0][1]);
-      if (pairs[1][1]) setUserNormalPhotoUri(pairs[1][1]);
-      if (pairs[2][1]) setUserPrasanaPhotoUri(pairs[2][1]);
-      if (pairs[3][1]) setUserName(pairs[3][1]);
-      if (pairs[4][1]) setUserBehaviour(pairs[4][1]);
+      if (pairs[1][1]) setUserName(pairs[1][1]);
+      if (pairs[2][1]) setUserBehaviour(pairs[2][1]);
     }).catch(() => {});
+    // Load per-character user prasana photo
+    if (personaId) {
+      AsyncStorage.getItem(`user_prasana_photo_${personaId}`).then(v => {
+        if (v) setUserPrasanaPhotoUri(v);
+      }).catch(() => {});
+    }
     AsyncStorage.multiGet(['chat_is_online', 'local_gemma_port']).then(pairs => {
       const onlineVal = pairs[0][1];
       const portVal = pairs[1][1];
@@ -1260,7 +1262,7 @@ export default function ChatScreen() {
           // User profiles — show mode-specific one
           const activeUserProfile = moodMode === 'presana'
             ? (avatarDescriptions.userPrasana || avatarDescriptions.user)
-            : (avatarDescriptions.userNormal || avatarDescriptions.user);
+            : null; // Normal mode: no user photo reflection
           if (activeUserProfile)
             lines.push('User Profile (avatar-ல் பார்த்து இப்படி treat பண்ணு): ' + activeUserProfile);
         }
