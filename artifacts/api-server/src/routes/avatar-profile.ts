@@ -60,11 +60,21 @@ const LAX_SAFETY = [
 // same information (needed to fill Face/Body/Attire boxes) but frames it as
 // ordinary outfit/style description, matching how the chat pipeline's prompt
 // avoids explicit body-part framing.
-const AVATAR_PROFILE_PROMPT = `Analyze this profile photo and describe it briefly using these exact labels (each 1 sentence max, plain text only):
+const AVATAR_PROFILE_PROMPT = `Analyze this profile photo like a fashion/portrait stylist and describe it briefly using these exact labels (each 1 sentence max, plain text only, describe silhouette/build/style — never explicit or clinical):
 
 AGE RANGE: (18-25 / 25-35 / 35-45 / 45+)
 FACE SHAPE: (oval/round/square/heart/diamond)
 HAIRSTYLE: (length, color, texture, style)
+FOREHEAD: (broad/narrow, smooth/defined)
+EYES: (shape, color, expressive quality)
+NOSE: (shape — straight/button/sharp)
+LIPS: (shape — full/thin/heart-shaped)
+CHEEKS: (shape — defined/soft/rounded)
+NECK: (length and shape — slender/graceful/average)
+SHOULDERS AND ARMS: (build — toned/slender/broad/average)
+FIGURE SILHOUETTE: (overall upper-body and waist silhouette as seen through clothing fit — hourglass/slim/athletic/curvy/average, no measurements)
+THIGH AND LEG BUILD: (build and proportion as seen through clothing — toned/slender/athletic/average)
+LEGS: (length and shape — long/average, proportion)
 CLOTHING STYLE: (describe the outfit style and coverage — traditional saree / modern / casual / etc)
 EXPRESSION: (smile/serious/playful/confident/shy)
 BODY LANGUAGE: (posture, stance, energy)
@@ -155,6 +165,16 @@ function parseProfile(raw: string) {
   const age = extractField(raw, "AGE RANGE");
   const face = extractField(raw, "FACE SHAPE");
   const hair = extractField(raw, "HAIRSTYLE");
+  const forehead = extractField(raw, "FOREHEAD");
+  const eyes = extractField(raw, "EYES");
+  const nose = extractField(raw, "NOSE");
+  const lips = extractField(raw, "LIPS");
+  const cheeks = extractField(raw, "CHEEKS");
+  const neck = extractField(raw, "NECK");
+  const shoulders = extractField(raw, "SHOULDERS AND ARMS");
+  const figure = extractField(raw, "FIGURE SILHOUETTE");
+  const thighLeg = extractField(raw, "THIGH AND LEG BUILD");
+  const legs = extractField(raw, "LEGS");
   const cloth = extractField(raw, "CLOTHING STYLE");
   const expr = extractField(raw, "EXPRESSION");
   const body = extractField(raw, "BODY LANGUAGE");
@@ -163,7 +183,24 @@ function parseProfile(raw: string) {
   const communicationStyle = extractField(raw, "COMMUNICATION STYLE");
 
   const faceVal = [age, face, hair].filter(Boolean).join(", ");
-  const bodyVal = [expr, body].filter(Boolean).join(", ");
+  // Full body-structure breakdown requested by the user — hair, thigh, forehead,
+  // eyes, nose, lips, cheeks, neck, shoulders/arms, bust/waist, legs — all rolled
+  // into the single BODY box the app UI shows.
+  const bodyVal = [
+    hair && `Hair: ${hair}`,
+    forehead && `Forehead: ${forehead}`,
+    eyes && `Eyes: ${eyes}`,
+    nose && `Nose: ${nose}`,
+    lips && `Lips: ${lips}`,
+    cheeks && `Cheeks: ${cheeks}`,
+    neck && `Neck: ${neck}`,
+    shoulders && `Shoulders & arms: ${shoulders}`,
+    figure && `Bust & waist: ${figure}`,
+    thighLeg && `Thighs: ${thighLeg}`,
+    legs && `Legs: ${legs}`,
+    expr && `Expression: ${expr}`,
+    body && `Body language: ${body}`,
+  ].filter(Boolean).join(", ");
   const attireVal = [cloth, vibe].filter(Boolean).join(", ");
 
   // If none of the expected labels matched (model replied in free-form prose
