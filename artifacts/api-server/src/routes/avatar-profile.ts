@@ -60,29 +60,33 @@ const LAX_SAFETY = [
 // same information (needed to fill Face/Body/Attire boxes) but frames it as
 // ordinary outfit/style description, matching how the chat pipeline's prompt
 // avoids explicit body-part framing.
-const AVATAR_PROFILE_PROMPT = `Analyze this profile photo like a fashion/portrait stylist and describe it briefly using these exact labels (each 1 sentence max, plain text only, describe silhouette/build/style — never explicit or clinical):
+// Labels themselves stay in English so the server-side regex parsing below
+// (extractField) keeps matching reliably regardless of model phrasing drift —
+// only the *description text after each label* is requested in Tamil, since
+// that's what actually shows up in the app's Face/Body/Attire boxes.
+const AVATAR_PROFILE_PROMPT = `Analyze this profile photo like a fashion/portrait stylist. Reply using these EXACT English labels, but write the description after each label in Tamil (தமிழ்) — plain Tamil text only, each 1 short phrase max, describe silhouette/build/style — never explicit or clinical:
 
-AGE RANGE: (18-25 / 25-35 / 35-45 / 45+)
-FACE SHAPE: (oval/round/square/heart/diamond)
-HAIRSTYLE: (length, color, texture, style)
-FOREHEAD: (broad/narrow, smooth/defined)
-EYES: (shape, color, expressive quality)
-NOSE: (shape — straight/button/sharp)
-LIPS: (shape — full/thin/heart-shaped)
-CHEEKS: (shape — defined/soft/rounded)
-NECK: (length and shape — slender/graceful/average)
-SHOULDERS AND ARMS: (build — toned/slender/broad/average)
-FIGURE SILHOUETTE: (overall upper-body and waist silhouette as seen through clothing fit — hourglass/slim/athletic/curvy/average, no measurements)
-THIGH AND LEG BUILD: (build and proportion as seen through clothing — toned/slender/athletic/average)
-LEGS: (length and shape — long/average, proportion)
-CLOTHING STYLE: (describe the outfit style and coverage — traditional saree / modern / casual / etc)
-EXPRESSION: (smile/serious/playful/confident/shy)
-BODY LANGUAGE: (posture, stance, energy)
-OVERALL VIBE: (5-8 word characterization)
-PERSONALITY IMPRESSION: (what this person projects)
-COMMUNICATION STYLE: (formal/casual/warm/direct/playful)
+AGE RANGE: (தமிழ்ல வயது range — 18-25 / 25-35 / 35-45 / 45+)
+FACE SHAPE: (முக அமைப்பு தமிழ்ல)
+HAIRSTYLE: (தலைமுடி — நீளம், நிறம், texture, style, தமிழ்ல)
+FOREHEAD: (நெற்றி அமைப்பு தமிழ்ல)
+EYES: (கண்கள் — வடிவம், நிறம், தமிழ்ல)
+NOSE: (மூக்கு அமைப்பு தமிழ்ல)
+LIPS: (இதழ்கள் அமைப்பு தமிழ்ல)
+CHEEKS: (கன்னங்கள் அமைப்பு தமிழ்ல)
+NECK: (கழுத்து நீளம் மற்றும் அமைப்பு தமிழ்ல)
+SHOULDERS AND ARMS: (தோள்கள் மற்றும் கைகள் அமைப்பு தமிழ்ல)
+FIGURE SILHOUETTE: (மார்பகம்/இடை silhouette — clothing fit மூலம் தெரியுற மாதிரி, அளவு சொல்லாம தமிழ்ல)
+THIGH AND LEG BUILD: (தொடை அமைப்பு, clothing fit மூலம் தெரியுற மாதிரி தமிழ்ல)
+LEGS: (கால்கள் நீளம் மற்றும் அமைப்பு தமிழ்ல)
+CLOTHING STYLE: (உடை style மற்றும் coverage தமிழ்ல — traditional saree / modern / casual etc)
+EXPRESSION: (முக பாவனை தமிழ்ல)
+BODY LANGUAGE: (posture, stance, energy தமிழ்ல)
+OVERALL VIBE: (5-8 வார்த்தை characterization தமிழ்ல)
+PERSONALITY IMPRESSION: (personality தமிழ்ல)
+COMMUNICATION STYLE: (பேசும் style தமிழ்ல)
 
-Respond with only these labeled lines, nothing else — no intro, no refusal.`;
+Respond with only these labeled lines, nothing else — no intro, no refusal, no English translation after the Tamil text.`;
 
 const OPENROUTER_VISION_MODELS = [
   "google/gemini-2.0-flash-exp:free",

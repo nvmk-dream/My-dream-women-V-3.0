@@ -9,6 +9,7 @@ import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
@@ -305,23 +306,59 @@ export default function EditCharacterScreen() {
     }
   };
 
+  // Per-field "+ வார்த்தை சேர்" quick-add input value, keyed by field label.
+  const [wordInputs, setWordInputs] = useState<Record<string, string>>({});
+
   const Field = ({ label, hint, value, onChange, minH = 60 }: {
     label: string; hint?: string; value: string;
     onChange: (v: string) => void; minH?: number;
-  }) => (
-    <View style={styles.fieldWrap}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={[styles.fieldInput, { minHeight: minH }]}
-        value={value}
-        onChangeText={onChange}
-        multiline
-        textAlignVertical="top"
-        placeholderTextColor="#bbb"
-      />
-      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
-    </View>
-  );
+  }) => {
+    const wordInput = wordInputs[label] ?? '';
+    const addWord = () => {
+      const w = wordInput.trim();
+      if (!w) return;
+      onChange(value.trim() ? `${value.trim()}, ${w}` : w);
+      setWordInputs(prev => ({ ...prev, [label]: '' }));
+    };
+    const copyValue = async () => {
+      if (!value.trim()) return;
+      await Clipboard.setStringAsync(value);
+      Alert.alert('✅ Copy ஆனது', 'Text clipboard-க்கு copy ஆயிடுச்சு');
+    };
+    return (
+      <View style={styles.fieldWrap}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.fieldLabel}>{label}</Text>
+          <TouchableOpacity onPress={copyValue} style={{ paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 13 }}>📋 Copy</Text>
+          </TouchableOpacity>
+        </View>
+        <TextInput
+          style={[styles.fieldInput, { minHeight: minH }]}
+          value={value}
+          onChangeText={onChange}
+          multiline
+          textAlignVertical="top"
+          placeholderTextColor="#bbb"
+        />
+        {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+          <TextInput
+            style={styles.wordAddInput}
+            value={wordInput}
+            onChangeText={(t) => setWordInputs(prev => ({ ...prev, [label]: t }))}
+            placeholder="புதுசா வார்த்தை சேர்..."
+            placeholderTextColor="#bbb"
+            onSubmitEditing={addWord}
+            returnKeyType="done"
+          />
+          <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   if (!persona) {
     return (
@@ -875,6 +912,8 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#555', marginBottom: 6, marginTop: 4 },
   fieldInput: { backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', padding: 10, fontSize: 14, color: '#222', lineHeight: 20 },
   fieldHint: { fontSize: 11, color: '#aaa', marginTop: 4, marginBottom: 4, lineHeight: 16 },
+  wordAddInput: { flex: 1, backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: '#222' },
+  wordAddBtn: { marginLeft: 6, backgroundColor: '#075E54', width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 14 },
   footerNote: { fontSize: 12, color: '#888', textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
   saveBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
