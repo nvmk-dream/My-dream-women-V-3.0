@@ -3,6 +3,10 @@ import { v2 as cloudinary } from "cloudinary";
 
 const router = Router();
 
+// ── Track Store (Cloudinary meta — survives Render redeploy + app reinstall) ──
+type TrackEntry = { url: string; public_id: string; created_at: string };
+const trackCache = new Map<string, TrackEntry[]>(); // in-memory for speed
+
 function cfg() {
   cloudinary.config({
     cloud_name: process.env["CLOUDINARY_CLOUD_NAME"],
@@ -10,6 +14,38 @@ function cfg() {
     api_secret: process.env["API_SECRET"] || process.env["CLOUDINARY_API_SECRET"],
   });
   return cloudinary;
+}
+
+function trackMetaKey(folder: string): string {
+  // e.g. "my-girls/storage/breast" → "track_my_girls_storage_breast"
+  return "track_" + folder.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
+async function getTracked(folder: string, cl: typeof cloudinary): Promise<TrackEntry[]> {
+  if (trackCache.has(folder)) return trackCache.get(folder)!;
+  try {
+    const key = trackMetaKey(folder);
+    const info = await cl.api.resource(`my-girls/meta/${key}`, { resource_type: "raw" });
+    const resp = await fetch(info.secure_url + `?_t=${Date.now()}`);
+    const data = await resp.json() as TrackEntry[];
+    const entries = Array.isArray(data) ? data : [];
+    trackCache.set(folder, entries);
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+async function saveTracked(folder: string, entries: TrackEntry[], cl: typeof cloudinary): Promise<void> {
+  trackCache.set(folder, entries);
+  const key = trackMetaKey(folder);
+  const b64 = Buffer.from(JSON.stringify(entries)).toString("base64");
+  await cl.uploader.upload(`data:application/json;base64,${b64}`, {
+    public_id: `my-girls/meta/${key}`,
+    resource_type: "raw",
+    overwrite: true,
+    invalidate: true,
+  } as any);
 }
 
 const PRESET_NAME = "my_girls_upload";
@@ -74,6 +110,16 @@ router.get("/cloudinary/list", async (req, res) => {
   try {
     const folder = (req.query["folder"] as string) || "my-girls";
     const cl = cfg();
+
+    // Primary: Cloudinary meta track store — survives Render redeploy + app reinstall
+    const tracked = await getTracked(folder, cl);
+    if (tracked.length > 0) {
+      const images = tracked.map(t => ({ url: t.url, public_id: t.public_id, created_at: t.created_at }));
+      res.json({ images, source: "track" });
+      return;
+    }
+
+    // Fallback: Admin API (3 methods)
     let resources: any[] = [];
     try {
       const r1 = await (cl.api as any).resources_by_asset_folder(folder, { max_results: 50, resource_type: "image" });
@@ -95,7 +141,7 @@ router.get("/cloudinary/list", async (req, res) => {
       url: r.secure_url, public_id: r.public_id,
       width: r.width, height: r.height, created_at: r.created_at,
     }));
-    res.json({ images });
+    res.json({ images, source: "admin_api" });
   } catch (err: any) {
     req.log.error({ err }, "Cloudinary list failed");
     res.status(500).json({ error: err?.message || "List failed" });
@@ -174,9 +220,28 @@ router.get("/cloudinary/videos", async (req, res) => {
 
 
 // ── POST /api/cloudinary/track ────────────────────────────────────────────
-// Fix 1: Fire-and-forget tracking endpoint (photos already safe in Cloudinary)
-router.post("/cloudinary/track", (_req, res) => {
-  res.json({ ok: true });
+// Saves upload metadata to Cloudinary meta (survives Render redeploy + reinstall)
+router.post("/cloudinary/track", async (req, res) => {
+  try {
+    const { folder, public_id, url, created_at } = req.body as {
+      folder: string; public_id: string; url: string; created_at?: string;
+    };
+    if (!folder || !public_id || !url) {
+      res.status(400).json({ error: "folder, public_id, url required" });
+      return;
+    }
+    const cl = cfg();
+    const entry: TrackEntry = { url, public_id, created_at: created_at || new Date().toISOString() };
+    const existing = await getTracked(folder, cl);
+    if (!existing.find(e => e.public_id === public_id)) {
+      const updated = [entry, ...existing];
+      trackCache.set(folder, updated); // immediate in-memory update
+      saveTracked(folder, updated, cl).catch(() => {}); // async save to Cloudinary meta
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message });
+  }
 });
 
 // ── GET /api/cloudinary/meta ───────────────────────────────────────────────

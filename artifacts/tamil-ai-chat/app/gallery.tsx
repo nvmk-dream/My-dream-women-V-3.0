@@ -10,7 +10,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const COLS = 3;
@@ -174,6 +174,7 @@ export default function GalleryScreen() {
         : `my-girls/storage/${albumKey}`;
       const uploaded = await uploadUriToCloudinary(asset.uri, 'image/jpeg', folder);
       const cloudFile: CloudFile = { url: uploaded.url, public_id: uploaded.public_id };
+      trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
 
       const key = filesKey(albumKey, currentFolder?.id);
       const existing = await AsyncStorage.getItem(key).catch(() => null);
@@ -361,6 +362,7 @@ export default function GalleryScreen() {
 
         const result = await uploadUriToCloudinary(uploadUri, mime, folder);
         uploaded.push({ cloudFile: { url: result.url, public_id: result.public_id, isVideo: asset.mediaType === 'video' }, asset });
+        trackCloudinaryUpload(folder, result.public_id, result.url).catch(() => {});
       } catch (e: any) {
         const reason = (e?.message || String(e) || 'unknown').slice(0, 120);
         failures.push({ name: fname, reason });
