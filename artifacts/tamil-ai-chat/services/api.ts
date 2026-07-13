@@ -475,14 +475,33 @@ export async function trackCloudinaryUpload(
 
 // Fetch custom folder metadata stored in Cloudinary (survives reinstall)
 export async function getCloudinaryMeta(key: string): Promise<unknown> {
+  // Primary: server (reads Cloudinary raw file and returns .data)
   try {
-    const res = await fetch(`${REPLIT_API}/api/cloudinary/meta?key=${encodeURIComponent(key)}`);
-    if (!res.ok) return null;
-    const json = await res.json() as { data: unknown };
-    return json.data ?? null;
-  } catch {
-    return null;
-  }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const res = await fetch(
+        `${REPLIT_API}/api/cloudinary/meta?key=${encodeURIComponent(key)}`,
+        { signal: controller.signal },
+      );
+      if (res.ok) {
+        const json = await res.json() as { data: unknown };
+        if (json.data != null) return json.data;
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {}
+
+  // Fallback: direct Cloudinary raw URL — bypasses server sleep entirely.
+  // Server stores meta at my-girls/meta/{key} as a raw JSON file.
+  try {
+    const metaUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/raw/upload/my-girls/meta/${encodeURIComponent(key)}`;
+    const res = await fetch(`${metaUrl}?_t=${Date.now()}`);
+    if (res.ok) return await res.json();
+  } catch {}
+
+  return null;
 }
 
 // Save custom folder metadata to Cloudinary (so it survives reinstall)
