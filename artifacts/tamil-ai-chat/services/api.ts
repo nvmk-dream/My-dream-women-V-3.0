@@ -561,15 +561,64 @@ export async function getCloudinaryMeta(key: string): Promise<unknown> {
   return null;
 }
 
+// ── Pending-meta queue (survives server sleep within same install) ─────────
+// If server is sleeping when we save meta (avatar URL, folder list, etc.),
+// we queue it and retry on next app open — same pattern as pending tracks.
+const PENDING_META_KEY = 'pending_cloudinary_meta';
+type PendingMeta = { key: string; data: unknown };
+
+async function _trySetMeta(key: string, data: unknown): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${REPLIT_API}/api/cloudinary/meta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, data }),
+        signal: controller.signal,
+      });
+      return res.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return false;
+  }
+}
+
 // Save custom folder metadata to Cloudinary (so it survives reinstall)
 export async function setCloudinaryMeta(key: string, data: unknown): Promise<void> {
+  const ok = await _trySetMeta(key, data);
+  if (!ok) {
+    // Server sleeping → queue for retry on next app open
+    try {
+      const AS = await _getAS();
+      const raw = await AS.getItem(PENDING_META_KEY);
+      const queue: PendingMeta[] = raw ? JSON.parse(raw) : [];
+      // Replace existing entry for same key (latest value wins)
+      const updated = queue.filter(e => e.key !== key);
+      updated.push({ key, data });
+      await AS.setItem(PENDING_META_KEY, JSON.stringify(updated));
+    } catch {}
+  }
+}
+
+// Call on app startup — retries any meta saves that failed while server was sleeping.
+export async function flushPendingMeta(): Promise<void> {
   try {
-    await fetch(`${REPLIT_API}/api/cloudinary/meta`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, data }),
-    });
-  } catch { /* fire-and-forget */ }
+    const AS = await _getAS();
+    const raw = await AS.getItem(PENDING_META_KEY);
+    if (!raw) return;
+    const queue: PendingMeta[] = JSON.parse(raw);
+    if (queue.length === 0) return;
+    const remaining: PendingMeta[] = [];
+    for (const entry of queue) {
+      const ok = await _trySetMeta(entry.key, entry.data);
+      if (!ok) remaining.push(entry);
+    }
+    await AS.setItem(PENDING_META_KEY, JSON.stringify(remaining));
+  } catch {}
 }
 
 
