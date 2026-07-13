@@ -141,6 +141,14 @@ router.get("/cloudinary/list", async (req, res) => {
       url: r.secure_url, public_id: r.public_id,
       width: r.width, height: r.height, created_at: r.created_at,
     }));
+    // Write-through: save Admin API results to track store so future reads don't need Admin API
+    if (images.length > 0) {
+      const entries: TrackEntry[] = images.map(i => ({
+        url: i.url, public_id: i.public_id,
+        created_at: i.created_at || new Date().toISOString(),
+      }));
+      saveTracked(folder, entries, cl).catch(() => {});
+    }
     res.json({ images, source: "admin_api" });
   } catch (err: any) {
     req.log.error({ err }, "Cloudinary list failed");

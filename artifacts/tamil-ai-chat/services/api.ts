@@ -408,7 +408,7 @@ export async function uploadToCloudinary(
 export async function listCloudinaryImages(
   folder: string = 'my-girls',
 ): Promise<{ url: string; public_id: string }[]> {
-  // Primary: backend track store (fastest, has created_at)
+  // Primary: backend (reads Cloudinary meta track store → Admin API fallback)
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -426,8 +426,21 @@ export async function listCloudinaryImages(
     }
   } catch {}
 
-  // Fallback: Cloudinary public tag list — survives Render redeploys & app reinstalls.
-  // Works because every upload is tagged with folderToTag(folder).
+  // Fallback 2: Direct Cloudinary meta read — bypasses server sleep entirely.
+  // Server saves track data here on every upload via POST /cloudinary/track.
+  try {
+    const metaKey = 'track_' + folder.replace(/[^a-zA-Z0-9]/g, '_');
+    const metaUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/raw/upload/my-girls/meta/${metaKey}`;
+    const res = await fetch(`${metaUrl}?_t=${Date.now()}`);
+    if (res.ok) {
+      const data = await res.json() as any;
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((d: any) => ({ url: d.url, public_id: d.public_id }));
+      }
+    }
+  } catch {}
+
+  // Fallback 3: Cloudinary public tag list (requires "Resource list" ON in Cloudinary dashboard).
   try {
     const tag = folderToTag(folder);
     const res = await fetch(
