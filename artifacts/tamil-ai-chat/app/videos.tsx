@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS } from '../constants/personas';
-import { listCloudinaryVideos, deleteFromCloudinary, uploadUriToCloudinary } from '../services/api';
+import { listCloudinaryVideos, deleteFromCloudinary, uploadUriToCloudinary, trackCloudinaryUpload } from '../services/api';
 
 const { } = Dimensions.get('window');
 
@@ -129,6 +129,7 @@ export default function VideosScreen() {
       setUploading(true);
       const folder = `my-girls/videos/${selectedPersona.toLowerCase()}`;
       const uploaded = await uploadUriToCloudinary(uri, mimeType, folder);
+      trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
 
       // ✅ Save to AsyncStorage immediately — survives app restarts & Cloudinary listing failures
       const newVid: VideoItem = {
