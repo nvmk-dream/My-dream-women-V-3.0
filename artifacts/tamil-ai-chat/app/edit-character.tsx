@@ -123,7 +123,18 @@ export default function EditCharacterScreen() {
         // Load per-character user prasana photo
         const userPrasanaKey = `user_prasana_photo_${base.id}`;
         const savedUserPrasana = await AsyncStorage.getItem(userPrasanaKey).catch(() => null);
-        if (savedUserPrasana) setUserPrasanaPhotoUri(savedUserPrasana);
+        if (savedUserPrasana) {
+          setUserPrasanaPhotoUri(savedUserPrasana);
+        } else {
+          // Restore from Cloudinary meta if missing locally (reinstall recovery)
+          try {
+            const cloudUserPrasana = await getCloudinaryMeta(userPrasanaKey);
+            if (typeof cloudUserPrasana === 'string' && cloudUserPrasana) {
+              setUserPrasanaPhotoUri(cloudUserPrasana);
+              await AsyncStorage.setItem(userPrasanaKey, cloudUserPrasana).catch(() => {});
+            }
+          } catch {}
+        }
         setBasePromptEdit(data.basePromptEdit ?? BASE_PROMPT);
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
@@ -185,8 +196,13 @@ export default function EditCharacterScreen() {
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
       // Save per-character user prasana photo separately
       const userPrasanaKey = `user_prasana_photo_${persona.id}`;
-      if (userPrasanaPhotoUri) await AsyncStorage.setItem(userPrasanaKey, userPrasanaPhotoUri).catch(() => {});
-      else await AsyncStorage.removeItem(userPrasanaKey).catch(() => {});
+      if (userPrasanaPhotoUri) {
+        await AsyncStorage.setItem(userPrasanaKey, userPrasanaPhotoUri).catch(() => {});
+        setCloudinaryMeta(userPrasanaKey, userPrasanaPhotoUri).catch(() => {}); // cloud backup — survives reinstall
+      } else {
+        await AsyncStorage.removeItem(userPrasanaKey).catch(() => {});
+        setCloudinaryMeta(userPrasanaKey, null).catch(() => {}); // clear cloud backup too
+      }
       setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
       router.back();

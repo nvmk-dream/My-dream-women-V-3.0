@@ -660,8 +660,20 @@ export default function ChatScreen() {
     }).catch(() => {});
     // Load per-character user prasana photo
     if (personaId) {
-      AsyncStorage.getItem(`user_prasana_photo_${personaId}`).then(v => {
-        if (v) setUserPrasanaPhotoUri(v);
+      const userPrasanaKey = `user_prasana_photo_${personaId}`;
+      AsyncStorage.getItem(userPrasanaKey).then(async v => {
+        if (v) {
+          setUserPrasanaPhotoUri(v);
+          return;
+        }
+        // Restore from Cloudinary meta if missing locally (reinstall recovery)
+        try {
+          const cloudV = await getCloudinaryMeta(userPrasanaKey);
+          if (typeof cloudV === 'string' && cloudV) {
+            setUserPrasanaPhotoUri(cloudV);
+            AsyncStorage.setItem(userPrasanaKey, cloudV).catch(() => {});
+          }
+        } catch {}
       }).catch(() => {});
     }
     AsyncStorage.multiGet(['chat_is_online', 'local_gemma_port']).then(pairs => {
