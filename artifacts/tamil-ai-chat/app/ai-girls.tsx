@@ -24,7 +24,7 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta, flushPendingTracks } from '../services/api';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
@@ -461,6 +461,8 @@ AsyncStorage-ல் save ஆச்சு!`
         Notification.requestPermission().catch(() => {});
       }
     }
+    // Retry any photo tracks that failed while server was sleeping
+    flushPendingTracks().catch(() => {});
   }, []);
 
   useFocusEffect(useCallback(() => {

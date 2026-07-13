@@ -5,7 +5,8 @@ const router = Router();
 
 // ── Track Store (Cloudinary meta — survives Render redeploy + app reinstall) ──
 type TrackEntry = { url: string; public_id: string; created_at: string };
-const trackCache = new Map<string, TrackEntry[]>(); // in-memory for speed
+const trackCache   = new Map<string, TrackEntry[]>(); // in-memory for speed
+const syncedFolders = new Set<string>(); // folders already Admin-API-synced this session
 
 function cfg() {
   cloudinary.config({
@@ -46,6 +47,40 @@ async function saveTracked(folder: string, entries: TrackEntry[], cl: typeof clo
     overwrite: true,
     invalidate: true,
   } as any);
+}
+
+// Run Admin API once per server-session per folder in background.
+// Merges any photos uploaded while server was sleeping (never tracked) into track store.
+async function backgroundSyncFolder(folder: string, cl: typeof cloudinary): Promise<void> {
+  if (syncedFolders.has(folder)) return;
+  syncedFolders.add(folder);
+  try {
+    let resources: any[] = [];
+    try {
+      const r = await (cl.api as any).resources_by_asset_folder(folder, { max_results: 100, resource_type: "image" });
+      if (r?.resources?.length) resources = r.resources;
+    } catch {}
+    if (resources.length === 0) {
+      try {
+        const r = await cl.api.resources({ type: "upload", resource_type: "image", prefix: folder + "/", max_results: 100 });
+        if (r?.resources?.length) resources = r.resources;
+      } catch {}
+    }
+    if (resources.length === 0) return;
+
+    const existing = await getTracked(folder, cl);
+    const existingIds = new Set(existing.map((e: TrackEntry) => e.public_id));
+    const missing = resources
+      .filter((r: any) => !existingIds.has(r.public_id))
+      .map((r: any): TrackEntry => ({
+        url: r.secure_url,
+        public_id: r.public_id,
+        created_at: r.created_at || new Date().toISOString(),
+      }));
+    if (missing.length > 0) {
+      await saveTracked(folder, [...missing, ...existing], cl);
+    }
+  } catch { /* best-effort */ }
 }
 
 const PRESET_NAME = "my_girls_upload";
@@ -116,6 +151,9 @@ router.get("/cloudinary/list", async (req, res) => {
     if (tracked.length > 0) {
       const images = tracked.map(t => ({ url: t.url, public_id: t.public_id, created_at: t.created_at }));
       res.json({ images, source: "track" });
+      // Background: once per server-session, sync Admin API to catch photos uploaded
+      // while server was sleeping (fire-and-forget — does not delay response)
+      backgroundSyncFolder(folder, cl).catch(() => {});
       return;
     }
 

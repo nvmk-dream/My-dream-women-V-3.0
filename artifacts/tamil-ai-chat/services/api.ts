@@ -458,19 +458,76 @@ export async function listCloudinaryImages(
   return [];
 }
 
+// ── Pending-track queue (survives server sleep within same install) ────────
+// If server is sleeping when user uploads, we queue the track and retry on next app open.
+const PENDING_TRACKS_KEY = 'pending_cloudinary_tracks';
+type PendingTrack = { folder: string; public_id: string; url: string; created_at: string };
+
+async function _getAS() {
+  return (await import('@react-native-async-storage/async-storage')).default;
+}
+
+async function _addPending(entry: PendingTrack): Promise<void> {
+  try {
+    const AS = await _getAS();
+    const raw = await AS.getItem(PENDING_TRACKS_KEY);
+    const queue: PendingTrack[] = raw ? JSON.parse(raw) : [];
+    if (!queue.find(e => e.public_id === entry.public_id)) {
+      queue.push(entry);
+      await AS.setItem(PENDING_TRACKS_KEY, JSON.stringify(queue));
+    }
+  } catch {}
+}
+
+async function _tryTrack(entry: PendingTrack): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${REPLIT_API}/api/cloudinary/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+        signal: controller.signal,
+      });
+      return res.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return false;
+  }
+}
+
 // Server stores the metadata so photos survive app reinstall.
 export async function trackCloudinaryUpload(
   folder: string,
   public_id: string,
   url: string,
 ): Promise<void> {
+  const entry: PendingTrack = { folder, public_id, url, created_at: new Date().toISOString() };
+  const ok = await _tryTrack(entry);
+  if (!ok) {
+    // Server sleeping → queue for retry on next app open
+    await _addPending(entry);
+  }
+}
+
+// Call once on app startup — retries any tracks that failed while server was sleeping.
+export async function flushPendingTracks(): Promise<void> {
   try {
-    await fetch(`${REPLIT_API}/api/cloudinary/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder, public_id, url, created_at: new Date().toISOString() }),
-    });
-  } catch { /* fire-and-forget — upload already succeeded */ }
+    const AS = await _getAS();
+    const raw = await AS.getItem(PENDING_TRACKS_KEY);
+    if (!raw) return;
+    const queue: PendingTrack[] = JSON.parse(raw);
+    if (queue.length === 0) return;
+    const remaining: PendingTrack[] = [];
+    for (const entry of queue) {
+      const ok = await _tryTrack(entry);
+      if (!ok) remaining.push(entry);
+    }
+    await AS.setItem(PENDING_TRACKS_KEY, JSON.stringify(remaining));
+  } catch {}
 }
 
 // Fetch custom folder metadata stored in Cloudinary (survives reinstall)
