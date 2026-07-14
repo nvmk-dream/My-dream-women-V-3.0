@@ -388,14 +388,24 @@ export default function GalleryScreen() {
     }
 
     // Cut: delete from phone
+    let cutDeleteFailed = false;
     if (mode === 'cut' && uploaded.length > 0) {
       try {
-        await MediaLibrary.deleteAssetsAsync(uploaded.map(u => u.asset));
+        // deleteAssetsAsync resolves to a boolean — on Android 11+, if the user
+        // dismisses the system delete-confirmation dialog, it resolves to
+        // `false` instead of throwing. We must check this, not just await it.
+        const deleted = await MediaLibrary.deleteAssetsAsync(uploaded.map(u => u.asset));
+        if (!deleted) {
+          cutDeleteFailed = true;
+        }
       } catch {
         // Some devices need MANAGE_MEDIA permission — silent fail, show note
+        cutDeleteFailed = true;
+      }
+      if (cutDeleteFailed) {
         Alert.alert(
           '⚠️ Delete பண்ண முடியல',
-          'Upload ஆச்சு ✅ ஆனா phone-ல் delete பண்ண permission இல்லை. Settings → My Girls → Permissions → Files → Delete முடிக்கணும்.',
+          'Upload ஆச்சு ✅ ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணுங்க, அல்லது Settings → My Girls → Permissions → Files → Delete முடிக்கணும்.',
         );
       }
     }
@@ -415,10 +425,15 @@ export default function GalleryScreen() {
         failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
         `${uploaded.length}/${total} files cloud-ல் save ஆச்சு.` + reasonsText,
       );
-    } else if (uploaded.length > 0) {
+    } else if (uploaded.length > 0 && !cutDeleteFailed) {
       Alert.alert(
         failures.length ? '⚠️ Partial Cut' : '✅ Cut & Upload ஆச்சு!',
-        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு.` + reasonsText,
+        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` + reasonsText,
+      );
+    } else if (uploaded.length > 0 && cutDeleteFailed) {
+      Alert.alert(
+        '⚠️ Upload ஆச்சு, ஆனா Delete ஆகல',
+        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு. Phone-ல் இன்னும் இருக்கும்.` + reasonsText,
       );
     }
   };
