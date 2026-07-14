@@ -169,12 +169,11 @@ router.get("/cloudinary/list", async (req, res) => {
         if (r2?.resources?.length) resources = r2.resources;
       } catch {}
     }
-    if (resources.length === 0) {
-      try {
-        const r3 = await cl.api.resources({ asset_folder: folder, max_results: 50, resource_type: "image" } as any);
-        if (r3?.resources?.length) resources = r3.resources;
-      } catch {}
-    }
+    // NOTE: a 3rd fallback using `resources({ asset_folder: folder })` used to exist here.
+    // Cloudinary's generic resources() endpoint silently ignores an `asset_folder` filter,
+    // so it returned unfiltered account-wide results — causing every empty folder to show
+    // random photos from OTHER folders. Removed; if methods 1+2 find nothing, the folder
+    // is genuinely empty.
     const images = resources.map((r: any) => ({
       url: r.secure_url, public_id: r.public_id,
       width: r.width, height: r.height, created_at: r.created_at,
@@ -234,12 +233,9 @@ router.get("/cloudinary/videos", async (req, res) => {
         if (r2?.resources?.length) resources = r2.resources;
       } catch {}
     }
-    if (resources.length === 0) {
-      try {
-        const r3 = await (cl.api as any).resources({ asset_folder: folder, max_results: 100, resource_type: "video" });
-        if (r3?.resources?.length) resources = r3.resources;
-      } catch {}
-    }
+    // NOTE: a fallback using `resources({ asset_folder: folder })` used to exist here.
+    // Cloudinary's generic resources() endpoint silently ignores an `asset_folder` filter,
+    // so it returned unfiltered account-wide results instead of an empty/real list. Removed.
     if (resources.length === 0) {
       try {
         const parentParts = folder.split("/");
