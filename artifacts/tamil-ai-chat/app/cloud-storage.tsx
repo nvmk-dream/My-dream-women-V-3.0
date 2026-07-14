@@ -5,7 +5,7 @@ import {
   Image, Modal, Dimensions, ActivityIndicator,
   Alert, RefreshControl, TextInput, StatusBar, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
@@ -83,6 +83,7 @@ const CLOUD_SECRETS_KEY = 'my_girls_cloud_secrets';
 
 export default function CloudStorageScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [images, setImages] = useState<CloudImage[]>([]);
   const [activeCategory, setActiveCategory] = useState('all');
   const [preview, setPreview] = useState<CloudImage | null>(null);
@@ -398,11 +399,11 @@ export default function CloudStorageScreen() {
   const femalePersonas = ALL_PERSONAS.filter((p: any) => p.gender === 'female');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerCloud}>☁️</Text>
           <Text style={styles.headerTitle}>My Cloud</Text>
