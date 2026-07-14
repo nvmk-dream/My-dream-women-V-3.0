@@ -29,8 +29,17 @@ async function getTracked(folder: string, cl: typeof cloudinary): Promise<TrackE
     const info = await cl.api.resource(`my-girls/meta/${key}`, { resource_type: "raw" });
     const resp = await fetch(info.secure_url + `?_t=${Date.now()}`);
     const data = await resp.json() as TrackEntry[];
-    const entries = Array.isArray(data) ? data : [];
+    const raw = Array.isArray(data) ? data : [];
+    // Self-heal: a since-fixed bug (broken asset_folder filter) previously wrote
+    // OTHER folders' photos into this folder's track file. Any entry whose
+    // public_id isn't actually inside this folder is pollution — drop it and
+    // persist the cleaned list so future reads don't need to re-filter.
+    const prefix = folder + "/";
+    const entries = raw.filter(e => typeof e.public_id === "string" && e.public_id.startsWith(prefix));
     trackCache.set(folder, entries);
+    if (entries.length !== raw.length) {
+      saveTracked(folder, entries, cl).catch(() => {});
+    }
     return entries;
   } catch {
     return [];
