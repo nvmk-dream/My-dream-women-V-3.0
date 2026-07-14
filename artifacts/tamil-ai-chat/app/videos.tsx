@@ -4,7 +4,7 @@ import {
   FlatList, Alert, ActivityIndicator, StatusBar, Dimensions, Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS } from '../constants/personas';
@@ -54,6 +54,7 @@ async function removeLocalVideo(public_id: string): Promise<void> {
 
 export default function VideosScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,8 +187,8 @@ export default function VideosScreen() {
   // ── Folder list view ─────────────────────────────────────────────
   if (!selectedPersona) {
     return (
-      <SafeAreaView style={s.safe} edges={['top']}>
-        <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+      <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <Stack.Screen options={{ headerShown: false }} />
 
         <View style={s.header}>
@@ -232,11 +233,11 @@ export default function VideosScreen() {
   const persona = femalePersonas.find((p: any) => p.name === selectedPersona) as any;
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={goBack}>
           <Text style={s.backBtnTxt}>← Back</Text>
         </TouchableOpacity>
