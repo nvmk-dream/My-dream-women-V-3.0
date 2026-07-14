@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, ScrollView, Alert, Dimensions,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -69,6 +69,7 @@ type Mode = 'text' | 'image';
 
 export default function PromptImageScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Mode: text prompt OR image upload
   const [mode, setMode] = useState<Mode>('text');
@@ -226,10 +227,11 @@ export default function PromptImageScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Header */}
-        <View style={s.header}>
+        <View style={[s.header, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
             <Text style={s.backTxt}>← Back</Text>
           </TouchableOpacity>
