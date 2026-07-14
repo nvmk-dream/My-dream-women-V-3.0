@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, Alert, ActivityIndicator, Modal, Switch,
+  ScrollView, TextInput, Alert, ActivityIndicator, Modal, Switch, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -97,6 +97,7 @@ const sb = StyleSheet.create({
 
 export default function KeysScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [deviceKey, setDeviceKey] = useState('');
   const [keys, setKeys] = useState<ApiKeyEntry[]>(
     DEFAULT_KEYS.map(k => ({ ...k, value: '', expanded: false, status: 'idle' as KeyStatus }))
@@ -496,11 +497,12 @@ export default function KeysScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <Text style={s.headerIcon}>🔐</Text>
         <Text style={s.headerTitle}>Keys & Accounts</Text>
         <TouchableOpacity style={s.checkAllBtn} onPress={checkAllNow} disabled={checkingAll}>
