@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
   ScrollView, StatusBar, Dimensions, Image, Modal, FlatList, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -51,6 +51,7 @@ type CloudPhoto = { uri: string };
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [showPickModal, setShowPickModal] = useState(false);
   const [cloudPhotos, setCloudPhotos] = useState<CloudPhoto[]>([]);
@@ -222,8 +223,8 @@ export default function HomeScreen() {
   const cloudSheetCat = CATEGORIES.find(c => c.key === cloudSheet);
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
-      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Cover image — only show if custom image set, else compact header bar */}
       {coverUri ? (
@@ -238,7 +239,7 @@ export default function HomeScreen() {
             }}
           />
           <View style={s.coverOverlay} />
-          <View style={s.coverBar}>
+          <View style={[s.coverBar, { paddingTop: insets.top + 14 }]}>
             <View style={s.headerLeft}>
               <Text style={s.headerCloud}>☁️</Text>
               <Text style={s.headerTitle}>My Dream Women</Text>
@@ -254,7 +255,7 @@ export default function HomeScreen() {
           </View>
         </View>
       ) : (
-        <View style={s.compactBar}>
+        <View style={[s.compactBar, { paddingTop: insets.top + 12 }]}>
           <View style={s.headerLeft}>
             <Text style={s.headerCloud}>☁️</Text>
             <Text style={s.headerTitle}>My Dream Women</Text>
