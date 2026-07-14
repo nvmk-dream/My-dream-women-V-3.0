@@ -2,9 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
   ActivityIndicator, Image, Dimensions, ScrollView, FlatList,
-  Platform, TextInput, Modal, BackHandler,
+  Platform, TextInput, Modal, BackHandler, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
@@ -38,6 +38,7 @@ function filesKey(album: string, sub?: string) {
 
 export default function GalleryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { album } = useLocalSearchParams<{ album: string }>();
   const albumKey = (album ?? 'pictures') as string;
   const meta = ALBUM_META[albumKey] ?? ALBUM_META.pictures;
@@ -475,11 +476,12 @@ export default function GalleryScreen() {
     : `${meta.emoji} ${meta.label}`;
 
   return (
-    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: meta.color }]}>
+      <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
         <TouchableOpacity onPress={depth === 1 ? goUp : () => router.back()} style={s.backBtn}>
           <Text style={s.backTxt}>{depth === 1 ? '‹ Back' : '‹'}</Text>
         </TouchableOpacity>
@@ -576,8 +578,9 @@ export default function GalleryScreen() {
 
       {/* ── MODAL 1: Phone Albums browser ───────────────────────── */}
       <Modal visible={showAlbums} animationType="slide" onRequestClose={() => setShowAlbums(false)}>
-        <SafeAreaView style={[s.safe, { backgroundColor: '#1a1a1a' }]} edges={['top','bottom']}>
-          <View style={[s.header, { backgroundColor: meta.color }]}>
+        <SafeAreaView style={[s.safe, { backgroundColor: '#1a1a1a' }]} edges={['bottom']}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
             <TouchableOpacity onPress={() => setShowAlbums(false)} style={s.backBtn}>
               <Text style={s.backTxt}>✕</Text>
             </TouchableOpacity>
