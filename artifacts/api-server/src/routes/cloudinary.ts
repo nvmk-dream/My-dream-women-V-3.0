@@ -219,8 +219,33 @@ router.delete("/cloudinary/delete", async (req, res) => {
   try {
     const { public_id } = req.body as { public_id: string };
     if (!public_id) { res.status(400).json({ error: "public_id is required" }); return; }
-    await cfg().uploader.destroy(public_id);
-    res.json({ success: true });
+    const cl = cfg();
+
+    // The client doesn't tell us whether this is an image or a video, and
+    // Cloudinary requires the correct resource_type to actually destroy it —
+    // destroying with the wrong type silently no-ops (result !== "ok").
+    // Try image first (the common case), then video.
+    let result = await cl.uploader.destroy(public_id, { resource_type: "image", invalidate: true });
+    if (result?.result !== "ok") {
+      result = await cl.uploader.destroy(public_id, { resource_type: "video", invalidate: true });
+    }
+
+    // Also remove this entry from the folder's track store — otherwise the
+    // deleted photo/video reappears next time the folder is synced/reloaded,
+    // since /list serves from the track store first.
+    const idx = public_id.lastIndexOf("/");
+    if (idx > 0) {
+      const folder = public_id.slice(0, idx);
+      try {
+        const existing = await getTracked(folder, cl);
+        const filtered = existing.filter(e => e.public_id !== public_id);
+        if (filtered.length !== existing.length) {
+          await saveTracked(folder, filtered, cl);
+        }
+      } catch { /* best-effort */ }
+    }
+
+    res.json({ success: true, result: result?.result });
   } catch (err: any) {
     req.log.error({ err }, "Cloudinary delete failed");
     res.status(500).json({ error: err?.message || "Delete failed" });
