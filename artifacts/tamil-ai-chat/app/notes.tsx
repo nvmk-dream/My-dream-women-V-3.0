@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   TextInput, Modal, ScrollView, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_PERSONAS } from '../constants/personas';
@@ -38,6 +38,7 @@ function formatDate(ts: number) {
 
 export default function NotesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [view, setView] = useState<'chars' | 'pages' | 'editor'>('chars');
   const [allNotes, setAllNotes] = useState<CharNotes>({});
   const [personas, setPersonas] = useState<PersonaMerged[]>(ALL_PERSONAS as PersonaMerged[]);
@@ -368,10 +369,10 @@ export default function NotesScreen() {
   // ── EDITOR ──
   if (view === 'editor' && activePage && activeChar) {
     return (
-      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+      <SafeAreaView style={s.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={s.editorHeader}>
+        <View style={[s.editorHeader, { paddingTop: insets.top + 14 }]}>
           <TouchableOpacity onPress={async () => { await savePage(); setView('pages'); }} style={s.editorBack}>
             <Text style={s.editorBackTxt}>‹ {activeChar.name}</Text>
           </TouchableOpacity>
@@ -444,11 +445,11 @@ export default function NotesScreen() {
   // ── PAGES LIST ──
   if (view === 'pages' && activeChar) {
     return (
-      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+      <SafeAreaView style={s.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
         <Stack.Screen options={{ headerShown: false }} />
 
-        <View style={s.notesHeader}>
+        <View style={[s.notesHeader, { paddingTop: insets.top + 16 }]}>
           {showSearch ? (
             <TextInput
               style={s.notesSearchInput}
@@ -644,11 +645,11 @@ export default function NotesScreen() {
 
   // ── CHARACTER LIST ──
   return (
-    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={s.notesHeader}>
+      <View style={[s.notesHeader, { paddingTop: insets.top + 16 }]}>
         {showSearch ? (
           <TextInput
             style={s.notesSearchInput}
