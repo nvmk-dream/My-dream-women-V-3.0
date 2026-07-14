@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, StatusBar,
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -55,6 +55,7 @@ const FOLDER_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#009688','#FF572
 
 export default function AIGirlsCloudScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [depth, setDepth] = useState<Depth>(0);
   const [selectedChar, setSelectedChar] = useState<{ id: string; name: string; color: string; letter: string } | null>(null);
@@ -720,11 +721,12 @@ export default function AIGirlsCloudScreen() {
     selectedStyle?.label ?? 'Photos';
 
   return (
-    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity onPress={goBack} style={s.backBtn}>
           <Text style={s.backTxt}>‹</Text>
         </TouchableOpacity>
