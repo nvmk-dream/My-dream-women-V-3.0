@@ -838,9 +838,9 @@ export default function EditCharacterScreen() {
               {/* 🟢 GREEN — CHARACTER-SPECIFIC (always visible, editable) */}
               <View style={{ borderWidth: 2, borderColor: '#2e7d32', borderRadius: 8, overflow: 'hidden' }}>
                 <View style={{ backgroundColor: '#e8f5e9', paddingHorizontal: 12, paddingVertical: 8 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
                     <Text style={{ color: '#1b5e20', fontWeight: '700', fontSize: 12 }}>🟢 இந்த CHARACTER மட்டும் (திருத்தலாம்)</Text>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
                       <TouchableOpacity
                         onPress={saveDefaultPrompt}
                         style={{ backgroundColor: '#2e7d32', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
