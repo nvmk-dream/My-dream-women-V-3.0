@@ -199,7 +199,15 @@ export default function AIGirlsScreen() {
       const allSrc: Persona[] = [...ALL_PERSONAS, ...customs];
       const merged = await Promise.all(allSrc.map(async p => {
         try {
-          const saved = await AsyncStorage.getItem(`persona_edit_${p.id}`);
+          let saved = await AsyncStorage.getItem(`persona_edit_${p.id}`);
+          if (!saved) {
+            // Not found locally (e.g. after reinstall) — try cloud backup
+            const cloudData = await getCloudinaryMeta(`persona_edit_${p.id}`).catch(() => null);
+            if (cloudData) {
+              saved = JSON.stringify(cloudData);
+              await AsyncStorage.setItem(`persona_edit_${p.id}`, saved).catch(() => {});
+            }
+          }
           const rel = await AsyncStorage.getItem(`relationship_${p.id}`);
           const data = saved ? JSON.parse(saved) : {};
           return { ...p, ...data, prompt: data.prompt ?? p.prompt, editedRelationship: rel ?? p.relationship } as PersonaWithExtra;
