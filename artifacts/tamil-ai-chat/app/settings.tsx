@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Linking, ActivityIndicator, Alert, Image, TextInput, Modal,
+  ScrollView, Linking, ActivityIndicator, Alert, Image, TextInput, Modal, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +23,7 @@ type BuildStatus = 'idle' | 'triggering' | 'queued' | 'in_progress' | 'success' 
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [checking, setChecking] = useState(false);
   const [customServerUrl, setCustomServerUrl] = useState('');
   const [savingServer, setSavingServer] = useState(false);
@@ -390,7 +391,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* HuggingFace Token Modal */}
@@ -468,7 +470,7 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.headerBack}>←</Text>
         </TouchableOpacity>
