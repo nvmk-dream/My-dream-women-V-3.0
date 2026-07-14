@@ -280,7 +280,15 @@ export default function ChatScreen() {
     if (!finalPersona) return; // truly not found
 
     try {
-      const saved = await AsyncStorage.getItem(`persona_edit_${finalPersona.id}`);
+      let saved = await AsyncStorage.getItem(`persona_edit_${finalPersona.id}`);
+      if (!saved) {
+        // Not found locally (e.g. after reinstall) — try cloud backup
+        const cloudData = await getCloudinaryMeta(`persona_edit_${finalPersona.id}`).catch(() => null);
+        if (cloudData) {
+          saved = JSON.stringify(cloudData);
+          await AsyncStorage.setItem(`persona_edit_${finalPersona.id}`, saved).catch(() => {});
+        }
+      }
       if (saved) {
         const data = JSON.parse(saved);
         setPersona({ ...finalPersona, ...data, prompt: data.prompt ?? finalPersona.prompt });
