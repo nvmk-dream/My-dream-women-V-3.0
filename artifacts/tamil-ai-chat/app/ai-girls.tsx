@@ -1024,12 +1024,12 @@ Then write these prompts:
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={s.safe} edges={['top','bottom']}>
-      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+    <SafeAreaView style={s.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* WhatsApp-style Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity onPress={openProfileModal} style={s.userAvatarBtn}>
           {uploadingUserPhoto
             ? <View style={s.userPhotoDefault}><ActivityIndicator color="#fff" size="small" /></View>
