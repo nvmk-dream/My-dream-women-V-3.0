@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sendMessage, uploadToCloudinary } from '../services/api';
+import { sendMessage, uploadToCloudinary, getCloudinaryMeta } from '../services/api';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
 
@@ -38,7 +38,15 @@ export default function GroupChatScreen() {
           const base = ALL_PERSONAS.find(p => p.id === id);
           if (!base) return null;
           try {
-            const saved = await AsyncStorage.getItem(`persona_edit_${base.id}`);
+            let saved = await AsyncStorage.getItem(`persona_edit_${base.id}`);
+            if (!saved) {
+              // Not found locally (e.g. after reinstall) — try cloud backup
+              const cloudData = await getCloudinaryMeta(`persona_edit_${base.id}`).catch(() => null);
+              if (cloudData) {
+                saved = JSON.stringify(cloudData);
+                await AsyncStorage.setItem(`persona_edit_${base.id}`, saved).catch(() => {});
+              }
+            }
             if (saved) {
               const data = JSON.parse(saved);
               return { ...base, ...data, prompt: data.prompt ?? base.prompt };
