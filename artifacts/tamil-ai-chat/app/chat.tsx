@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
+import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -281,13 +281,14 @@ export default function ChatScreen() {
 
     try {
       let saved = await AsyncStorage.getItem(`persona_edit_${finalPersona.id}`);
-      if (!saved) {
+      if (!saved && !(await wasCloudRestoreChecked())) {
         // Not found locally (e.g. after reinstall) — try cloud backup
         const cloudData = await getCloudinaryMeta(`persona_edit_${finalPersona.id}`).catch(() => null);
         if (cloudData) {
           saved = JSON.stringify(cloudData);
           await AsyncStorage.setItem(`persona_edit_${finalPersona.id}`, saved).catch(() => {});
         }
+        await markCloudRestoreChecked();
       }
       if (saved) {
         const data = JSON.parse(saved);
@@ -674,6 +675,7 @@ export default function ChatScreen() {
           setUserPrasanaPhotoUri(v);
           return;
         }
+        if (await wasCloudRestoreChecked()) return;
         // Restore from Cloudinary meta if missing locally (reinstall recovery)
         try {
           const cloudV = await getCloudinaryMeta(userPrasanaKey);
@@ -682,6 +684,7 @@ export default function ChatScreen() {
             AsyncStorage.setItem(userPrasanaKey, cloudV).catch(() => {});
           }
         } catch {}
+        await markCloudRestoreChecked();
       }).catch(() => {});
     }
     AsyncStorage.multiGet(['chat_is_online', 'local_gemma_port']).then(pairs => {
