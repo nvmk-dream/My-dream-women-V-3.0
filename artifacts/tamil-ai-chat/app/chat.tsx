@@ -1347,7 +1347,7 @@ export default function ChatScreen() {
         ? `\n\n**[User-ஓட personal details — எப்பவும் நினைவில் வச்சு பேசு]:**\n${kiruthikaUserDetails.trim()}`
         : '';
       const storyContext = (moodMode === 'story' && todayStory.trim())
-        ? `\n\n**[இன்றைய கதை — Scene-by-Scene நடிக்கணும்]:**\n${todayStory.trim()}\n\nஇந்த கதையை character-ஆக முழுசா feel பண்ணி வாழ்ந்து பேசு. ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான அடுத்த scene-ஆ இருக்கணும் — conversation தொடர்ந்தா தானாகவே கதை நகர்ந்து அடுத்த scene-க்கு advance ஆகணும். User "தொடர்" / "next scene" / "அடுத்தது" சொன்னாலும் உடனே அடுத்த scene-க்கு போ. கதைக்கு வெளியே topic மாறாதே — இந்த mode-ல் இதே கதைய மட்டும் தொடரு.`
+        ? `\n\n**[இன்றைய கதை — Scene-by-Scene நடிக்கணும்]:**\n${todayStory.trim()}\n\nஇந்த கதையை character-ஆக முழுசா feel பண்ணி வாழ்ந்து பேசு. நீங்க கொடுக்குற கதை full detail-ஆ இருந்தாலும் outline (சுருக்கமான points) ஆ இருந்தாலும், அதை character-ஆக முழு scene-ஆ develop பண்ணி (dialogue, emotion, சூழ்நிலை விவரங்கள் சேர்த்து) நடிக்கணும். Outline-ல உள்ள ஒவ்வொரு point-உம் ஒரு scene-ஆ விரிவாக்கப்படணும். ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான அடுத்த scene-ஆ இருக்கணும் — conversation தொடர்ந்தா தானாகவே கதை நகர்ந்து அடுத்த scene-க்கு advance ஆகணும். User "தொடர்" / "next scene" / "அடுத்தது" சொன்னாலும் உடனே அடுத்த scene-க்கு போ. கதைக்கு வெளியே topic மாறாதே — இந்த mode-ல் இதே கதைய மட்டும் தொடரு.`
         : '';
       const effectivePrompt = persona?.prompt
         ? persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + identityContext + avatarContext + kiruthikaContext
