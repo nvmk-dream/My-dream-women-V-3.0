@@ -494,12 +494,12 @@ router.post("/analyze-file", async (req, res) => {
       // ── Step 1: Try inline data first (fast — no File API wait, beats Render 30s timeout)
       // Works for videos under ~20MB. gemini-2.0-flash supports inline video.
       if (videoSizeMB < 18) {
-        const inlineVideoModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+        const inlineVideoModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
         console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) safety=BLOCK_NONE`);
         for (const key of allGeminiKeys) {
           for (const model of inlineVideoModels) {
             try {
-              const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 25000 } } as any);
+              const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 28000 } } as any);
               console.log(`[analyze-file][video] trying inline model=${model} key=...${key.slice(-6)}`);
               const resp = await ai.models.generateContent({
                 model,
@@ -585,12 +585,13 @@ router.post("/analyze-file", async (req, res) => {
 
       // ── Step 3: Groq text-only fallback
       const videoDebugBlock = buildDebugBlock(videoErrors);
+      console.error("[analyze-file][video] All paths failed:", videoDebugBlock);
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
-      if (groqReply) return res.json({ reply: groqReply + videoDebugBlock });
+      if (groqReply) return res.json({ reply: groqReply });
 
       return res.json({
-        reply: `${characterName}: வீடியோ பாக்க முடியல 😅 Home → Keys-ல் Gemini API key add பண்ணுங்க!${videoDebugBlock}`,
+        reply: `${characterName}: வீடியோ பாக்க முடியல 😔 சற்று நேரம் கழிச்சு மீண்டும் try பண்ணுங்க!`,
       });
     }
 
