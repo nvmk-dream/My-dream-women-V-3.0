@@ -65,10 +65,12 @@ export default function EditCharacterScreen() {
   const [userBodyDesc, setUserBodyDesc] = useState('');
   const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | undefined>(undefined);
   const [uploadingUserPrasanaPhoto, setUploadingUserPrasanaPhoto] = useState(false);
+  const [todayStory, setTodayStory] = useState('');
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     basicDetails: true,
+    todayStory: false,
     userStyle: false,
     avatarReflection: false,
     mood: false,
@@ -133,6 +135,7 @@ export default function EditCharacterScreen() {
         setUserNormalBeh(data.userNormalBeh ?? '');
         setUserPresanaBeh(data.userPresanaBeh ?? '');
         setUserBodyDesc(data.userBodyDesc ?? '');
+        setTodayStory(data.todayStory ?? '');
         // Load per-character user prasana photo
         const userPrasanaKey = `user_prasana_photo_${base.id}`;
         const savedUserPrasana = await AsyncStorage.getItem(userPrasanaKey).catch(() => null);
@@ -202,6 +205,7 @@ export default function EditCharacterScreen() {
         normalAvatarUri, presanaAvatarUri, relationship,
         presanaBehaviour, normalBehaviour,
         userWhatsappBeh, userNormalBeh, userPresanaBeh, userBodyDesc,
+        todayStory,
         basePromptEdit: basePromptEdit.trim() || BASE_PROMPT,
         avatarReflectionEnabled, avatarReflectionPrompt,
         imageVideoPrompt,
@@ -589,6 +593,27 @@ export default function EditCharacterScreen() {
             placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
             placeholderTextColor="#bbb"
           />
+        </SectionCard>
+
+        <SectionCard sectionKey="todayStory" icon="📖" title="இன்றைய கதை" subtitle="Today's Story" color="#8D6E63">
+          <Text style={styles.fieldHint}>இங்க ஒரு கதை type பண்ணுங்க — Chat screen-ல் "📖 Story" mode select பண்ணா, character இந்த கதைய scene-by-scene ஆ நடிச்சு பேசும். நீங்க மாத்தும் வரைக்கும் இதே கதை save-ஆ இருக்கும்.</Text>
+          <TextInput
+            style={[styles.fieldInput, { minHeight: 160 }]}
+            value={todayStory}
+            onChangeText={setTodayStory}
+            multiline
+            textAlignVertical="top"
+            placeholder="இன்றைய கதையை இங்க type பண்ணுங்க..."
+            placeholderTextColor="#bbb"
+          />
+          {!!todayStory.trim() && (
+            <TouchableOpacity
+              onPress={() => setTodayStory('')}
+              style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#efebe9', borderRadius: 12, alignSelf: 'flex-start' }}
+            >
+              <Text style={{ color: '#5d4037', fontSize: 11, fontWeight: '600' }}>🗑️ Story Clear பண்ணு</Text>
+            </TouchableOpacity>
+          )}
         </SectionCard>
 
         <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color="#1565C0">
