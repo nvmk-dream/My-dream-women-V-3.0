@@ -24,7 +24,7 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta, flushPendingTracks, flushPendingMeta } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
@@ -197,10 +197,13 @@ export default function AIGirlsScreen() {
       const customs: Persona[] = customRaw ? JSON.parse(customRaw) : [];
       setCustomChars(customs);
       const allSrc: Persona[] = [...ALL_PERSONAS, ...customs];
+      // Cloud restore is only needed once (fresh install / reinstall). After that,
+      // skip the network round-trips so the list opens instantly on every launch.
+      const restoreAlreadyChecked = await wasCloudRestoreChecked();
       const merged = await Promise.all(allSrc.map(async p => {
         try {
           let saved = await AsyncStorage.getItem(`persona_edit_${p.id}`);
-          if (!saved) {
+          if (!saved && !restoreAlreadyChecked) {
             // Not found locally (e.g. after reinstall) — try cloud backup
             const cloudData = await getCloudinaryMeta(`persona_edit_${p.id}`).catch(() => null);
             if (cloudData) {
@@ -215,6 +218,7 @@ export default function AIGirlsScreen() {
           return { ...p, editedRelationship: p.relationship } as PersonaWithExtra;
         }
       }));
+      if (!restoreAlreadyChecked) await markCloudRestoreChecked();
       setPersonas(merged);
     } catch {}
     setLoading(false);
