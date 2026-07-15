@@ -531,6 +531,29 @@ export async function flushPendingTracks(): Promise<void> {
 }
 
 // Fetch custom folder metadata stored in Cloudinary (survives reinstall)
+// One-time gate for the reinstall cloud-restore fallback below. Without this,
+// every app open would fire a network lookup for every character that has no
+// local edits yet (i.e. never customized) — that's what caused the character
+// list to show a loading spinner on every launch instead of just after a
+// fresh install/reinstall. Once we've checked cloud once, skip it forever.
+const CLOUD_RESTORE_FLAG_KEY = 'cloud_restore_checked_v1';
+
+export async function wasCloudRestoreChecked(): Promise<boolean> {
+  try {
+    const AS = await _getAS();
+    return (await AS.getItem(CLOUD_RESTORE_FLAG_KEY)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export async function markCloudRestoreChecked(): Promise<void> {
+  try {
+    const AS = await _getAS();
+    await AS.setItem(CLOUD_RESTORE_FLAG_KEY, '1');
+  } catch {}
+}
+
 export async function getCloudinaryMeta(key: string): Promise<unknown> {
   // Primary: server (reads Cloudinary raw file and returns .data)
   try {
