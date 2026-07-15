@@ -261,6 +261,7 @@ export default function ChatScreen() {
   const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | null>(null);
   const [userName, setUserName]           = useState('');
   const [userBehaviour, setUserBehaviour] = useState('');
+  const [todayStory, setTodayStory]       = useState('');
 
   const reloadPersona = useCallback(async () => {
     // Step 1: Look up built-in personas first
@@ -305,9 +306,11 @@ export default function ChatScreen() {
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
+        setTodayStory(data.todayStory ?? '');
       } else {
         setPersona(finalPersona);
         setAvatarUri(finalPersona.avatarPhotoUri);
+        setTodayStory('');
       }
     } catch {
       setPersona(finalPersona);
@@ -421,7 +424,7 @@ export default function ChatScreen() {
   // Dialect toggle
   const [dialectMode, setDialectMode] = useState(true);
   // Mood: 'presana' (default flirty) | 'normal' (clean friendly)
-  const [moodMode, setMoodMode] = useState<'presana' | 'normal' | 'whatsapp'>('presana');
+  const [moodMode, setMoodMode] = useState<'presana' | 'normal' | 'whatsapp' | 'story'>('presana');
   const [kiruthikaUserDetails, setKiruthikaUserDetails] = useState('');
   const [showKiruthikaDetails, setShowKiruthikaDetails] = useState(false);
   const [kiruthikaDetailsDraft, setKiruthikaDetailsDraft] = useState('');
@@ -619,7 +622,7 @@ export default function ChatScreen() {
 
   // ── Kiruthika mode guard: reset presana → first allowed mode ──
   useEffect(() => {
-    const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp'> | undefined;
+    const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp' | 'story'> | undefined;
     if (allowedModes?.length && !allowedModes.includes(moodMode)) {
       setMoodMode(allowedModes[0]);
       if (personaId) AsyncStorage.setItem(`mood_mode_${personaId}`, allowedModes[0]).catch(() => {});
@@ -633,13 +636,18 @@ export default function ChatScreen() {
   };
 
   const toggleMood = async () => {
-    const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp'> | undefined;
-    let next: 'presana' | 'normal' | 'whatsapp';
+    const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp' | 'story'> | undefined;
+    let next: 'presana' | 'normal' | 'whatsapp' | 'story';
     if (allowedModes?.length) {
-      const idx = allowedModes.indexOf(moodMode);
-      next = allowedModes[(idx < 0 ? 0 : idx + 1) % allowedModes.length];
+      const cycle = allowedModes.includes('story') ? allowedModes : [...allowedModes, 'story'];
+      const idx = cycle.indexOf(moodMode);
+      next = cycle[(idx < 0 ? 0 : idx + 1) % cycle.length];
     } else {
-      next = moodMode === 'presana' ? 'normal' : moodMode === 'normal' ? 'whatsapp' : 'presana';
+      next = moodMode === 'presana' ? 'normal' : moodMode === 'normal' ? 'whatsapp' : moodMode === 'whatsapp' ? 'story' : 'presana';
+    }
+    if (next === 'story' && !todayStory.trim()) {
+      Alert.alert('இன்றைய கதை இல்ல', 'Edit Character page-ல் "இன்றைய கதை" section-ல் ஒரு கதை add பண்ணுங்க, அப்புறம் Story mode use பண்ணலாம்.');
+      next = 'normal';
     }
     setMoodMode(next);
     if (personaId) await AsyncStorage.setItem(`mood_mode_${personaId}`, next);
@@ -1228,6 +1236,8 @@ export default function ChatScreen() {
         ? `\n\n**NORMAL MODE:** ${normalBehaviour.trim() || DEFAULT_NORMAL}\n[8-10 lines max, NEVER cut mid-sentence]`
         : moodMode === 'whatsapp'
         ? `\n\n**WHATSAPP MODE:** ${DEFAULT_WHATSAPP}`
+        : moodMode === 'story'
+        ? `\n\n**STORY MODE:** கீழே கொடுக்கப்பட்ட "இன்றைய கதை"-ஐ character-ஆக உணர்ச்சியுடன், naturally நடிக்கணும். 8-10 lines max, ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான scene-ஆ இருக்கணும்.`
         : `\n\n**PRESANA MODE:** ${presanaBehaviour.trim() || DEFAULT_PRESANA}\n[8-10 lines max, NEVER cut mid-sentence]`;
 
       const dialectOverride = dialectMode
@@ -1238,6 +1248,8 @@ export default function ChatScreen() {
         ? userWhatsappBeh
         : moodMode === 'normal'
         ? userNormalBeh
+        : moodMode === 'story'
+        ? (userNormalBeh || userWhatsappBeh || userPresanaBeh)
         : userPresanaBeh;
 
       const userContext = (userName || userBehaviour || modeUserBeh || userBodyDesc)
@@ -1274,7 +1286,7 @@ export default function ChatScreen() {
           // Character profiles — mode-specific first, then fallback to any available
           if (moodMode === 'presana' && avatarDescriptions.presana)
             lines.push('Character Presana Mode Profile: ' + avatarDescriptions.presana);
-          else if (moodMode === 'normal' && avatarDescriptions.normal)
+          else if ((moodMode === 'normal' || moodMode === 'story') && avatarDescriptions.normal)
             lines.push('Character Normal Mode Profile: ' + avatarDescriptions.normal);
           else if (avatarDescriptions.main)
             lines.push('Character Profile: ' + avatarDescriptions.main);
@@ -1334,8 +1346,11 @@ export default function ChatScreen() {
       const kiruthikaContext = (personaId === 'kiruthika' && kiruthikaUserDetails.trim())
         ? `\n\n**[User-ஓட personal details — எப்பவும் நினைவில் வச்சு பேசு]:**\n${kiruthikaUserDetails.trim()}`
         : '';
+      const storyContext = (moodMode === 'story' && todayStory.trim())
+        ? `\n\n**[இன்றைய கதை — Scene-by-Scene நடிக்கணும்]:**\n${todayStory.trim()}\n\nஇந்த கதையை character-ஆக முழுசா feel பண்ணி வாழ்ந்து பேசு. ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான அடுத்த scene-ஆ இருக்கணும் — conversation தொடர்ந்தா தானாகவே கதை நகர்ந்து அடுத்த scene-க்கு advance ஆகணும். User "தொடர்" / "next scene" / "அடுத்தது" சொன்னாலும் உடனே அடுத்த scene-க்கு போ. கதைக்கு வெளியே topic மாறாதே — இந்த mode-ல் இதே கதைய மட்டும் தொடரு.`
+        : '';
       const effectivePrompt = persona?.prompt
-        ? persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + dialectOverride + userContext + identityContext + avatarContext + kiruthikaContext
+        ? persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + identityContext + avatarContext + kiruthikaContext
         : persona?.prompt;
 
       let reply: string;
@@ -1396,7 +1411,7 @@ export default function ChatScreen() {
       setLoading(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [input, loading, messages, provider, persona, isOnline, localGemmaPort, moodMode, presanaBehaviour, normalBehaviour, dialectMode, userName, userBehaviour, reloadPersona, kiruthikaUserDetails]);
+  }, [input, loading, messages, provider, persona, isOnline, localGemmaPort, moodMode, presanaBehaviour, normalBehaviour, dialectMode, userName, userBehaviour, reloadPersona, kiruthikaUserDetails, todayStory]);
 
   const handleShowGalleryInChat = async (styleId: string) => {
     if (!persona) return;
@@ -1835,7 +1850,7 @@ export default function ChatScreen() {
           {/* Mood badge */}
           <TouchableOpacity onPress={toggleMood} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Text style={[styles.headerMoodBadge, moodMode !== 'presana' && styles.headerMoodNormal]}>
-              {moodMode === 'normal' ? '😇 Normal' : moodMode === 'whatsapp' ? '💬 WA' : '😈 Presana'} ⇄
+              {moodMode === 'normal' ? '😇 Normal' : moodMode === 'whatsapp' ? '💬 WA' : moodMode === 'story' ? '📖 Story' : '😈 Presana'} ⇄
             </Text>
           </TouchableOpacity>
           {/* Dialect badge */}
