@@ -100,8 +100,8 @@ const laxSafety = [
   { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" },
 ] as any;
 
-// Models in priority order — flash models are more permissive for visual content
-const GEMINI_VISION_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+// Models in priority order — 2.5-flash first (separate quota), then fallbacks
+const GEMINI_VISION_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 async function tryGeminiKeys(
   contents: any,
@@ -419,13 +419,34 @@ router.post("/analyze-file", async (req, res) => {
       console.warn("[analyze-file] Env issues detected:", envIssues);
     }
 
-    // Helper: build full debug block combining API errors + env issues
+    // Helper: log full debug info to server console only — never shown to user
     function buildDebugBlock(apiErrors: string[]): string {
       const lines: string[] = [];
       if (apiErrors.length > 0) lines.push(...apiErrors.map(e => `• ${e}`));
       if (envIssues.length > 0) lines.push(...envIssues.map(e => `• ${e}`));
-      if (lines.length === 0) return "";
-      return `\n\n⚠️ Debug Info:\n${lines.join("\n")}`;
+      if (lines.length > 0) console.error("[analyze-file] Debug:", lines.join(" | "));
+      return ""; // always empty — raw errors must never reach the user
+    }
+
+    // Helper: classify errors into Tamil-friendly reason for user display
+    function classifyErrors(apiErrors: string[]): string {
+      const all = [...apiErrors, ...envIssues].join(" ").toLowerCase();
+      if (all.includes("429") || all.includes("quota") || all.includes("exceeded") || all.includes("resource_exhausted") || all.includes("rate limit")) {
+        return "\n\n⏳ காரணம்: API quota தீர்ந்துவிட்டது — நாளை மீண்டும் try பண்ணுங்க அல்லது Settings → Keys-ல் புதிய key சேர்க்கவும்.";
+      }
+      if (all.includes("timeout") || all.includes("timed out") || all.includes("abort") || all.includes("aborted")) {
+        return "\n\n⏱️ காரணம்: Response time out ஆச்சு — சிறிய / குறுகிய video try பண்ணுங்க.";
+      }
+      if (all.includes("api key") || all.includes("api_key") || all.includes("invalid") || all.includes("401") || all.includes("403") || all.includes("unauthenticated") || all.includes("permission_denied")) {
+        return "\n\n🔑 காரணம்: API key valid இல்லை — Settings → Keys-ல் check பண்ணுங்க.";
+      }
+      if (all.includes("safety") || all.includes("blocked") || all.includes("finish_reason")) {
+        return "\n\n🔒 காரணம்: Safety filter block ஆச்சு — வேற video / photo try பண்ணுங்க.";
+      }
+      if (apiErrors.length > 0) {
+        return "\n\n🔧 காரணம்: Server error — சற்று நேரம் கழிச்சு மீண்டும் try பண்ணுங்க.";
+      }
+      return "";
     }
 
     const systemInstruction = buildSystemPrompt(characterName, characterPrompt);
@@ -470,10 +491,10 @@ router.post("/analyze-file", async (req, res) => {
       const debugBlock = buildDebugBlock(allImgErrors);
       const groqTextPrompt = `User shared a photo (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't see the image directly. React sweetly in Tamil — ask what's in the photo, compliment them for sharing, stay in character.`;
       const groqTextReply = await tryGroqText(mediaSystemInstruction, groqTextPrompt);
-      if (groqTextReply) return res.json({ reply: groqTextReply + debugBlock });
+      if (groqTextReply) return res.json({ reply: groqTextReply + classifyErrors(allImgErrors) });
 
       return res.json({
-        reply: `${characterName}: ஐயோ, படம் load ஆகல 😅 Home → Keys-ல் Gemini API key add பண்ணுங்க.${debugBlock}`,
+        reply: `${characterName}: ஐயோ, படம் load ஆகல 😅 Home → Keys-ல் Gemini API key add பண்ணுங்க.${classifyErrors(allImgErrors)}`,
       });
     }
 
@@ -491,16 +512,18 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Try inline data first (fast — no File API wait, beats Render 30s timeout)
-      // Works for videos under ~20MB. gemini-2.0-flash supports inline video.
+      // ── Step 1: Try inline data first (fast — single key + 18s timeout to beat Render 30s limit)
+      // Only first key is tried inline; if it fails we immediately jump to faster fallbacks.
+      // gemini-2.5-flash has separate quota so it succeeds even when 2.0-flash is exhausted.
       if (videoSizeMB < 18) {
-        const inlineVideoModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
-        console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) safety=BLOCK_NONE`);
-        for (const key of allGeminiKeys) {
+        const inlineVideoModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+        const inlineKey = allGeminiKeys[0]; // use best key only — multi-key retry risks Render 30s timeout
+        if (inlineKey) {
+          console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) key=...${inlineKey.slice(-6)}`);
           for (const model of inlineVideoModels) {
             try {
-              const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 28000 } } as any);
-              console.log(`[analyze-file][video] trying inline model=${model} key=...${key.slice(-6)}`);
+              const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 18000 } } as any);
+              console.log(`[analyze-file][video] trying inline model=${model}`);
               const resp = await ai.models.generateContent({
                 model,
                 contents: [{
@@ -520,8 +543,9 @@ router.post("/analyze-file", async (req, res) => {
               console.log(`[analyze-file][video] model=${model} returned empty text`);
             } catch (e: any) {
               const msg = e.message || String(e);
-              console.log(`[analyze-file][video] inline model=${model} key=...${key.slice(-6)} failed: ${msg}`);
-              videoErrors.push(`inline ${model} ...${key.slice(-6)}: ${msg}`);
+              console.log(`[analyze-file][video] inline model=${model} failed: ${msg}`);
+              videoErrors.push(`inline ${model}: ${msg}`);
+              // stop trying more models if key itself is invalid
               if (msg.includes("API_KEY") || msg.includes("auth") || msg.includes("credential")) break;
             }
           }
@@ -584,14 +608,13 @@ router.post("/analyze-file", async (req, res) => {
       }
 
       // ── Step 3: Groq text-only fallback
-      const videoDebugBlock = buildDebugBlock(videoErrors);
-      console.error("[analyze-file][video] All paths failed:", videoDebugBlock);
+      buildDebugBlock(videoErrors); // logs to console; returns ""
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
       if (groqReply) return res.json({ reply: groqReply });
 
       return res.json({
-        reply: `${characterName}: வீடியோ பாக்க முடியல 😔 சற்று நேரம் கழிச்சு மீண்டும் try பண்ணுங்க!`,
+        reply: `${characterName}: வீடியோ பாக்க முடியல 😔${classifyErrors(videoErrors)}`,
       });
     }
 
@@ -636,10 +659,10 @@ router.post("/analyze-file", async (req, res) => {
             ? `Document content:\n---\n${pdfText}\n---\n${userPrompt ? `User request: "${userPrompt}"` : "Give a warm Tamil summary of this document."}\nRespond as ${characterName} in Tamil.`
             : `User shared a PDF (${fileName}). ${userPrompt ? `They request: "${userPrompt}".` : "Respond warmly in Tamil."}`;
         const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
-        if (groqReply) return res.json({ reply: groqReply + pdfDebugBlock });
+        if (groqReply) return res.json({ reply: groqReply + classifyErrors(pdfErrors) });
 
         return res.json({
-          reply: `${characterName}: PDF படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${pdfDebugBlock}`,
+          reply: `${characterName}: PDF படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${classifyErrors(pdfErrors)}`,
         });
       }
 
@@ -662,10 +685,10 @@ router.post("/analyze-file", async (req, res) => {
         if (geminiReply) return res.json({ reply: geminiReply, docText });
 
         const groqReply = await tryGroqText(systemInstruction, docPrompt);
-        if (groqReply) return res.json({ reply: groqReply + docxDebugBlock, docText });
+        if (groqReply) return res.json({ reply: groqReply + classifyErrors(docxErrors), docText });
 
         return res.json({
-          reply: `${characterName}: Word document படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${docxDebugBlock}`,
+          reply: `${characterName}: Word document படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${classifyErrors(docxErrors)}`,
           docText,
         });
       }
@@ -697,10 +720,10 @@ router.post("/analyze-file", async (req, res) => {
       if (txtGeminiReply) return res.json({ reply: txtGeminiReply, docText });
 
       const txtGroqReply = await tryGroqText(systemInstruction, docPrompt);
-      if (txtGroqReply) return res.json({ reply: txtGroqReply + txtDebugBlock, docText });
+      if (txtGroqReply) return res.json({ reply: txtGroqReply + classifyErrors(txtErrors), docText });
 
       return res.json({
-        reply: `${characterName}: Document படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${txtDebugBlock}`,
+        reply: `${characterName}: Document படிக்க முடியல 😅 மீண்டும் try பண்ணுங்க!${classifyErrors(txtErrors)}`,
         docText,
       });
     }

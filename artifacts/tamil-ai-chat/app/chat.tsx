@@ -932,11 +932,11 @@ export default function ChatScreen() {
               const asset = result.assets[0];
               const isVideo = asset.type === 'video';
 
-              // Validate video duration — 30 seconds limit for full analysis
-              if (isVideo && asset.duration && asset.duration > 30000) {
+              // Validate video duration — 45 seconds limit for full analysis
+              if (isVideo && asset.duration && asset.duration > 45000) {
                 Alert.alert(
                   '⏱️ Video Too Long',
-                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 30 seconds-க்கு கீழ் உள்ள clip மட்டும் full analyze ஆகும்.\n\nகுறுகிய clip trim பண்ணி அனுப்புங்க!`
+                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 45 seconds-க்கு கீழ் உள்ள clip மட்டும் full analyze ஆகும்.\n\nகுறுகிய clip trim பண்ணி அனுப்புங்க!`
                 );
                 return;
               }
