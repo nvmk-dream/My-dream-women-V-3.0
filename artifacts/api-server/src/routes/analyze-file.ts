@@ -512,42 +512,39 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Try inline data first (fast — single key + 18s timeout to beat Render 30s limit)
-      // Only first key is tried inline; if it fails we immediately jump to faster fallbacks.
-      // gemini-2.5-flash has separate quota so it succeeds even when 2.0-flash is exhausted.
+      // ── Step 1: Try inline data first (gemini-2.5-flash ONLY — hard 18s limit)
+      // ONE model × ONE key = max 18s. Previous bug: 3 models × 18s = 54s max →
+      // Render 30s HTTP timeout killed connection → client "Network request failed".
+      // gemini-2.5-flash has separate quota (works even when 2.0/1.5 exhausted).
+      // Any failure → immediately falls through to OpenRouter Qwen fallback.
       if (videoSizeMB < 18) {
-        const inlineVideoModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-        const inlineKey = allGeminiKeys[0]; // use best key only — multi-key retry risks Render 30s timeout
+        const inlineKey = allGeminiKeys[0];
         if (inlineKey) {
           console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) key=...${inlineKey.slice(-6)}`);
-          for (const model of inlineVideoModels) {
-            try {
-              const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 18000 } } as any);
-              console.log(`[analyze-file][video] trying inline model=${model}`);
-              const resp = await ai.models.generateContent({
-                model,
-                contents: [{
-                  role: "user",
-                  parts: [
-                    { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } },
-                    { text: prompt },
-                  ],
-                }],
-                config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
-              });
-              const text = (resp.text || "").trim();
-              if (text) {
-                console.log(`[analyze-file][video] inline success model=${model} len=${text.length}`);
-                return res.json({ reply: text });
-              }
-              console.log(`[analyze-file][video] model=${model} returned empty text`);
-            } catch (e: any) {
-              const msg = e.message || String(e);
-              console.log(`[analyze-file][video] inline model=${model} failed: ${msg}`);
-              videoErrors.push(`inline ${model}: ${msg}`);
-              // stop trying more models if key itself is invalid
-              if (msg.includes("API_KEY") || msg.includes("auth") || msg.includes("credential")) break;
+          try {
+            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 18000 } } as any);
+            console.log(`[analyze-file][video] trying inline model=gemini-2.5-flash`);
+            const resp = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{
+                role: "user",
+                parts: [
+                  { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } },
+                  { text: prompt },
+                ],
+              }],
+              config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
+            });
+            const text = (resp.text || "").trim();
+            if (text) {
+              console.log(`[analyze-file][video] inline success len=${text.length}`);
+              return res.json({ reply: text });
             }
+            console.log(`[analyze-file][video] inline returned empty — falling to OpenRouter`);
+          } catch (e: any) {
+            const msg = e.message || String(e);
+            console.log(`[analyze-file][video] inline failed: ${msg} — falling to OpenRouter`);
+            videoErrors.push(`inline gemini-2.5-flash: ${msg}`);
           }
         }
       }
