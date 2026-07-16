@@ -95,7 +95,9 @@ async function tryOpenAICompatible(
     throw err;
   }
   const json: any = await r.json();
-  return json?.choices?.[0]?.message?.content ?? "பதில் இல்லை";
+  const oaTxt = json?.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!oaTxt) throw new Error('empty_openai_response');
+  return oaTxt;
 }
 
 const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
@@ -188,15 +190,15 @@ router.post("/chat", async (req, res) => {
             `gemini ${model}`,
           );
           const blockReason = (result as any)?.candidates?.[0]?.finishReason;
-          if (!result.text && (blockReason === "SAFETY" || blockReason === "PROHIBITED_CONTENT")) {
-            // Response was filtered — try next model/key instead of silently returning empty
-            lastErr = new Error(`blocked: ${blockReason}`);
-            req.log.warn({ keyIdx: ki, model, blockReason }, "Chat response blocked by safety filter");
+          const textContent = result.text?.trim() ?? '';
+          if (!textContent) {
+            // Empty/null/blocked for ANY reason — try next model/key
+            lastErr = new Error(`empty_response: ${blockReason ?? 'unknown'}`);
+            req.log.warn({ keyIdx: ki, model, blockReason }, "Empty response — trying next model/key");
             continue;
           }
-          const content = result.text ?? "பதில் இல்லை";
-          req.log.info({ keyIdx: ki, model }, "Chat success");
-          res.json({ content });
+          req.log.info({ keyIdx: ki, model, blockReason }, "Chat success");
+          res.json({ content: textContent });
           return;
         } catch (err: any) {
           lastErr = err;
