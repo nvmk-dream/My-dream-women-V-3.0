@@ -30,6 +30,31 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
+function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle }: {
+  sectionKey: string; icon: string; title: string; subtitle?: string; color?: string;
+  children: React.ReactNode; openSections: Record<string, boolean>; onToggle: (key: string) => void;
+}) {
+  const isOpen = !!openSections[sectionKey];
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        onPress={() => onToggle(sectionKey)}
+        style={styles.sectionCardHeader}
+        activeOpacity={0.75}
+      >
+        <Text style={styles.sectionCardIcon}>{icon}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.sectionCardTitle, { color }]}>{title}</Text>
+          {subtitle ? <Text style={styles.sectionCardSubtitle}>{subtitle}</Text> : null}
+        </View>
+        <Text style={styles.sectionCardChevron}>{isOpen ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
+    </View>
+  );
+}
+
 export default function EditCharacterScreen() {
   const router = useRouter();
   const personaId = ParamsStore.getEditPersonaId() ?? '';
@@ -431,29 +456,6 @@ export default function EditCharacterScreen() {
     );
   };
 
-  // Reusable collapsible section — tap header to open/close; multiple sections can stay open.
-  const SectionCard = ({ sectionKey, icon, title, subtitle, color = '#075E54', children }: {
-    sectionKey: string; icon: string; title: string; subtitle?: string; color?: string; children: React.ReactNode;
-  }) => {
-    const isOpen = !!openSections[sectionKey];
-    return (
-      <View style={styles.card}>
-        <TouchableOpacity
-          onPress={() => toggleSection(sectionKey)}
-          style={styles.sectionCardHeader}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.sectionCardIcon}>{icon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionCardTitle, { color }]}>{title}</Text>
-            {subtitle ? <Text style={styles.sectionCardSubtitle}>{subtitle}</Text> : null}
-          </View>
-          <Text style={styles.sectionCardChevron}>{isOpen ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-        {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
-      </View>
-    );
-  };
 
   if (!persona) {
     return (
@@ -567,7 +569,7 @@ export default function EditCharacterScreen() {
           </View>
         </Modal>
 
-        <SectionCard sectionKey="basicDetails" icon="👤" title="Character Basic Details" subtitle="அடிப்படை விவரங்கள்">
+        <SectionCard sectionKey="basicDetails" icon="👤" title="Character Basic Details" subtitle="அடிப்படை விவரங்கள்" openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.sectionLabel}>NAME</Text>
           <TextInput
             style={styles.nameInput}
@@ -595,7 +597,7 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="todayStory" icon="📖" title="இன்றைய கதை" subtitle="Today's Story" color="#8D6E63">
+        <SectionCard sectionKey="todayStory" icon="📖" title="இன்றைய கதை" subtitle="Today's Story" color="#8D6E63" openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.fieldHint}>இங்க ஒரு கதை type பண்ணுங்க — Chat screen-ல் "📖 Story" mode select பண்ணா, character இந்த கதைய scene-by-scene ஆ நடிச்சு பேசும். நீங்க மாத்தும் வரைக்கும் இதே கதை save-ஆ இருக்கும்.</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 160 }]}
@@ -616,7 +618,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color="#1565C0">
+        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color="#1565C0" openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.fieldHint}>ஒவ்வொரு mode-லயும் user எப்படி பேசுவாரு, எப்படி feel ஆவாரு என்று சொல்லுங்க — AI அதுக்கு ஏத்த மாதிரி character react பண்ணும்.</Text>
 
           {/* WhatsApp mode */}
@@ -668,7 +670,7 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="Avatar Reflection" subtitle="அவதார பிரதிபலிப்பு" color="#6C63FF">
+        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="Avatar Reflection" subtitle="அவதார பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ color: '#888', fontSize: 11, lineHeight: 17 }}>
@@ -742,7 +744,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்" color="#E91E63">
+        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்" color="#E91E63" openSections={openSections} onToggle={toggleSection}>
           <View style={styles.moodRow}>
             <View style={styles.moodInfo}>
               <Text style={styles.moodTitle}>
@@ -811,7 +813,7 @@ export default function EditCharacterScreen() {
           <Text style={{ color: '#888', fontSize: 11, marginTop: 8 }}>💡 Save பண்ணா chat-ல உடனே apply ஆகும்.</Text>
         </SectionCard>
 
-        <SectionCard sectionKey="greeting" icon="😊" title="Greeting (First Message)" subtitle="முதல் வாழ்த்து">
+        <SectionCard sectionKey="greeting" icon="😊" title="Greeting (First Message)" subtitle="முதல் வாழ்த்து" openSections={openSections} onToggle={toggleSection}>
           <TextInput
             style={[styles.fieldInput, { minHeight: 80 }]}
             value={greeting}
@@ -823,7 +825,7 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828">
+        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 200, fontSize: 11, lineHeight: 18, color: '#555', backgroundColor: '#fff5f5' }]}
@@ -847,7 +849,7 @@ export default function EditCharacterScreen() {
           </TouchableOpacity>
         </SectionCard>
 
-        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt" color="#1b5e20">
+        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt" color="#1b5e20" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 8 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
             <TouchableOpacity
@@ -881,7 +883,7 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt" color="#4527A0">
+        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt" color="#4527A0" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#6C63FF', fontSize: 10, marginBottom: 8 }}>
             {'Photo/Video அனுப்பும்போது இந்த prompt மட்டும் use ஆகும். Empty விட்டால் character-ஓட default prompt use ஆகும்.'}
           </Text>
@@ -908,7 +910,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Mode Avatars / Image Generation" subtitle="Mode அவதார்கள் / Image உருவாக்கம்" color="#C2185B">
+        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Mode Avatars / Image Generation" subtitle="Mode அவதார்கள் / Image உருவாக்கம்" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
           <View style={{ alignItems: 'center' }}>
             <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
