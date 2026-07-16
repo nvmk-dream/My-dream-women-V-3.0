@@ -512,18 +512,18 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Try inline data first (gemini-2.5-flash ONLY — hard 18s limit)
-      // ONE model × ONE key = max 18s. Previous bug: 3 models × 18s = 54s max →
-      // Render 30s HTTP timeout killed connection → client "Network request failed".
-      // gemini-2.5-flash has separate quota (works even when 2.0/1.5 exhausted).
-      // Any failure → immediately falls through to OpenRouter Qwen fallback.
-      if (videoSizeMB < 18) {
-        const inlineKey = allGeminiKeys[0];
-        if (inlineKey) {
-          console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) key=...${inlineKey.slice(-6)}`);
+      // ── Step 1: Inline Gemini — up to 3 keys, 12s timeout each, gemini-2.5-flash only
+      // KEY INSIGHT: 429 quota errors return in <1s → cycling keys is near-free.
+      // Budget: download(5s) + Gemini(12s) + Groq(5s) = 22s < Render 30s ✅
+      // Previous bug: only key[0] tried → if quota 429, fell straight to Groq text (no vision).
+      // Gemini inline supports up to ~20MB; larger videos skip to Groq text.
+      if (videoSizeMB < 20) {
+        const inlineKeys = allGeminiKeys.slice(0, 3);
+        console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
+        for (const inlineKey of inlineKeys) {
           try {
-            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 18000 } } as any);
-            console.log(`[analyze-file][video] trying inline model=gemini-2.5-flash`);
+            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 12000 } } as any);
+            console.log(`[analyze-file][video] inline key=...${inlineKey.slice(-6)}`);
             const resp = await ai.models.generateContent({
               model: "gemini-2.5-flash",
               contents: [{
@@ -537,41 +537,26 @@ router.post("/analyze-file", async (req, res) => {
             });
             const text = (resp.text || "").trim();
             if (text) {
-              console.log(`[analyze-file][video] inline success len=${text.length}`);
+              console.log(`[analyze-file][video] inline success key=...${inlineKey.slice(-6)} len=${text.length}`);
               return res.json({ reply: text });
             }
-            console.log(`[analyze-file][video] inline returned empty — falling to OpenRouter`);
+            console.log(`[analyze-file][video] key=...${inlineKey.slice(-6)} empty reply — next key`);
           } catch (e: any) {
             const msg = e.message || String(e);
-            console.log(`[analyze-file][video] inline failed: ${msg} — falling to OpenRouter`);
-            videoErrors.push(`inline gemini-2.5-flash: ${msg}`);
+            console.log(`[analyze-file][video] key=...${inlineKey.slice(-6)} failed: ${msg.slice(0, 80)}`);
+            videoErrors.push(`inline ...${inlineKey.slice(-6)}: ${msg.slice(0, 100)}`);
+            // Auth error → stop; quota 429 → try next key (fast)
+            if (msg.includes("API_KEY") || msg.includes("credential") ||
+                msg.includes("401") || msg.includes("403")) break;
           }
         }
-      }
-
-      // ── Step 2: File API REMOVED — always times out on Render free tier (30s HTTP limit)
-      // Upload + ACTIVE wait + generate = 60–90s → Render kills connection.
-      // Large videos (≥ 18MB) go directly to OpenRouter Qwen below (Cloudinary URL, fast).
-      if (videoSizeMB >= 18) {
-        console.log(`[analyze-file][video] large video (${videoSizeMB.toFixed(1)}MB) — skipping File API (Render timeout), going to OpenRouter`);
-      }
-
-      // ── Step 2.5: OpenRouter Qwen 2.5 VL video vision fallback ─────────────
-      // Runs when ALL Gemini keys fail (blocked/exhausted).
-      // Requires Cloudinary URL (fileUrl) — uploaded by client before calling analyze-file.
-      // media-chat.ts already uses this pattern successfully.
-      if (fileUrl) {
-        console.log(`[analyze-file][video] OpenRouter Qwen fallback with Cloudinary URL`);
-        const { text: orVideoReply, errors: orVideoErrors } = await tryOpenRouterVideoVision(
-          fileUrl as string,
-          prompt,
-          mediaSystemInstruction,
-        );
-        if (orVideoReply) return res.json({ reply: orVideoReply });
-        videoErrors.push(...orVideoErrors);
       } else {
-        console.log(`[analyze-file][video] No fileUrl — OpenRouter Qwen fallback skipped`);
+        console.log(`[analyze-file][video] ${videoSizeMB.toFixed(1)}MB ≥ 20MB — too large for inline, Groq fallback`);
+        videoErrors.push(`Video too large for inline (${videoSizeMB.toFixed(1)}MB)`);
       }
+
+      // Note: OpenRouter Qwen video_url NOT supported ("No endpoints found that support input video")
+      // Removed to avoid wasting 10s timeout on a guaranteed failure.
 
       // ── Step 3: Groq text-only fallback
       buildDebugBlock(videoErrors); // logs to console; returns ""
