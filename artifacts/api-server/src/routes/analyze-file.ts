@@ -512,9 +512,11 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Inline Gemini — up to 3 keys, 12s timeout each, gemini-2.5-flash only
+      // ── Step 1: Inline Gemini — up to 3 keys, 20s timeout each, gemini-2.5-flash only
       // KEY INSIGHT: 429 quota errors return in <1s → cycling keys is near-free.
-      // Budget: download(5s) + Gemini(12s) + Groq(5s) = 22s < Render 30s ✅
+      // Measured: Gemini takes ~15-16s to process a 10MB video inline.
+      // 12s timeout was killing successful requests! 20s is safe.
+      // Budget: download(5s) + Gemini(20s) + Groq(4s) = 29s < Render 30s ✅
       // Previous bug: only key[0] tried → if quota 429, fell straight to Groq text (no vision).
       // Gemini inline supports up to ~20MB; larger videos skip to Groq text.
       if (videoSizeMB < 20) {
@@ -522,7 +524,7 @@ router.post("/analyze-file", async (req, res) => {
         console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
         for (const inlineKey of inlineKeys) {
           try {
-            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 12000 } } as any);
+            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 20000 } } as any);
             console.log(`[analyze-file][video] inline key=...${inlineKey.slice(-6)}`);
             const resp = await ai.models.generateContent({
               model: "gemini-2.5-flash",
