@@ -549,42 +549,11 @@ router.post("/analyze-file", async (req, res) => {
         }
       }
 
-      // ── Step 2: File API fallback (for large videos or when inline fails)
-      // Only if we still have time — skip if Render timeout is likely
+      // ── Step 2: File API REMOVED — always times out on Render free tier (30s HTTP limit)
+      // Upload + ACTIVE wait + generate = 60–90s → Render kills connection.
+      // Large videos (≥ 18MB) go directly to OpenRouter Qwen below (Cloudinary URL, fast).
       if (videoSizeMB >= 18) {
-        const videoBlob = new Blob([videoBuffer], { type: mimeType || "video/mp4" });
-        for (const key of allGeminiKeys) {
-          let uploadedFileName: string | undefined;
-          try {
-            const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 90000 } } as any);
-            console.log(`[analyze-file] Uploading large video (${videoSizeMB.toFixed(1)}MB) to File API...`);
-            const uploadResult: any = await (ai.files as any).upload({
-              file: videoBlob,
-              config: { mimeType: mimeType || "video/mp4", displayName: fileName },
-            });
-            uploadedFileName = uploadResult.name;
-            if (!uploadedFileName) throw new Error("File upload returned no name");
-            const activeFile = await waitForActive(ai, uploadedFileName);
-            const resp = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
-              contents: [{ role: "user", parts: [
-                { fileData: { fileUri: activeFile.uri, mimeType: mimeType || "video/mp4" } },
-                { text: prompt },
-              ]}],
-              config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
-            });
-            const text = (resp.text || "").trim();
-            await (ai.files as any).delete({ name: uploadedFileName }).catch(() => {});
-            if (text) return res.json({ reply: text });
-          } catch (e: any) {
-            const msg = e.message || String(e);
-            console.log(`[analyze-file] File API key ${key.slice(-6)} failed: ${msg}`);
-            videoErrors.push(`FileAPI key ...${key.slice(-6)}: ${msg}`);
-            if (uploadedFileName) {
-              try { const c = new GoogleGenAI({ apiKey: key }); await (c.files as any).delete({ name: uploadedFileName }).catch(() => {}); } catch {}
-            }
-          }
-        }
+        console.log(`[analyze-file][video] large video (${videoSizeMB.toFixed(1)}MB) — skipping File API (Render timeout), going to OpenRouter`);
       }
 
       // ── Step 2.5: OpenRouter Qwen 2.5 VL video vision fallback ─────────────
