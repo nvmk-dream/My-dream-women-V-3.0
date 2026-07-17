@@ -1253,6 +1253,15 @@ export default function ChatScreen() {
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       history.push({ role: 'user', content: text });
+      // Inject story as first conversation messages (bypasses system-prompt content filtering)
+      // Declared HERE (before use) to avoid Hermes hoisting undefined crash
+      const storyPrefix: Array<{role: 'user' | 'assistant'; content: string}> = (moodMode === 'story' && todayStory.trim())
+        ? [
+            { role: 'user', content: `[இன்றைய கதை]:
+${todayStory.trim()}` },
+            { role: 'assistant', content: 'கதை புரிஞ்சுட்டேன். Character-ஆக scene-by-scene நடிக்கிறேன்.' },
+          ]
+        : [];
       // Story mode: limit to last 8 so storyPrefix (2 msgs) always stays within sendMessage slice(-10)
       const recentHistory = moodMode === 'story' ? history.slice(-8) : history;
       const sendHistory = [...storyPrefix, ...recentHistory];
@@ -1378,13 +1387,6 @@ export default function ChatScreen() {
       const storyContext = moodMode === 'story' && todayStory.trim()
         ? '\n\n**STORY MODE:** Conversation-இல் share ஆன கதையை character-ஆக scene-by-scene நடிக்கணும். 8-10 lines max. Story-க்கு வெளியே போகாதே.'
         : '';
-      // Inject story as first conversation messages (bypasses system-prompt content filtering)
-      const storyPrefix: Array<{role: 'user' | 'assistant'; content: string}> = (moodMode === 'story' && todayStory.trim())
-        ? [
-            { role: 'user', content: `[இன்றைய கதை]:\n${todayStory.trim()}` },
-            { role: 'assistant', content: 'கதை புரிஞ்சுட்டேன். Character-ஆக scene-by-scene நடிக்கிறேன்.' },
-          ]
-        : [];
       const effectivePrompt = persona?.prompt
         ? persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + identityContext + avatarContext + kiruthikaContext
         : persona?.prompt;
