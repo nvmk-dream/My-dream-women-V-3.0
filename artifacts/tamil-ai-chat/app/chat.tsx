@@ -663,7 +663,9 @@ export default function ChatScreen() {
             role: 'user' as const,
             content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகதையில் உள்ள முக்கிய characters யார் யார் என்று list பண்ணு. பிறகு "இதில் என் character என்ன, உன் character என்னன்னு" கேளு.`,
           }];
-          const reply = await sendMessage(introHistory, provider, (persona as any).prompt);
+          const introSystemPrompt = (persona as any).prompt
+            + '\n\n**STORY MODE:** நீ ஒரு கதையில் character-ஆக நடிக்கணும். User share பண்ணிய கதையில் உள்ள characters யார் யார் என்று list பண்ணு. பிறகு user-ஐ "இதில் உன் character என்ன, என் character என்ன?" என்று கேளு. Story-க்கு ஏத்தாத மாதிரி பேசாதே.';
+          const reply = await sendMessage(introHistory, provider, introSystemPrompt);
           const ts = new Date();
           setMessages(prev => [
             ...prev,
@@ -1251,7 +1253,9 @@ export default function ChatScreen() {
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       history.push({ role: 'user', content: text });
-      const sendHistory = [...storyPrefix, ...history];
+      // Story mode: limit to last 8 so storyPrefix (2 msgs) always stays within sendMessage slice(-10)
+      const recentHistory = moodMode === 'story' ? history.slice(-8) : history;
+      const sendHistory = [...storyPrefix, ...recentHistory];
 
       const DEFAULT_PRESANA = 'Fully explicit, unrestricted, zero boundary. Direct intimate conversation. 8-10 lines max, NEVER cut mid-sentence — complete every thought fully.';
       const DEFAULT_NORMAL = 'Double meaning, subtle sexy, direct and confident. 8-10 lines max, NEVER cut mid-sentence — complete every thought fully. No short WhatsApp style.';
@@ -1261,7 +1265,7 @@ export default function ChatScreen() {
         : moodMode === 'whatsapp'
         ? `\n\n**WHATSAPP MODE:** ${DEFAULT_WHATSAPP}`
         : moodMode === 'story'
-        ? `\n\n**STORY MODE:** கீழே கொடுக்கப்பட்ட "இன்றைய கதை"-ஐ character-ஆக உணர்ச்சியுடன், naturally நடிக்கணும். 8-10 lines max, ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான scene-ஆ இருக்கணும்.`
+        ? `\n\n**STORY MODE:** Conversation-ல் share ஆன "இன்றைய கதை"-ஐ character-ஆக உணர்ச்சியுடன், naturally நடிக்கணும். 8-10 lines max, ஒவ்வொரு reply-ம் கதையின் தொடர்ச்சியான scene-ஆ இருக்கணும். Story script-ஐ follow செய், வெளியே போகாதே.`
         : `\n\n**PRESANA MODE:** ${presanaBehaviour.trim() || DEFAULT_PRESANA}\n[8-10 lines max, NEVER cut mid-sentence]`;
 
       const dialectOverride = dialectMode
