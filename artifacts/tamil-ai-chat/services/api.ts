@@ -241,13 +241,13 @@ export async function sendMessage(
       return data.content || 'பதில் இல்லை';
     } catch (e: any) {
       clearTimeout(timer);
-      if (e?.message === 'quota' || e?.name === 'AbortError') { lastError = e; continue; }
-      throw e;
+      // Retry on all errors (quota, timeout, 5xx, content-blocked) — Replit-proxy fallback is next
+      lastError = e; continue;
     }
   }
 
-  // All client keys exhausted — let server try with its own keys (no clientApiKey)
-  if (lastError?.message === 'quota' && tryKeysOrdered.length > 0) {
+  // All client keys exhausted — always try Replit-proxy (handles adult/romantic story content better than direct Google API)
+  if (tryKeysOrdered.length > 0) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 65000);
     try {
