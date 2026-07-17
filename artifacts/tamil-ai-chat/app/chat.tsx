@@ -12,16 +12,7 @@ import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, gene
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
-/g) || []).forEach(w => { if (!stopWords.has(w)) nameSet.add(w); });
-  // Tamil words (unicode ஀-௿) that appear 2+ times
-  const tamilWords = story.match(/[஀-௿]{3,}/g) || [];
-  const freq: Record<string, number> = {};
-  tamilWords.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
-  Object.entries(freq).filter(([, n]) => n >= 2).forEach(([w]) => nameSet.add(w));
-  return Array.from(nameSet).slice(0, 12);
-}
-
-function cloudVideoThumbnail(videoUrl: string): string {
+function cloudVideoThumbnail(videoUrl: string): string {
   try {
     return videoUrl
       .replace('/video/upload/', '/video/upload/so_0,w_400,h_225,c_fill,f_jpg/')
