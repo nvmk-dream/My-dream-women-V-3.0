@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -261,6 +261,8 @@ export default function ChatScreen() {
   const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | null>(null);
   const [userName, setUserName]           = useState('');
   const [userBehaviour, setUserBehaviour] = useState('');
+  // Wake Render on open — prevents cold-start Aborted error
+  useEffect(() => { pingServer(); }, []);
   const [todayStory, setTodayStory]       = useState('');
 
   const reloadPersona = useCallback(async () => {
@@ -1403,6 +1405,12 @@ export default function ChatScreen() {
             { text: 'Cancel', style: 'cancel' },
             { text: '🔑 Keys Screen திற', onPress: () => router.push('/keys') },
           ],
+        );
+      } else if (err?.name === 'AbortError' || errMsg === 'Aborted') {
+        Alert.alert(
+          '⏳ Server எழும்பிட்டிருக்கு',
+          'Server தூக்கத்திலிருந்து எழும்பிட்டிருக்கு — 30-60 sec ஆகும்.\n\nகொஞ்சம் wait பண்ணி மீண்டும் send பண்ணுங்க.',
+          [{ text: 'சரி' }],
         );
       } else {
         Alert.alert('பிழை', errMsg || 'பதில் வரவில்லை. மீண்டும் முயல்க.');

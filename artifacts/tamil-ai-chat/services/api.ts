@@ -218,7 +218,7 @@ export async function sendMessage(
   // Try each client key in order
   for (const key of tryKeysOrdered.length > 0 ? tryKeysOrdered : [undefined as any]) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 65000);
+    const timer = setTimeout(() => controller.abort(), 100000);
     try {
       const res = await fetch(`${REPLIT_API}/api/chat`, {
         method: 'POST',
@@ -249,7 +249,7 @@ export async function sendMessage(
   // All client keys exhausted — always try Replit-proxy (handles adult/romantic story content better than direct Google API)
   if (tryKeysOrdered.length > 0) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 65000);
+    const timer = setTimeout(() => controller.abort(), 100000);
     try {
       const res = await fetch(`${REPLIT_API}/api/chat`, {
         method: 'POST',
@@ -269,6 +269,15 @@ export async function sendMessage(
   }
 
   throw lastError || new Error('பதில் வரல. மீண்டும் try பண்ணுங்க.');
+}
+
+
+export async function pingServer(): Promise<void> {
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 8000);
+    await fetch(`${REPLIT_API}/api/ping`, { method: 'GET', signal: ctrl.signal });
+  } catch { /* fire-and-forget — wake Render server */ }
 }
 
 export async function generateImage(params: {
