@@ -12,13 +12,7 @@ import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, gene
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
-
-// ── Story: extract likely character names from story text ──────────────────
-function extractNamesFromStory(story: string): string[] {
-  const nameSet = new Set<string>();
-  // English capitalized words (min 3 chars, not common words)
-  const stopWords = new Set(['The','And','But','For','With','That','This','From','Have','Will','When','Then','They','She','His','Her','Was','Are','Had','Not','You','Can','All','One','Two','Its']);
-  (story.match(/[A-Z][a-z]{2,}/g) || []).forEach(w => { if (!stopWords.has(w)) nameSet.add(w); });
+/g) || []).forEach(w => { if (!stopWords.has(w)) nameSet.add(w); });
   // Tamil words (unicode ஀-௿) that appear 2+ times
   const tamilWords = story.match(/[஀-௿]{3,}/g) || [];
   const freq: Record<string, number> = {};
@@ -279,12 +273,9 @@ export default function ChatScreen() {
   // Wake Render on open — prevents cold-start Aborted error
   useEffect(() => { pingServer(); }, []);
   const [todayStory, setTodayStory]       = useState('');
-  // Story Role Assignment
-  const [showStoryRoleModal, setShowStoryRoleModal] = useState(false);
-  const [storyNames, setStoryNames]         = useState<string[]>([]);
-  const [storyRoles, setStoryRoles]         = useState<Record<string, 'char' | 'user' | 'other'>>({});
-  const [storyRoleHash, setStoryRoleHash]   = useState('');
-  const [newStoryName, setNewStoryName]     = useState('');
+  // Story Role: save user's role-reply text; flag while waiting for it
+  const [awaitingRoleAssign, setAwaitingRoleAssign] = useState(false);
+  const [storyRoleText, setStoryRoleText]           = useState('');
 
   const reloadPersona = useCallback(async () => {
     // Step 1: Look up built-in personas first
@@ -330,6 +321,12 @@ export default function ChatScreen() {
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
         setTodayStory(data.todayStory ?? '');
+        // Load saved role assignment for this persona's story
+        if (personaId) {
+          AsyncStorage.getItem(`story_role_${personaId}`).then(raw => {
+            if (raw) { try { const s = JSON.parse(raw); setStoryRoleText(s.roleText ?? ''); } catch {} }
+          }).catch(() => {});
+        }
       } else {
         setPersona(finalPersona);
         setAvatarUri(finalPersona.avatarPhotoUri);
@@ -675,42 +672,42 @@ export default function ChatScreen() {
     setMoodMode(next);
     if (personaId) await AsyncStorage.setItem(`mood_mode_${personaId}`, next);
 
-    // Story Role Assignment: show modal to assign character roles
-    if (next === 'story' && todayStory.trim()) {
-      loadStoryRoles(todayStory);
+    // Story intro: AI lists characters + asks role questions automatically
+    if (next === 'story' && todayStory.trim() && persona?.prompt) {
+      setTimeout(async () => {
+        setLoading(true);
+        try {
+          // Check if we already have a saved role assignment for this story
+          const savedHash = todayStory.trim().slice(0, 120);
+          const raw = await AsyncStorage.getItem(`story_role_${personaId}`).catch(() => null);
+          let existingRole = '';
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved.hash === savedHash) existingRole = saved.roleText ?? '';
+          }
+
+          const introHistory = [{
+            role: 'user' as const,
+            content: existingRole
+              ? `கதை ஆரம்பிக்கலாம். முன்பு save ஆன role: ${existingRole}`
+              : `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகதையில் உள்ள கதாப்பாத்திரங்களின் பெயர்களை தனித்தனியாக list செய். பிறகு கீழே இரண்டு கேள்விகளை கேளு:\n1. இந்த கதையில் நான் யாருக்கெல்லாம் roleplay செய்யவேண்டும்?\n2. நீ யாருக்கெல்லாம் roleplay செய்ய போகிறாய்?`,
+          }];
+          const introSystemPrompt = (persona as any).prompt
+            + `\n\n**STORY MODE INTRO:** கதையில் உள்ள அனைத்து முக்கிய கதாப்பாத்திரங்களின் பெயர்களை இப்படி format-ல் list செய்:\n\nஇந்த கதையின் கதாப்பாத்திரங்கள்:\n[பெயர் 1]\n[பெயர் 2]\n...\n\nபிறகு கேளு:\n"இந்த கதையில் நான் யாருக்கெல்லாம் roleplay செய்யவேண்டும்?\nநீ யாருக்கெல்லாம் roleplay செய்ய போகிறாய்?"`;
+          const reply = await sendMessage(introHistory, provider, introSystemPrompt);
+          const ts = new Date();
+          setMessages(prev => [
+            ...prev,
+            { id: `story-u-${Date.now()}`,   role: 'user'      as const, content: '📖 Story Mode', timestamp: ts },
+            { id: `story-a-${Date.now()+1}`, role: 'assistant' as const, content: reply,          timestamp: ts },
+          ]);
+          if (!existingRole) setAwaitingRoleAssign(true);
+          else { setStoryRoleText(existingRole); }
+        } catch { /* silent */ }
+        finally { setLoading(false); }
+      }, 400);
     }
   };
-
-  // Story Role: load saved roles or show assignment modal
-  const loadStoryRoles = useCallback(async (story: string) => {
-    if (!personaId) return;
-    const hash = story.trim().slice(0, 120);
-    try {
-      const raw = await AsyncStorage.getItem(`story_roles_${personaId}`);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved.hash === hash) {
-          setStoryRoles(saved.roles ?? {});
-          setStoryRoleHash(hash);
-          return; // story unchanged — skip modal
-        }
-      }
-    } catch {}
-    // New story or changed story — extract names and show modal
-    const names = extractNamesFromStory(story);
-    setStoryNames(names);
-    setStoryRoles({});
-    setStoryRoleHash(hash);
-    setNewStoryName('');
-    setShowStoryRoleModal(true);
-  }, [personaId]);
-
-  const saveStoryRoles = useCallback(async (roles: Record<string, 'char' | 'user' | 'other'>) => {
-    if (!personaId) return;
-    await AsyncStorage.setItem(`story_roles_${personaId}`, JSON.stringify({ hash: storyRoleHash, roles })).catch(() => {});
-    setStoryRoles(roles);
-    setShowStoryRoleModal(false);
-  }, [personaId, storyRoleHash]);
 
   // Online / Offline toggle + local Gemma settings
   const [isOnline, setIsOnline] = useState(true);
@@ -1282,6 +1279,15 @@ export default function ChatScreen() {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+
+    // Capture role assignment reply (first user message after story intro)
+    if (awaitingRoleAssign && moodMode === 'story' && personaId) {
+      const hash = todayStory.trim().slice(0, 120);
+      AsyncStorage.setItem(`story_role_${personaId}`, JSON.stringify({ hash, roleText: text })).catch(() => {});
+      setStoryRoleText(text);
+      setAwaitingRoleAssign(false);
+    }
+
     setLoading(true);
 
     try {
@@ -1289,14 +1295,10 @@ export default function ChatScreen() {
       history.push({ role: 'user', content: text });
       // Inject story as first conversation messages (bypasses system-prompt content filtering)
       // Declared HERE (before use) to avoid Hermes hoisting undefined crash
-      const storyRoleLines = Object.entries(storyRoles)
-        .filter(([, v]) => v !== 'other')
-        .map(([name, role]) => role === 'char' ? `${name} = என் role (Character)` : `${name} = உன் role (User)`)
-        .join(', ');
       const storyPrefix: Array<{role: 'user' | 'assistant'; content: string}> = (moodMode === 'story' && todayStory.trim())
         ? [
-            { role: 'user', content: `[இன்றைய கதை]:\n${todayStory.trim()}${storyRoleLines ? `\n\n[Role Mapping]: ${storyRoleLines}` : ''}` },
-            { role: 'assistant', content: 'கதை புரிஞ்சுட்டேன். Role mapping பார்த்தேன். Character-ஆக scene-by-scene நடிக்கிறேன்.' },
+            { role: 'user', content: `[இன்றைய கதை]:\n${todayStory.trim()}${storyRoleText.trim() ? `\n\n[Role Assignment]:\n${storyRoleText.trim()}` : ''}` },
+            { role: 'assistant', content: 'கதை புரிஞ்சுட்டேன்.' + (storyRoleText.trim() ? ' Role assignment பார்த்தேன். அதன்படி நடிக்கிறேன்.' : ' Character-ஆக scene-by-scene நடிக்கிறேன்.') },
           ]
         : [];
       // Story mode: limit to last 8 so storyPrefix (2 msgs) always stays within sendMessage slice(-10)
@@ -2769,66 +2771,7 @@ export default function ChatScreen() {
         onClose={() => setFullViewVideo(null)}
       />
 
-      {/* ── Story Role Assignment Modal ── */}
-      <Modal visible={showStoryRoleModal} transparent animationType="slide" onRequestClose={() => setShowStoryRoleModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => {}}>
-          <View style={styles.storyRoleSheet}>
-            <View style={styles.storyRoleHeader}>
-              <Text style={styles.storyRoleTitle}>📖 கதை Characters</Text>
-              <TouchableOpacity onPress={() => setShowStoryRoleModal(false)}>
-                <Text style={{ fontSize: 22, color: '#888' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.storyRoleSubtitle}>ஒவ்வொரு பெயருக்கும் role select செய்யுங்கள்</Text>
-            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
-              {storyNames.map(name => (
-                <View key={name} style={styles.storyRoleRow}>
-                  <Text style={styles.storyRoleName}>{name}</Text>
-                  <View style={styles.storyRoleBtns}>
-                    <TouchableOpacity
-                      style={[styles.storyRoleBtn, storyRoles[name] === 'char' && styles.storyRoleBtnCharActive]}
-                      onPress={() => setStoryRoles(r => ({ ...r, [name]: 'char' }))}>
-                      <Text style={[styles.storyRoleBtnTxt, storyRoles[name] === 'char' && { color: '#fff' }]}>Character</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.storyRoleBtn, storyRoles[name] === 'user' && styles.storyRoleBtnUserActive]}
-                      onPress={() => setStoryRoles(r => ({ ...r, [name]: 'user' }))}>
-                      <Text style={[styles.storyRoleBtnTxt, storyRoles[name] === 'user' && { color: '#fff' }]}>User</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.storyRoleBtn, storyRoles[name] === 'other' && styles.storyRoleBtnOtherActive]}
-                      onPress={() => setStoryRoles(r => ({ ...r, [name]: 'other' }))}>
-                      <Text style={[styles.storyRoleBtnTxt, storyRoles[name] === 'other' && { color: '#fff' }]}>Skip</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-            {/* Manual add name */}
-            <View style={styles.storyRoleAddRow}>
-              <TextInput
-                style={styles.storyRoleAddInput}
-                placeholder="பெயர் add பண்ண..."
-                placeholderTextColor="#aaa"
-                value={newStoryName}
-                onChangeText={setNewStoryName}
-              />
-              <TouchableOpacity
-                style={styles.storyRoleAddBtn}
-                onPress={() => {
-                  const n = newStoryName.trim();
-                  if (n && !storyNames.includes(n)) { setStoryNames(prev => [...prev, n]); }
-                  setNewStoryName('');
-                }}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Add</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity style={styles.storyRoleSaveBtn} onPress={() => saveStoryRoles(storyRoles)}>
-              <Text style={styles.storyRoleSaveTxt}>✅ Save & Start Story</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+
 
     </SafeAreaView>
   );
@@ -3147,28 +3090,6 @@ const styles = StyleSheet.create({
   bdaySet: { fontSize: 12, color: '#2e7d32', marginBottom: 12 },
 
   // ── Full-screen viewer prompt button ──
-  // ── Story Role Modal ──
-  storyRoleSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, paddingBottom: 36, marginTop: 'auto',
-  },
-  storyRoleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  storyRoleTitle: { fontSize: 18, fontWeight: 'bold', color: '#1B5E20' },
-  storyRoleSubtitle: { fontSize: 13, color: '#666', marginBottom: 14 },
-  storyRoleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
-  storyRoleName: { flex: 1, fontSize: 15, color: '#111', fontWeight: '600' },
-  storyRoleBtns: { flexDirection: 'row', gap: 6 },
-  storyRoleBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderColor: '#ccc', backgroundColor: '#f5f5f5' },
-  storyRoleBtnTxt: { fontSize: 12, fontWeight: '600', color: '#555' },
-  storyRoleBtnCharActive: { backgroundColor: '#1B5E20', borderColor: '#1B5E20' },
-  storyRoleBtnUserActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  storyRoleBtnOtherActive: { backgroundColor: '#888', borderColor: '#888' },
-  storyRoleAddRow: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 12 },
-  storyRoleAddInput: { flex: 1, borderWidth: 1.5, borderColor: '#ddd', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#111' },
-  storyRoleAddBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  storyRoleSaveBtn: { backgroundColor: '#2E7D32', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  storyRoleSaveTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
   viewerPromptBtn: {
     position: 'absolute', bottom: 36, alignSelf: 'center',
     backgroundColor: '#6a1b9a', borderRadius: 24,
