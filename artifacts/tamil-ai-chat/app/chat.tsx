@@ -12,7 +12,7 @@ import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, gene
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
-function cloudVideoThumbnail(videoUrl: string): string {
+function cloudVideoThumbnail(videoUrl: string): string {
   try {
     return videoUrl
       .replace('/video/upload/', '/video/upload/so_0,w_400,h_225,c_fill,f_jpg/')
