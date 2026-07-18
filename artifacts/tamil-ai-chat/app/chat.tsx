@@ -1423,7 +1423,7 @@ export default function ChatScreen() {
         : '';
       const effectivePrompt = persona?.prompt
         ? storyRoleOverride + persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext
-        : persona?.prompt;
+        : (storyRoleOverride + charContext + getFamilyContext(persona?.id ?? '') + imageContext + moodOverride + storyContext + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext) || undefined;
 
       let reply: string;
       if (isOnline) {
@@ -1489,7 +1489,7 @@ export default function ChatScreen() {
       setLoading(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [input, loading, messages, provider, persona, isOnline, localGemmaPort, moodMode, presanaBehaviour, normalBehaviour, dialectMode, userName, userBehaviour, reloadPersona, kiruthikaUserDetails, todayStory]);
+  }, [input, loading, messages, provider, persona, isOnline, localGemmaPort, moodMode, presanaBehaviour, normalBehaviour, dialectMode, userName, userBehaviour, reloadPersona, kiruthikaUserDetails, todayStory, storyRoleText, awaitingRoleAssign]);
 
   const handleShowGalleryInChat = async (styleId: string) => {
     if (!persona) return;
