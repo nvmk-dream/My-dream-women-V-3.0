@@ -38,6 +38,18 @@ function getOpenAIKeys(): string[] {
   return Array.from(new Set(keys.map((k) => k.trim())));
 }
 
+// Multimedia/Story mode keys — separate pool from chat keys
+function getMultimediaKeys(): string[] {
+  const candidates: (string | undefined)[] = [
+    process.env["GEMINI_MULTIMEDIA_API_KEY"],
+  ];
+  for (let i = 2; i <= 20; i++) {
+    candidates.push(process.env[`GEMINI_MULTIMEDIA_API_KEY_${i}`]);
+  }
+  const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
+  return Array.from(new Set(keys.map((k) => k.trim())));
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
@@ -130,10 +142,11 @@ function isKeyError(err: any): boolean {
 
 router.post("/chat", async (req, res) => {
   try {
-    const { messages, systemPrompt, apiKey: clientApiKey } = req.body as {
+    const { messages, systemPrompt, apiKey: clientApiKey, mode } = req.body as {
       messages: { role: string; content: string }[];
       systemPrompt?: string;
       apiKey?: string;
+      mode?: string;
     };
 
     if (!messages || messages.length === 0) {
@@ -141,7 +154,8 @@ router.post("/chat", async (req, res) => {
       return;
     }
 
-    const serverKeys = getServerKeys();
+    // Story mode → use multimedia key pool; other modes → use chat key pool
+    const serverKeys = mode === 'story' ? getMultimediaKeys() : getServerKeys();
     const tryKeys: string[] = [];
     if (clientApiKey?.trim()) tryKeys.push(clientApiKey.trim());
     for (const k of serverKeys) if (!tryKeys.includes(k)) tryKeys.push(k);

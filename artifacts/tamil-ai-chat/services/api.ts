@@ -189,6 +189,7 @@ export async function sendMessage(
   messages: { role: string; content: string }[],
   _provider: string = 'gemini',
   systemPrompt?: string,
+  mode?: string,
 ): Promise<string> {
   const trimmed = messages.slice(-10);
 
@@ -223,7 +224,7 @@ export async function sendMessage(
       const res = await fetch(`${REPLIT_API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: trimmed, systemPrompt, ...(key ? { apiKey: key } : {}) }),
+        body: JSON.stringify({ messages: trimmed, systemPrompt, ...(key ? { apiKey: key } : {}), ...(mode ? { mode } : {}) }),
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -254,7 +255,7 @@ export async function sendMessage(
       const res = await fetch(`${REPLIT_API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: trimmed, systemPrompt }),
+        body: JSON.stringify({ messages: trimmed, systemPrompt, ...(mode ? { mode } : {}) }),
         signal: controller.signal,
       });
       clearTimeout(timer);

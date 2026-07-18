@@ -685,7 +685,7 @@ export default function ChatScreen() {
           }];
           const introSystemPrompt = (persona as any).prompt
             + `\n\n**STORY MODE INTRO:** கதையில் உள்ள அனைத்து முக்கிய கதாப்பாத்திரங்களின் பெயர்களை இப்படி format-ல் list செய்:\n\nஇந்த கதையின் கதாப்பாத்திரங்கள்:\n[பெயர் 1]\n[பெயர் 2]\n...\n\nபிறகு கேளு:\n"இந்த கதையில் நான் யாருக்கெல்லாம் roleplay செய்யவேண்டும்?\nநீ யாருக்கெல்லாம் roleplay செய்ய போகிறாய்?"`;
-          const reply = await sendMessage(introHistory, provider, introSystemPrompt);
+          const reply = await sendMessage(introHistory, provider, introSystemPrompt, 'story');
           const ts = new Date();
           setMessages(prev => [
             ...prev,
@@ -1428,7 +1428,7 @@ export default function ChatScreen() {
       let reply: string;
       if (isOnline) {
         // Online: Replit API → Gemini
-        reply = await sendMessage(sendHistory, provider, effectivePrompt);
+        reply = await sendMessage(sendHistory, provider, effectivePrompt, moodMode);
       } else {
         // Offline priority: 1) In-browser Gemma (WebLLM) → 2) Local server → 3) Scripted
         if (isEngineReady()) {
