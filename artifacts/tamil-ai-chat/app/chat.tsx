@@ -1417,8 +1417,12 @@ export default function ChatScreen() {
       const storyContext = moodMode === 'story' && todayStory.trim()
         ? '\n\n**STORY MODE:** Conversation-இல் share ஆன கதையை character-ஆக scene-by-scene நடிக்கணும். 8-10 lines max. Story-க்கு வெளியே போகாதே.'
         : '';
+      // Role assignment FIRST — overrides persona identity in story mode
+      const storyRoleOverride = (moodMode === 'story' && storyRoleText.trim())
+        ? `**[STORY ROLEPLAY — OVERRIDE — இதை கண்டிப்பாக follow செய்]:**\nRole Assignment: ${storyRoleText.trim()}\n⚠️ நீ இந்த assignment-ல் உனக்கு குறிப்பிட்ட character-ஆக மட்டும் பேசு. உன் base identity இந்த கதையில் இல்லை — story character-ஆக முழுமையாக மாறு. User assignment-ல் குறிப்பிட்ட character-ஆக பேசுவார் — அவரை அந்த character-ஆக treat பண்ணு. 8-10 lines max, கதைக்கு வெளியே போகாதே.\n\n`
+        : '';
       const effectivePrompt = persona?.prompt
-        ? persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + identityContext + avatarContext + kiruthikaContext
+        ? storyRoleOverride + persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext
         : persona?.prompt;
 
       let reply: string;
