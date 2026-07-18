@@ -38,13 +38,15 @@ function getOpenAIKeys(): string[] {
   return Array.from(new Set(keys.map((k) => k.trim())));
 }
 
-// Multimedia/Story mode keys — separate pool from chat keys
+// Multimedia/Story mode keys — GEMINI_API_KEY_1..5 only (Multimedia Render group)
+// Same keys used by video/image/document analysis (media-chat.ts, analyze-file.ts)
 function getMultimediaKeys(): string[] {
   const candidates: (string | undefined)[] = [
-    process.env["GEMINI_MULTIMEDIA_API_KEY"],
+    process.env["GEMINI_API_KEY"],
+    process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
   ];
-  for (let i = 2; i <= 20; i++) {
-    candidates.push(process.env[`GEMINI_MULTIMEDIA_API_KEY_${i}`]);
+  for (let i = 1; i <= 5; i++) {
+    candidates.push(process.env[`GEMINI_API_KEY_${i}`]);
   }
   const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
   return Array.from(new Set(keys.map((k) => k.trim())));
