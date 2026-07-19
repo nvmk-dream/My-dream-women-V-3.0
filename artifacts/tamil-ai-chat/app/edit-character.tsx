@@ -12,7 +12,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
-import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
+import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -266,9 +266,32 @@ export default function EditCharacterScreen() {
         imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
-      // Save கல்லாட்டம் engine data separately
+      // Save கல்லாட்டம் engine data — auto-extract outline & characters if story exists
       if (persona.id === 'kallaatam') {
-        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
+        let finalOutline = kOutline;
+        let finalChars  = kChars;
+        if (todayStory.trim()) {
+          try {
+            const reply = await sendMessage([
+              { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
+            ], 'gemini', undefined, 'story');
+            const parts = reply.split('---');
+            finalOutline = parts[0]?.trim() ?? reply;
+            setKOutline(finalOutline);
+            const charPart = parts[1] ?? '';
+            const charLines = charPart.split('\n').filter((l: string) => l.includes('|'));
+            if (charLines.length > 0) {
+              const newChars = [...DEFAULT_K_CHARS];
+              charLines.slice(0, 6).forEach((line: string, i: number) => {
+                const [nm, rl] = line.split('|').map((s: string) => s.trim());
+                if (nm && i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: rl ?? newChars[i].role };
+              });
+              finalChars = newChars;
+              setKChars(newChars);
+            }
+          } catch { /* silent — save still proceeds */ }
+        }
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars: finalChars, kAllAI, kOutline: finalOutline })).catch(() => {});
       }
       // Save per-character user prasana photo separately
       const userPrasanaKey = `user_prasana_photo_${persona.id}`;
@@ -681,8 +704,7 @@ export default function EditCharacterScreen() {
                     if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
                     setKExtracting(true);
                     try {
-                      const { sendMessage: sm } = await import('../services/api');
-                      const reply = await sm([
+                      const reply = await sendMessage([
                         { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
                       ], 'gemini', undefined, 'story');
                       // Parse outline and characters
