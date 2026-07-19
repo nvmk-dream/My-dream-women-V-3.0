@@ -437,7 +437,7 @@ export default function ChatScreen() {
   // Dialect toggle
   const [dialectMode, setDialectMode] = useState(true);
   // Mood: 'presana' (default flirty) | 'normal' (clean friendly)
-  const [moodMode, setMoodMode] = useState<'presana' | 'normal' | 'whatsapp' | 'story'>('presana');
+  const [moodMode, setMoodMode] = useState<'presana' | 'normal' | 'whatsapp' | 'story'>('normal');
   const [kiruthikaUserDetails, setKiruthikaUserDetails] = useState('');
   const [showKiruthikaDetails, setShowKiruthikaDetails] = useState(false);
   const [kiruthikaDetailsDraft, setKiruthikaDetailsDraft] = useState('');
@@ -582,7 +582,7 @@ export default function ChatScreen() {
       `chat_avatar_theme_${personaId}`,
     ]).then(pairs => {
       if (pairs[0][1] !== null) setDialectMode(pairs[0][1] === 'true');
-      if (pairs[1][1] !== null) { const m = pairs[1][1]; setMoodMode(m === 'normal' ? 'normal' : m === 'whatsapp' ? 'whatsapp' : 'presana'); }
+      if (pairs[1][1] !== null) { const m = pairs[1][1]; setMoodMode(m === 'presana' ? 'presana' : m === 'whatsapp' ? 'whatsapp' : m === 'story' ? 'story' : 'normal'); }
       if (pairs[2][1]) setChatWallpaper(pairs[2][1]);
       if (pairs[3][1]) setBubbleStyle(pairs[3][1]);
       if (pairs[5][1]) setAvatarAsBg(pairs[5][1] === '1');
