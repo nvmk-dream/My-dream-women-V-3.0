@@ -271,6 +271,10 @@ export default function ChatScreen() {
   const [storyRoleText, setStoryRoleText]           = useState('');
   // கல்லாட்டம் story engine
   const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>([]);
+  const [kOutline, setKOutline] = useState('');
+  const [kTaskContinue, setKTaskContinue] = useState(true);
+  const [kTaskOutline, setKTaskOutline] = useState(true);
+  const [kAllAI, setKAllAI] = useState(true);
 
   const reloadPersona = useCallback(async () => {
     // Step 1: Look up built-in personas first
@@ -320,7 +324,14 @@ export default function ChatScreen() {
         if (finalPersona.id === 'kallaatam') {
           try {
             const kRaw = await AsyncStorage.getItem('kallaatam_engine');
-            if (kRaw) { const kd = JSON.parse(kRaw); if (kd.kChars) setKChars(kd.kChars); }
+            if (kRaw) {
+              const kd = JSON.parse(kRaw);
+              if (kd.kChars) setKChars(kd.kChars);
+              if (kd.kOutline) setKOutline(kd.kOutline);
+              if (kd.kTaskContinue !== undefined) setKTaskContinue(kd.kTaskContinue);
+              if (kd.kTaskOutline !== undefined) setKTaskOutline(kd.kTaskOutline);
+              if (kd.kAllAI !== undefined) setKAllAI(kd.kAllAI);
+            }
           } catch {}
         }
         // Load saved role assignment for this persona's story
@@ -1439,6 +1450,34 @@ export default function ChatScreen() {
       // Role assignment FIRST — overrides persona identity in story mode
       const storyRoleOverride = (moodMode === 'story' && storyRoleText.trim())
         ? `**[STORY ROLEPLAY — OVERRIDE — இதை கண்டிப்பாக follow செய்]:**\nRole Assignment: ${storyRoleText.trim()}\n⚠️ நீ இந்த assignment-ல் உனக்கு குறிப்பிட்ட character-ஆக மட்டும் பேசு. உன் base identity இந்த கதையில் இல்லை — story character-ஆக முழுமையாக மாறு. User assignment-ல் குறிப்பிட்ட character-ஆக பேசுவார் — அவரை அந்த character-ஆக treat பண்ணு. 8-10 lines max, கதைக்கு வெளியே போகாதே.\n\n`
+        : '';
+      // கல்லாட்டம் multi-character story engine prompt
+      const kallaatamPrompt = (personaId === 'kallaatam' && kChars.length > 0)
+        ? (() => {
+            const lines: string[] = ['\n\n**[கல்லாட்டம் Story Engine — கண்டிப்பாக follow செய்]:**'];
+            if (kOutline.trim()) {
+              lines.push(`\n📖 கதை Outline:\n${kOutline.trim()}`);
+            }
+            const charLines = kChars.map(ch => {
+              const player = ch.aiPlay ? '🤖 AI நடிக்கும்' : '👤 User நடிக்கும்';
+              return `• ${ch.name} (${ch.role}) — ${player}`;
+            });
+            if (charLines.length > 0) {
+              lines.push(`\n🎭 Characters:\n${charLines.join('\n')}`);
+            }
+            const aiChars = kChars.filter(ch => ch.aiPlay);
+            if (aiChars.length > 0) {
+              lines.push(`\n⚠️ நீ AI-யாக நடிக்கும் characters: ${aiChars.map(c => c.name).join(', ')}`);
+              lines.push('இந்த characters-ஆக மாறி பேசு. ஒவ்வொரு response-லும் character பெயர் bold-ல் போடு (e.g. **அர்ஜுன்:**).');
+            }
+            if (kTaskContinue) {
+              lines.push('\n✅ கதையை தொடர்ந்து இயக்கு — user reply-க்கு ஏத்த மாதிரி story முன்னேற்று.');
+            }
+            if (kTaskOutline && kOutline.trim()) {
+              lines.push('✅ Outline-ல் குறிப்பிட்ட திசையில் கதையை வழிநடத்து.');
+            }
+            return lines.join('\n');
+          })()
         : '';
       const effectivePrompt = persona?.prompt
         ? storyRoleOverride + persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + kallaatamPrompt + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext
