@@ -727,12 +727,12 @@ export default function EditCharacterScreen() {
                       Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
                     } catch (e: any) {
                       const msg = String(e?.message ?? e);
-                      const isQuota = msg.includes('busy') || msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு');
+                      const isQuota = msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு') || msg.includes('resource_exhausted') || msg.includes('rate limit');
                       Alert.alert(
-                        isQuota ? '⏳ API Quota தீர்ந்தது' : '⚠️ Error',
+                        isQuota ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
                         isQuota
                           ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
-                          : msg.slice(0, 200));
+                          : msg.slice(0, 300));
                     } finally { setKExtracting(false); }
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
