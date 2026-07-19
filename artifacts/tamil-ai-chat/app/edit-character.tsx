@@ -91,6 +91,21 @@ export default function EditCharacterScreen() {
   const [userPrasanaPhotoUri, setUserPrasanaPhotoUri] = useState<string | undefined>(undefined);
   const [uploadingUserPrasanaPhoto, setUploadingUserPrasanaPhoto] = useState(false);
   const [todayStory, setTodayStory] = useState('');
+  // ── கல்லாட்டம் Story Engine state ──────────────────────────────────────────
+  const DEFAULT_K_CHARS = [
+    { name: '', role: 'example - மருமகன்', aiPlay: true, color: '#E53935' },
+    { name: '', role: 'example - மாமனார்', aiPlay: true, color: '#455A64' },
+    { name: '', role: 'example - பிரியாவின் கணவர்', aiPlay: true, color: '#37474F' },
+    { name: '', role: 'example - பிரியாவின் அம்மா', aiPlay: true, color: '#7B1FA2' },
+    { name: '', role: 'கூடுதல் கதாபாத்திரம் 1', aiPlay: true, color: '#E91E63' },
+    { name: '', role: 'கூடுதல் கதாபாத்திரம் 2', aiPlay: true, color: '#1E88E5' },
+  ];
+  const [kTaskContinue, setKTaskContinue] = useState(true);
+  const [kTaskOutline, setKTaskOutline] = useState(true);
+  const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>(DEFAULT_K_CHARS);
+  const [kAllAI, setKAllAI] = useState(true);
+  const [kOutline, setKOutline] = useState('');
+  const [kExtracting, setKExtracting] = useState(false);
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -103,6 +118,7 @@ export default function EditCharacterScreen() {
     baseRules: false,
     characterPrompt: false,
     imageVideoPrompt: false,
+    kallaatamEngine: false,
     modeAvatarsImageGen: false,
   });
   const toggleSection = (key: string) => {
@@ -161,6 +177,20 @@ export default function EditCharacterScreen() {
         setUserPresanaBeh(data.userPresanaBeh ?? '');
         setUserBodyDesc(data.userBodyDesc ?? '');
         setTodayStory(data.todayStory ?? '');
+        // Load கல்லாட்டம் story engine data
+        if (base.id === 'kallaatam') {
+          try {
+            const kRaw = await AsyncStorage.getItem('kallaatam_engine');
+            if (kRaw) {
+              const kd = JSON.parse(kRaw);
+              if (kd.kTaskContinue !== undefined) setKTaskContinue(kd.kTaskContinue);
+              if (kd.kTaskOutline !== undefined) setKTaskOutline(kd.kTaskOutline);
+              if (kd.kChars) setKChars(kd.kChars);
+              if (kd.kAllAI !== undefined) setKAllAI(kd.kAllAI);
+              if (kd.kOutline) setKOutline(kd.kOutline);
+            }
+          } catch {}
+        }
         // Load per-character user prasana photo
         const userPrasanaKey = `user_prasana_photo_${base.id}`;
         const savedUserPrasana = await AsyncStorage.getItem(userPrasanaKey).catch(() => null);
@@ -236,6 +266,10 @@ export default function EditCharacterScreen() {
         imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
+      // Save கல்லாட்டம் engine data separately
+      if (persona.id === 'kallaatam') {
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
+      }
       // Save per-character user prasana photo separately
       const userPrasanaKey = `user_prasana_photo_${persona.id}`;
       if (userPrasanaPhotoUri) {
@@ -617,6 +651,133 @@ export default function EditCharacterScreen() {
             </TouchableOpacity>
           )}
         </SectionCard>
+
+        {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
+        {persona?.id === 'kallaatam' && (
+          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}>
+
+            {/* Tasks */}
+            <View style={{ backgroundColor: '#f1f8e9', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#c8e6c9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 15, marginRight: 6 }}>✅</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1b5e20' }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Switch value={kTaskContinue} onValueChange={setKTaskContinue} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
+                <Text style={{ marginLeft: 10, fontSize: 13, color: '#2e7d32', flex: 1 }}>கொடுக்கப்பட்ட கதையை தொடரவும்.</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Switch value={kTaskOutline} onValueChange={setKTaskOutline} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
+                <Text style={{ marginLeft: 10, fontSize: 13, color: '#2e7d32', flex: 1 }}>Out Line வைத்து கொண்டு புது Screen play செய்யவும்.</Text>
+              </View>
+            </View>
+
+            {/* Outline Box */}
+            <View style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#4a148c' }}>📋 Story Outline</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
+                    setKExtracting(true);
+                    try {
+                      const { sendMessage: sm } = await import('../services/api');
+                      const reply = await sm([
+                        { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
+                      ], 'gemini', undefined, 'story');
+                      // Parse outline and characters
+                      const parts = reply.split('---');
+                      const outlinePart = parts[0]?.trim() ?? reply;
+                      setKOutline(outlinePart);
+                      // Parse characters
+                      const charPart = parts[1] ?? '';
+                      const charLines = charPart.split('\n').filter(l => l.includes('|'));
+                      const newChars = [...DEFAULT_K_CHARS];
+                      charLines.slice(0, 6).forEach((line, i) => {
+                        const [nm, rl] = line.split('|').map(s => s.trim());
+                        if (nm && i < newChars.length) {
+                          newChars[i] = { ...newChars[i], name: nm, role: rl ?? newChars[i].role };
+                        }
+                      });
+                      setKChars(newChars);
+                      Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
+                    } catch (e: any) {
+                      Alert.alert('⚠️ Error', String(e?.message ?? e).slice(0, 200));
+                    } finally { setKExtracting(false); }
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+                  disabled={kExtracting}
+                >
+                  {kExtracting ? <ActivityIndicator size="small" color="#fff" /> : null}
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600', marginLeft: kExtracting ? 6 : 0 }}>
+                    {kExtracting ? 'Extracting...' : '✨ Extract'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={[styles.fieldInput, { minHeight: 120, fontSize: 13 }]}
+                value={kOutline}
+                onChangeText={setKOutline}
+                multiline
+                textAlignVertical="top"
+                placeholder="கதையிலிருந்து outline இங்க auto-fill ஆகும்... (edit பண்ணலாம்)"
+                placeholderTextColor="#bbb"
+              />
+            </View>
+
+            {/* Character Details Table */}
+            <View style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 16, marginRight: 6 }}>🎭</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1565C0' }}>Character Details:</Text>
+              </View>
+              {/* Table header */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#e3f2fd', paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6, marginBottom: 4 }}>
+                <Text style={{ width: 28, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>#</Text>
+                <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: '#555' }}>👤 பெயர்</Text>
+                <Text style={{ flex: 1.4, fontSize: 10, fontWeight: '700', color: '#555' }}>📋 கதாபாத்திரம்</Text>
+                <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>🎭 by</Text>
+                <Text style={{ width: 36, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>Avtar</Text>
+              </View>
+              {kChars.map((ch, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, backgroundColor: '#fafafa', borderRadius: 8, padding: 4 }}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: ['#E53935','#455A64','#37474F','#7B1FA2','#E91E63','#1E88E5'][i], alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{i+1}</Text>
+                  </View>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: '#f0f0f0', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: '#222', marginRight: 4 }}
+                    value={ch.name}
+                    onChangeText={v => { const arr = [...kChars]; arr[i] = {...arr[i], name: v}; setKChars(arr); }}
+                    placeholder="பேரு..."
+                    placeholderTextColor="#bbb"
+                  />
+                  <TextInput
+                    style={{ flex: 1.4, backgroundColor: '#f0f0f0', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: '#222', marginRight: 4 }}
+                    value={ch.role}
+                    onChangeText={v => { const arr = [...kChars]; arr[i] = {...arr[i], role: v}; setKChars(arr); }}
+                    placeholder="கதாபாத்திரம்..."
+                    placeholderTextColor="#bbb"
+                  />
+                  <Switch
+                    value={ch.aiPlay}
+                    onValueChange={v => { const arr = [...kChars]; arr[i] = {...arr[i], aiPlay: v}; setKChars(arr); }}
+                    trackColor={{ true: '#43a047', false: '#ccc' }}
+                    thumbColor="#fff"
+                    style={{ width: 44 }}
+                  />
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: ch.color, marginLeft: 4 }} />
+                </View>
+              ))}
+            </View>
+
+            {/* Master toggle */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e8f5e9', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#a5d6a7' }}>
+              <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
+              <Text style={{ marginLeft: 10, fontSize: 13, color: '#1b5e20', fontWeight: '600', flex: 1 }}>அனைத்து character உம் AI roleplay செய்ய வேண்டும்.</Text>
+            </View>
+
+          </SectionCard>
+        )}
 
         <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color="#1565C0" openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.fieldHint}>ஒவ்வொரு mode-லயும் user எப்படி பேசுவாரு, எப்படி feel ஆவாரு என்று சொல்லுங்க — AI அதுக்கு ஏத்த மாதிரி character react பண்ணும்.</Text>

@@ -269,6 +269,8 @@ export default function ChatScreen() {
   // Story Role: save user's role-reply text; flag while waiting for it
   const [awaitingRoleAssign, setAwaitingRoleAssign] = useState(false);
   const [storyRoleText, setStoryRoleText]           = useState('');
+  // கல்லாட்டம் story engine
+  const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>([]);
 
   const reloadPersona = useCallback(async () => {
     // Step 1: Look up built-in personas first
@@ -314,6 +316,13 @@ export default function ChatScreen() {
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
         setTodayStory(data.todayStory ?? '');
+        // Load kallaatam character table
+        if (finalPersona.id === 'kallaatam') {
+          try {
+            const kRaw = await AsyncStorage.getItem('kallaatam_engine');
+            if (kRaw) { const kd = JSON.parse(kRaw); if (kd.kChars) setKChars(kd.kChars); }
+          } catch {}
+        }
         // Load saved role assignment for this persona's story
         if (personaId) {
           AsyncStorage.getItem(`story_role_${personaId}`).then(raw => {
@@ -641,6 +650,14 @@ export default function ChatScreen() {
       if (personaId) AsyncStorage.setItem(`mood_mode_${personaId}`, allowedModes[0]).catch(() => {});
     }
   }, [(persona as any)?.id]);
+
+  // ── கல்லாட்டம்: always force story mode ──
+  useEffect(() => {
+    if (persona?.id === 'kallaatam' && moodMode !== 'story') {
+      setMoodMode('story');
+      if (personaId) AsyncStorage.setItem(`mood_mode_${personaId}`, 'story').catch(() => {});
+    }
+  }, [persona?.id]);
 
   const toggleDialect = async () => {
     const next = !dialectMode;
@@ -1424,8 +1441,8 @@ export default function ChatScreen() {
         ? `**[STORY ROLEPLAY — OVERRIDE — இதை கண்டிப்பாக follow செய்]:**\nRole Assignment: ${storyRoleText.trim()}\n⚠️ நீ இந்த assignment-ல் உனக்கு குறிப்பிட்ட character-ஆக மட்டும் பேசு. உன் base identity இந்த கதையில் இல்லை — story character-ஆக முழுமையாக மாறு. User assignment-ல் குறிப்பிட்ட character-ஆக பேசுவார் — அவரை அந்த character-ஆக treat பண்ணு. 8-10 lines max, கதைக்கு வெளியே போகாதே.\n\n`
         : '';
       const effectivePrompt = persona?.prompt
-        ? storyRoleOverride + persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext
-        : (storyRoleOverride + charContext + getFamilyContext(persona?.id ?? '') + imageContext + moodOverride + storyContext + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext) || undefined;
+        ? storyRoleOverride + persona.prompt + charContext + getFamilyContext(persona.id) + imageContext + moodOverride + storyContext + kallaatamPrompt + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext
+        : (storyRoleOverride + charContext + getFamilyContext(persona?.id ?? '') + imageContext + moodOverride + storyContext + kallaatamPrompt + dialectOverride + userContext + (moodMode !== 'story' ? identityContext : '') + avatarContext + kiruthikaContext) || undefined;
 
       let reply: string;
       if (isOnline) {
