@@ -276,7 +276,7 @@ export default function EditCharacterScreen() {
           try {
             const reply = await sendMessage([
               { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
-            ], 'gemini', undefined, 'story');
+            ], 'gemini', undefined);
             const parts = reply.split('---');
             finalOutline = parts[0]?.trim() ?? reply;
             setKOutline(finalOutline);
@@ -708,7 +708,7 @@ export default function EditCharacterScreen() {
                     try {
                       const reply = await sendMessage([
                         { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
-                      ], 'gemini', undefined, 'story');
+                      ], 'gemini', undefined);
                       // Parse outline and characters
                       const parts = reply.split('---');
                       const outlinePart = parts[0]?.trim() ?? reply;
