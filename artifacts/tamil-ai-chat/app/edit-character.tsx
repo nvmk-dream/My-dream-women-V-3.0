@@ -270,7 +270,9 @@ export default function EditCharacterScreen() {
       if (persona.id === 'kallaatam') {
         let finalOutline = kOutline;
         let finalChars  = kChars;
-        if (todayStory.trim()) {
+        // Only auto-extract if outline is empty OR all character names are blank
+        const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
+        if (todayStory.trim() && needsExtract) {
           try {
             const reply = await sendMessage([
               { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
@@ -724,7 +726,13 @@ export default function EditCharacterScreen() {
                       setKChars(newChars);
                       Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
                     } catch (e: any) {
-                      Alert.alert('⚠️ Error', String(e?.message ?? e).slice(0, 200));
+                      const msg = String(e?.message ?? e);
+                      const isQuota = msg.includes('busy') || msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு');
+                      Alert.alert(
+                        isQuota ? '⏳ API Quota தீர்ந்தது' : '⚠️ Error',
+                        isQuota
+                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
+                          : msg.slice(0, 200));
                     } finally { setKExtracting(false); }
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
