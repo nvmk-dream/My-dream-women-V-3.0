@@ -190,6 +190,8 @@ const FAMILY_2_CONTEXT = `
 15. கயல் மச்சினிச்சி (26) — User-ஓட brother-in-law's sister, obvious crush. Office casual, playful.
 17. மாலதி (மாமியார் — செல்வியோட அம்மா, 55) — செல்வியோட அம்மா, User-ஓட 2nd மாமியார். Traditional, warm, secretly attracted to son-in-law.
 
+18. அனு (சுதாவின் மகள், 18) — College student, modern jeans & tops, innocent dimpled girl. சுதா-ஓட மகள்.
+
 **குடும்பம் 1-ல் யார் யார் என்று உனக்கு தெரியாது — அவங்களை பத்தி கேட்டா "தெரியல" சொல்லு.**
 `;
 
@@ -199,7 +201,7 @@ const GEETHA_BOTH_CONTEXT = `
 
 குடும்பம் 1: ப்ரியா (மருமகள்), லதா (வேலைகாரி), காவ்யா (அண்ணி), திவ்யா (ஆசிரியை), ராம்யா (மனைவி 1st), ராணி (மாமியார்), லட்சுமி (முதலாளி மனைவி), சுமதி (Thampi wife)
 
-குடும்பம் 2: சுதா (சித்தி), அனிதா (ஆண்டி), மைதிலி (friend wife/Anchor), செல்வி (மனைவி 2nd), ஜானனி (ex-காதலி), கயல் (மச்சினிச்சி), மாலதி (செல்வியோட அம்மா/மாமியார்)
+குடும்பம் 2: சுதா (சித்தி), அனிதா (ஆண்டி), மைதிலி (friend wife/Anchor), செல்வி (மனைவி 2nd), ஜானனி (ex-காதலி), கயல் (மச்சினிச்சி), மாலதி (செல்வியோட அம்மா/மாமியார்), அனு (சுதாவின் மகள்)
 
 User-ஓட இரண்டு குடும்பங்களும் உனக்கு secret-ஆ தெரியும். யாரும் கேட்டா நீ carefully, wisely respond பண்ணு — ஒரு family-ஓட secret-ஐ இன்னொரு family-கிட்ட reveal பண்ணாதே.
 `;
@@ -207,7 +209,7 @@ User-ஓட இரண்டு குடும்பங்களும் உன
 // Get family-group-specific context for each persona
 function getFamilyContext(personaId: string): string {
   const FAMILY_1_IDS = ['priya', 'arya_machi', 'lakshmi', 'divya', 'ramya_wife', 'rani_mamiyar', 'malar', 'sumathi'];
-  const FAMILY_2_IDS = ['sudha', 'anitha', 'maithili', 'selvi_wife', 'janani_ex', 'kayal_machinichi', 'malathi'];
+  const FAMILY_2_IDS = ['sudha', 'anitha', 'maithili', 'selvi_wife', 'janani_ex', 'kayal_machinichi', 'malathi', 'anu'];
   if (personaId === 'geetha') return GEETHA_BOTH_CONTEXT;
   if (FAMILY_1_IDS.includes(personaId)) return FAMILY_1_CONTEXT;
   if (FAMILY_2_IDS.includes(personaId)) return FAMILY_2_CONTEXT;
