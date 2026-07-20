@@ -55,6 +55,45 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', chi
   );
 }
 
+// Extract button — uses multimedia_gemini_1..5 keys only (separate from chat gemini_1..13 keys)
+const EXTRACT_API: string = (process.env['EXPO_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
+async function sendExtractMessage(content: string): Promise<string> {
+  const AS = (await import('@react-native-async-storage/async-storage')).default;
+  const [saved, enabledRaw] = await Promise.all([
+    AS.getItem('api_keys_store').catch(() => null),
+    AS.getItem('api_keys_enabled_v1').catch(() => null),
+  ]);
+  const parsed = saved ? JSON.parse(saved) as Record<string, string> : {};
+  const enabled = enabledRaw ? JSON.parse(enabledRaw) as Record<string, boolean> : {};
+  const multimediaKeys: string[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const k = parsed[`multimedia_gemini_${i}`];
+    if (k?.trim() && enabled[`multimedia_gemini_${i}`] !== false) multimediaKeys.push(k.trim());
+  }
+  const tryKeys = multimediaKeys.length > 0 ? multimediaKeys : [undefined as any];
+  const messages = [{ role: 'user', content }];
+  let lastErr: any;
+  for (const key of tryKeys) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 100000);
+      const res = await fetch(`${EXTRACT_API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, ...(key ? { apiKey: key } : {}) }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (res.status === 429) { lastErr = new Error('quota'); continue; }
+      if (!res.ok) { const e = await res.json().catch(() => ({})) as any; throw new Error(e?.error || `HTTP ${res.status}`); }
+      const data = await res.json() as any;
+      if (data.error) throw new Error(data.error);
+      return data.content || '';
+    } catch (e: any) { lastErr = e; continue; }
+  }
+  throw lastErr ?? new Error('Extract failed');
+}
+
 export default function EditCharacterScreen() {
   const router = useRouter();
   const personaId = ParamsStore.getEditPersonaId() ?? '';
@@ -274,9 +313,7 @@ export default function EditCharacterScreen() {
         const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
         if (todayStory.trim() && needsExtract) {
           try {
-            const reply = await sendMessage([
-              { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
-            ], 'gemini', undefined);
+            const reply = await sendExtractMessage(`இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)`);
             const parts = reply.split('---');
             finalOutline = parts[0]?.trim() ?? reply;
             setKOutline(finalOutline);
@@ -706,9 +743,7 @@ export default function EditCharacterScreen() {
                     if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
                     setKExtracting(true);
                     try {
-                      const reply = await sendMessage([
-                        { role: 'user', content: `இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)` }
-                      ], 'gemini', undefined);
+                      const reply = await sendExtractMessage(`இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)`);
                       // Parse outline and characters
                       const parts = reply.split('---');
                       const outlinePart = parts[0]?.trim() ?? reply;
