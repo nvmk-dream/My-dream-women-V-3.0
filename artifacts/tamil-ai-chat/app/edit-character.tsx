@@ -313,17 +313,21 @@ export default function EditCharacterScreen() {
         const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
         if (todayStory.trim() && needsExtract) {
           try {
-            const reply = await sendExtractMessage(`இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)`);
-            const parts = reply.split('---');
-            finalOutline = parts[0]?.trim() ?? reply;
+            const story = todayStory.trim();
+            // Message 1: character names
+            const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
+            const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+            // Message 2: character roles
+            const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
+            const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+            // Message 3: story outline
+            const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
+            finalOutline = outlineReply.trim();
             setKOutline(finalOutline);
-            const charPart = parts[1] ?? '';
-            const charLines = charPart.split('\n').filter((l: string) => l.includes('|'));
-            if (charLines.length > 0) {
+            if (names.length > 0) {
               const newChars = [...DEFAULT_K_CHARS];
-              charLines.slice(0, 6).forEach((line: string, i: number) => {
-                const [nm, rl] = line.split('|').map((s: string) => s.trim());
-                if (nm && i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: rl ?? newChars[i].role };
+              names.forEach((nm: string, i: number) => {
+                if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
               });
               finalChars = newChars;
               setKChars(newChars);
@@ -743,20 +747,20 @@ export default function EditCharacterScreen() {
                     if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
                     setKExtracting(true);
                     try {
-                      const reply = await sendExtractMessage(`இந்த கதையை படி:\n\n${todayStory.trim()}\n\nகீழ்க்கண்டதை செய்:\n1. Story Outline: கதையின் முக்கிய scenes-ஐ numbered headings-உடன் outline-ஆக எழுது (e.g. "1. காட்சி பெயர்\n   - சுருக்கம்")\n2. பிறகு line separator போடு: ---\n3. Characters: இந்த கதையில் உள்ள முக்கிய கதாபாத்திரங்களை இப்படி list பண்ணு:\nCHARACTERS:\n[பேரு1] | [கதாபாத்திரம்1]\n[பேரு2] | [கதாபாத்திரம்2]\n...\n(maximum 6 characters)`);
-                      // Parse outline and characters
-                      const parts = reply.split('---');
-                      const outlinePart = parts[0]?.trim() ?? reply;
-                      setKOutline(outlinePart);
-                      // Parse characters
-                      const charPart = parts[1] ?? '';
-                      const charLines = charPart.split('\n').filter(l => l.includes('|'));
+                      const story = todayStory.trim();
+                      // Message 1: character names
+                      const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
+                      const names = namesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+                      // Message 2: character roles
+                      const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
+                      const roles = rolesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+                      // Message 3: story outline
+                      const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
+                      setKOutline(outlineReply.trim());
+                      // Fill character details
                       const newChars = [...DEFAULT_K_CHARS];
-                      charLines.slice(0, 6).forEach((line, i) => {
-                        const [nm, rl] = line.split('|').map(s => s.trim());
-                        if (nm && i < newChars.length) {
-                          newChars[i] = { ...newChars[i], name: nm, role: rl ?? newChars[i].role };
-                        }
+                      names.forEach((nm, i) => {
+                        if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
                       });
                       setKChars(newChars);
                       Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
