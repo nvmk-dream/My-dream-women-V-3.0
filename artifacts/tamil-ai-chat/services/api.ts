@@ -209,6 +209,13 @@ export async function sendMessage(
     const k = parsed[`gemini_${i}`];
     if (k?.trim() && enabled[`gemini_${i}`] !== false) allActiveKeys.push(k.trim());
   }
+  // multimedia_gemini_1..5 keys as fallback when regular keys are exhausted
+  for (let i = 1; i <= 5; i++) {
+    const k = parsed[`multimedia_gemini_${i}`];
+    if (k?.trim() && enabled[`multimedia_gemini_${i}`] !== false && !allActiveKeys.includes(k.trim())) {
+      allActiveKeys.push(k.trim());
+    }
+  }
   // Deduplicate starting from current key first
   const tryKeysOrdered = apiKey
     ? [apiKey, ...allActiveKeys.filter(k => k !== apiKey)]
