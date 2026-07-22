@@ -31,9 +31,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
-function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle }: {
+function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle, headerExtra }: {
   sectionKey: string; icon: string; title: string; subtitle?: string; color?: string;
   children: React.ReactNode; openSections: Record<string, boolean>; onToggle: (key: string) => void;
+  headerExtra?: React.ReactNode;
 }) {
   const isOpen = !!openSections[sectionKey];
   return (
@@ -48,6 +49,7 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', chi
           <Text style={[styles.sectionCardTitle, { color }]}>{title}</Text>
           {subtitle ? <Text style={styles.sectionCardSubtitle}>{subtitle}</Text> : null}
         </View>
+        {headerExtra ? <View onStartShouldSetResponder={() => true}>{headerExtra}</View> : null}
         <Text style={styles.sectionCardChevron}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
@@ -697,7 +699,26 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="todayStory" icon="📖" title="இன்றைய கதை" subtitle="Today's Story" color="#8D6E63" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard
+          sectionKey="todayStory"
+          icon="📖"
+          title="இன்றைய கதை"
+          subtitle="Today's Story"
+          color="#8D6E63"
+          openSections={openSections}
+          onToggle={toggleSection}
+          headerExtra={persona?.id === 'kallaatam' ? (
+            <TouchableOpacity
+              onPress={handleStorySave}
+              disabled={storySaving}
+              style={{ backgroundColor: '#2E7D32', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
+            >
+              {storySaving
+                ? <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                : <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>💾 Save</Text>}
+            </TouchableOpacity>
+          ) : undefined}
+        >
           <Text style={styles.fieldHint}>இங்க ஒரு கதை type பண்ணுங்க — Chat screen-ல் "📖 Story" mode select பண்ணா, character இந்த கதைய scene-by-scene ஆ நடிச்சு பேசும். நீங்க மாத்தும் வரைக்கும் இதே கதை save-ஆ இருக்கும்.</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 160 }]}
