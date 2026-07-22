@@ -1971,7 +1971,7 @@ export default function ChatScreen() {
     : (normalAvatarUri || avatarUri);
 
   const headerTitle = () => (
-    <TouchableOpacity style={styles.headerTitleWrap} onPress={pickAvatarPhoto}>
+    <TouchableOpacity style={styles.headerTitleWrap} onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}>
       {avatarUri
         ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
         : persona
