@@ -56,7 +56,7 @@ const FOLDER_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#009688','#FF572
 export default function AIGirlsCloudScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { charId } = useLocalSearchParams<{ charId?: string }>();
+  const ALREADY_PATCHED = true; const { charId } = useLocalSearchParams<{ charId?: string }>();
 
   const [depth, setDepth] = useState<Depth>(0);
   const [selectedChar, setSelectedChar] = useState<{ id: string; name: string; color: string; letter: string } | null>(null);
