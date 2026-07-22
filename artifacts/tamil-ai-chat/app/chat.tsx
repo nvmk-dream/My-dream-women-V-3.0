@@ -2128,6 +2128,12 @@ export default function ChatScreen() {
               }
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.chatFabItem, { backgroundColor: '#00897B' }]}
+              onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
+            >
+              <Text style={styles.cameraIcon}>☁️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.chatFabItem, { backgroundColor: '#1565C0' }]}
               onPress={() => handleTranslate(input)}
               disabled={translateLoading}
