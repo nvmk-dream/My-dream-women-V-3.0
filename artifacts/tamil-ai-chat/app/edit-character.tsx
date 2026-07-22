@@ -146,6 +146,7 @@ export default function EditCharacterScreen() {
   const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>(DEFAULT_K_CHARS);
   const [kAllAI, setKAllAI] = useState(true);
   const [kOutline, setKOutline] = useState('');
+  const [kAiFill, setKAiFill] = useState(false);
   const [kExtracting, setKExtracting] = useState(false);
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
@@ -293,6 +294,72 @@ export default function EditCharacterScreen() {
 
   const [storySaving, setStorySaving] = useState(false);
 
+  const handleKAiFill = async () => {
+    if (!todayStory.trim()) {
+      Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணி 💾 Save பண்ணுங்க');
+      setKAiFill(false);
+      return;
+    }
+    const story = todayStory.trim();
+    setKExtracting(true);
+    try {
+      // Step 1: Names
+      const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
+      const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+      await new Promise<void>(resolve => {
+        Alert.alert(
+          '👥 கதாபாத்திரங்கள் பெயர்கள்',
+          `கதையில் இந்த பெயர்கள் கிடைச்சது:\n\n${names.map((n: string, i: number) => `${i + 1}. ${n}`).join('\n')}\n\nCharacter name-ஆக fill செய்யவா?`,
+          [
+            { text: '✅ Yes, Fill பண்ணு', onPress: () => {
+              const arr = [...kChars];
+              names.forEach((nm: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], name: nm }; });
+              setKChars(arr);
+              resolve();
+            }},
+            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
+          ]
+        );
+      });
+      // Step 2: Roles
+      const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
+      const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+      await new Promise<void>(resolve => {
+        Alert.alert(
+          '🎭 கதாபாத்திர Roles',
+          `இந்த roles கிடைச்சது:\n\n${roles.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n')}\n\nCharacter role-ஆக fill செய்யவா?`,
+          [
+            { text: '✅ Yes, Fill பண்ணு', onPress: () => {
+              const arr = [...kChars];
+              roles.forEach((rl: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], role: rl }; });
+              setKChars(arr);
+              resolve();
+            }},
+            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
+          ]
+        );
+      });
+      // Step 3: Outline
+      const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
+      const outline = outlineReply.trim();
+      await new Promise<void>(resolve => {
+        Alert.alert(
+          '📋 Story Outline',
+          `இந்த Outline கிடைச்சது:\n\n${outline.slice(0, 300)}${outline.length > 300 ? '...' : ''}\n\nOutline-ஆக fill செய்யவா?`,
+          [
+            { text: '✅ Yes, Fill பண்ணு', onPress: () => { setKOutline(outline); resolve(); } },
+            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
+          ]
+        );
+      });
+    } catch {
+      Alert.alert('Error', 'AI extract பண்ண முடியல. Try again.');
+    } finally {
+      setKExtracting(false);
+      setKAiFill(false);
+    }
+  };
+
   const handleStorySave = async () => {
     if (!persona) return;
     setStorySaving(true);
@@ -300,31 +367,11 @@ export default function EditCharacterScreen() {
       const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
       const existing = existingRaw ? JSON.parse(existingRaw) : {};
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory }));
-      let finalOutline = kOutline;
-      let finalChars = kChars;
-      const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
-      if (todayStory.trim() && needsExtract) {
-        try {
-          const story = todayStory.trim();
-          const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-          const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-          const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-          const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-          const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-          finalOutline = outlineReply.trim();
-          setKOutline(finalOutline);
-          if (names.length > 0) {
-            const newChars = [...DEFAULT_K_CHARS];
-            names.forEach((nm: string, i: number) => {
-              if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
-            });
-            finalChars = newChars;
-            setKChars(newChars);
-          }
-        } catch { /* silent */ }
-      }
-      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars: finalChars, kAllAI, kOutline: finalOutline })).catch(() => {});
+      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
       Alert.alert('✅ கதை Save ஆனது!', 'Story successfully saved.');
+      // Auto-open CHARACTER DETAILS section
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setOpenSections(prev => ({ ...prev, kallaatamEngine: true }));
     } catch {
       Alert.alert('Error', 'Story save failed. Try again.');
     } finally {
@@ -348,36 +395,9 @@ export default function EditCharacterScreen() {
         imageVideoPrompt,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
-      // Save கல்லாட்டம் engine data — auto-extract outline & characters if story exists
+      // Save கல்லாட்டம் engine data
       if (persona.id === 'kallaatam') {
-        let finalOutline = kOutline;
-        let finalChars  = kChars;
-        // Only auto-extract if outline is empty OR all character names are blank
-        const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
-        if (todayStory.trim() && needsExtract) {
-          try {
-            const story = todayStory.trim();
-            // Message 1: character names
-            const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-            const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-            // Message 2: character roles
-            const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-            const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-            // Message 3: story outline
-            const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-            finalOutline = outlineReply.trim();
-            setKOutline(finalOutline);
-            if (names.length > 0) {
-              const newChars = [...DEFAULT_K_CHARS];
-              names.forEach((nm: string, i: number) => {
-                if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
-              });
-              finalChars = newChars;
-              setKChars(newChars);
-            }
-          } catch { /* silent — save still proceeds */ }
-        }
-        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars: finalChars, kAllAI, kOutline: finalOutline })).catch(() => {});
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
       }
       // Save per-character user prasana photo separately
       const userPrasanaKey = `user_prasana_photo_${persona.id}`;
@@ -782,7 +802,19 @@ export default function EditCharacterScreen() {
 
         {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
         {persona?.id === 'kallaatam' && (
-          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}>
+          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}
+            headerExtra={
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }} pointerEvents="box-none">
+                <Text style={{ fontSize: 11, color: '#fff', marginRight: 4, fontWeight: '700' }}>{kExtracting ? '⏳' : '🤖 AI Fill'}</Text>
+                <Switch
+                  value={kAiFill}
+                  onValueChange={(v) => { if (!kExtracting) { setKAiFill(v); if (v) handleKAiFill(); } }}
+                  trackColor={{ true: '#81C784', false: '#888' }}
+                  thumbColor="#fff"
+                  style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
+                />
+              </View>
+            }>
 
             {/* Tasks */}
             <View style={{ backgroundColor: '#f1f8e9', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#c8e6c9' }}>
