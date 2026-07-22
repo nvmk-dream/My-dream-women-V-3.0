@@ -291,6 +291,47 @@ export default function EditCharacterScreen() {
     }
   };
 
+  const [storySaving, setStorySaving] = useState(false);
+
+  const handleStorySave = async () => {
+    if (!persona) return;
+    setStorySaving(true);
+    try {
+      const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory }));
+      let finalOutline = kOutline;
+      let finalChars = kChars;
+      const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
+      if (todayStory.trim() && needsExtract) {
+        try {
+          const story = todayStory.trim();
+          const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
+          const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+          const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
+          const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+          const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
+          finalOutline = outlineReply.trim();
+          setKOutline(finalOutline);
+          if (names.length > 0) {
+            const newChars = [...DEFAULT_K_CHARS];
+            names.forEach((nm: string, i: number) => {
+              if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
+            });
+            finalChars = newChars;
+            setKChars(newChars);
+          }
+        } catch { /* silent */ }
+      }
+      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars: finalChars, kAllAI, kOutline: finalOutline })).catch(() => {});
+      Alert.alert('✅ கதை Save ஆனது!', 'Story successfully saved.');
+    } catch {
+      Alert.alert('Error', 'Story save failed. Try again.');
+    } finally {
+      setStorySaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!persona) return;
     setSaving(true);
