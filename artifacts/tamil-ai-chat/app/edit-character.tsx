@@ -82,7 +82,7 @@ async function sendExtractMessage(content: string): Promise<string> {
       const res = await fetch(`${EXTRACT_API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, ...(key ? { apiKey: key } : {}) }),
+        body: JSON.stringify({ messages, mode: 'story', ...(key ? { apiKey: key } : {}) }),
         signal: ctrl.signal,
       });
       clearTimeout(timer);
@@ -330,9 +330,11 @@ export default function EditCharacterScreen() {
           `இந்த roles கிடைச்சது:\n\n${roles.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n')}\n\nCharacter role-ஆக fill செய்யவா?`,
           [
             { text: '✅ Yes, Fill பண்ணு', onPress: () => {
-              const arr = [...kChars];
-              roles.forEach((rl: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], role: rl }; });
-              setKChars(arr);
+              setKChars(prev => {
+                const arr = [...prev];
+                roles.forEach((rl: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], role: rl }; });
+                return arr;
+              });
               resolve();
             }},
             { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
