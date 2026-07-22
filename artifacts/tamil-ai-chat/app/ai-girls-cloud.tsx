@@ -5,7 +5,7 @@ import {
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
@@ -56,10 +56,25 @@ const FOLDER_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#009688','#FF572
 export default function AIGirlsCloudScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { charId } = useLocalSearchParams<{ charId?: string }>();
 
   const [depth, setDepth] = useState<Depth>(0);
   const [selectedChar, setSelectedChar] = useState<{ id: string; name: string; color: string; letter: string } | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<{ id: string; label: string } | null>(null);
+
+  // Auto-select character when charId param provided (chat ☁️ shortcut)
+  useEffect(() => {
+    if (!charId) return;
+    const persona = ALL_PERSONAS.find(p => p.id === charId);
+    if (!persona) return;
+    setSelectedChar({
+      id: persona.id,
+      name: persona.name,
+      color: persona.avatarColor,
+      letter: (persona as any).avatarLetter || persona.emoji,
+    });
+    setDepth(1);
+  }, [charId]);
 
   // Photos state (depth 2)
   const [photos, setPhotos] = useState<CloudPhoto[]>([]);
