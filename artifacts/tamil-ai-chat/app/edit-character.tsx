@@ -350,8 +350,15 @@ export default function EditCharacterScreen() {
         );
       });
       // (roles and outline not extracted — names only)
-    } catch {
-      Alert.alert('Error', 'AI extract பண்ண முடியல. Try again.');
+    } catch (e: any) {
+      const _msg = String(e?.message ?? e);
+      const _isQuota = _msg.includes('quota') || _msg.includes('429') || _msg.includes('நாளைக்கு') || _msg.includes('resource_exhausted') || _msg.includes('rate limit') || _msg.includes('busy');
+      Alert.alert(
+        _isQuota ? '⏳ API Quota தீர்ந்தது' : 'Error',
+        _isQuota
+          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
+          : (_msg.slice(0, 300) || 'AI extract பண்ண முடியல. Try again.')
+      );
     } finally {
       setKExtracting(false);
       setKAiFill(false);
