@@ -67,15 +67,23 @@ async function sendExtractMessage(content: string): Promise<string> {
   ]);
   const parsed = saved ? JSON.parse(saved) as Record<string, string> : {};
   const enabled = enabledRaw ? JSON.parse(enabledRaw) as Record<string, boolean> : {};
+  // Multimedia keys (story mode — preferred pool)
   const multimediaKeys: string[] = [];
   for (let i = 1; i <= 5; i++) {
     const k = parsed[`multimedia_gemini_${i}`];
     if (k?.trim() && enabled[`multimedia_gemini_${i}`] !== false) multimediaKeys.push(k.trim());
   }
-  const tryKeys = multimediaKeys.length > 0 ? multimediaKeys : [undefined as any];
+  // Chat keys (fallback when multimedia quota exhausted)
+  const chatKeys: string[] = [];
+  for (let i = 1; i <= 13; i++) {
+    const k = parsed[`gemini_${i}`];
+    if (k?.trim() && enabled[`gemini_${i}`] !== false) chatKeys.push(k.trim());
+  }
   const messages = [{ role: 'user', content }];
   let lastErr: any;
-  for (const key of tryKeys) {
+  // Pass 1: multimedia keys with mode:'story' (dedicated story/multimedia pool)
+  const pass1Keys = multimediaKeys.length > 0 ? multimediaKeys : [undefined as any];
+  for (const key of pass1Keys) {
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 100000);
@@ -83,6 +91,26 @@ async function sendExtractMessage(content: string): Promise<string> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, mode: 'story', ...(key ? { apiKey: key } : {}) }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (res.status === 429) { lastErr = new Error('quota'); continue; }
+      if (!res.ok) { const e = await res.json().catch(() => ({})) as any; throw new Error(e?.error || `HTTP ${res.status}`); }
+      const data = await res.json() as any;
+      if (data.error) throw new Error(data.error);
+      return data.content || '';
+    } catch (e: any) { lastErr = e; continue; }
+  }
+  // Pass 2: fallback — chat keys without mode (larger gemini chat pool on server)
+  const pass2Keys = chatKeys.length > 0 ? chatKeys : [undefined as any];
+  for (const key of pass2Keys) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 100000);
+      const res = await fetch(`${EXTRACT_API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, ...(key ? { apiKey: key } : {}) }),
         signal: ctrl.signal,
       });
       clearTimeout(timer);
