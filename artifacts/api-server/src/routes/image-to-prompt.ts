@@ -87,18 +87,23 @@ router.post("/image-to-prompt", async (req, res) => {
 
     // Try Gemini first (highest quality)
     const geminiKeyFromHeader = (req.headers['x-gemini-key'] as string)?.trim();
-    const geminiKey = geminiKeyFromHeader
-      || process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]
-      || process.env["GEMINI_API_KEY_1"]
-      || process.env["GEMINI_API_KEY_2"]
-      || process.env["GEMINI_API_KEY_3"]
-      || process.env["GEMINI_API_KEY"];
+    // Multimedia key pool — GEMINI_API_KEY_1..5 with rotation
+    const multimediaKeys: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const k = process.env[`GEMINI_API_KEY_${i}`]?.trim();
+      if (k) multimediaKeys.push(k);
+    }
+    // Also include integration key and base key
+    const baseKey = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"]?.trim() || process.env["GEMINI_API_KEY"]?.trim();
+    if (baseKey && !multimediaKeys.includes(baseKey)) multimediaKeys.unshift(baseKey);
+    const geminiKey = geminiKeyFromHeader || multimediaKeys[0] || null;
+    const geminiKeys = geminiKeyFromHeader ? [geminiKeyFromHeader] : multimediaKeys;
     const geminiBase = geminiKeyFromHeader ? undefined : process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
 
-    if (geminiKey) {
-      try {
+    if (geminiKeys.length > 0) {
+      for (const currentGeminiKey of geminiKeys) { try {
         const ai = new GoogleGenAI({
-          apiKey: geminiKey,
+          apiKey: currentGeminiKey,
           ...(geminiBase ? { httpOptions: { apiVersion: "", baseUrl: geminiBase } } : {}),
         });
         
@@ -121,8 +126,8 @@ router.post("/image-to-prompt", async (req, res) => {
             const prompt = result.text?.trim();
             if (prompt) {
               req.log.info({ model }, "image-to-prompt success via Gemini");
-              res.json({ prompt });
-              return;
+            res.json({ prompt });
+            return;
             }
           } catch (e: any) {
             const errorInfo = detectErrorType(e);
