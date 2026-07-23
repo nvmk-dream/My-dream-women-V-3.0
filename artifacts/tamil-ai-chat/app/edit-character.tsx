@@ -349,39 +349,7 @@ export default function EditCharacterScreen() {
           ]
         );
       });
-      // Step 2: Roles
-      const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-      const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-      await new Promise<void>(resolve => {
-        Alert.alert(
-          '🎭 கதாபாத்திர Roles',
-          `இந்த roles கிடைச்சது:\n\n${roles.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n')}\n\nCharacter role-ஆக fill செய்யவா?`,
-          [
-            { text: '✅ Yes, Fill பண்ணு', onPress: () => {
-              setKChars(prev => {
-                const arr = [...prev];
-                roles.forEach((rl: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], role: rl }; });
-                return arr;
-              });
-              resolve();
-            }},
-            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
-          ]
-        );
-      });
-      // Step 3: Outline
-      const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-      const outline = outlineReply.trim();
-      await new Promise<void>(resolve => {
-        Alert.alert(
-          '📋 Story Outline',
-          `இந்த Outline கிடைச்சது:\n\n${outline.slice(0, 300)}${outline.length > 300 ? '...' : ''}\n\nOutline-ஆக fill செய்யவா?`,
-          [
-            { text: '✅ Yes, Fill பண்ணு', onPress: () => { setKOutline(outline); resolve(); } },
-            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
-          ]
-        );
-      });
+      // (roles and outline not extracted — names only)
     } catch {
       Alert.alert('Error', 'AI extract பண்ண முடியல. Try again.');
     } finally {
@@ -875,19 +843,13 @@ export default function EditCharacterScreen() {
                       // Message 1: character names
                       const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
                       const names = namesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-                      // Message 2: character roles
-                      const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-                      const roles = rolesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-                      // Message 3: story outline
-                      const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-                      setKOutline(outlineReply.trim());
-                      // Fill character details
-                      const newChars = [...DEFAULT_K_CHARS];
-                      names.forEach((nm, i) => {
-                        if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
+                      // Fill only character names (keep existing roles)
+                      setKChars(prev => {
+                        const arr = [...prev];
+                        names.forEach((nm, i) => { if (i < arr.length) arr[i] = { ...arr[i], name: nm }; });
+                        return arr;
                       });
-                      setKChars(newChars);
-                      Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
+                      Alert.alert('✅ பெயர்கள் fill ஆச்சு!', `${names.length} கதாபாத்திர பெயர்கள் fill ஆச்சு. Edit பண்ணலாம்.`);
                     } catch (e: any) {
                       const msg = String(e?.message ?? e);
                       const isQuota = msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு') || msg.includes('resource_exhausted') || msg.includes('rate limit');
