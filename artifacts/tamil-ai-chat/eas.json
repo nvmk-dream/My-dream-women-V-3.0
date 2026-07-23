@@ -13,7 +13,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://my-dream-women-v2.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://my-dream-women-v-3-0.onrender.com"
       }
     },
     "production": {
@@ -21,7 +21,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://my-dream-women-v2.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://my-dream-women-v-3-0.onrender.com"
       }
     }
   },
