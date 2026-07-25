@@ -230,12 +230,15 @@ router.delete("/cloudinary/delete", async (req, res) => {
       result = await cl.uploader.destroy(public_id, { resource_type: "video", invalidate: true });
     }
 
-    // Also remove this entry from the folder's track store — otherwise the
-    // deleted photo/video reappears next time the folder is synced/reloaded,
-    // since /list serves from the track store first.
-    const idx = public_id.lastIndexOf("/");
-    if (idx > 0) {
-      const folder = public_id.slice(0, idx);
+    // Remove from ALL ancestor folder track stores — otherwise the deleted
+    // image reappears on the next sync because parent-folder tracks (e.g.
+    // my-girls root) still hold a reference even after the direct-parent
+    // track is cleaned. Walk up every level: my-girls/kavya/breast →
+    // my-girls/kavya → my-girls.
+    const parts = public_id.split('/');
+    parts.pop(); // strip filename, keep folder segments only
+    while (parts.length > 0) {
+      const folder = parts.join('/');
       try {
         const existing = await getTracked(folder, cl);
         const filtered = existing.filter(e => e.public_id !== public_id);
@@ -243,6 +246,7 @@ router.delete("/cloudinary/delete", async (req, res) => {
           await saveTracked(folder, filtered, cl);
         }
       } catch { /* best-effort */ }
+      parts.pop(); // move up one level
     }
 
     res.json({ success: true, result: result?.result });
