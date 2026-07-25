@@ -996,7 +996,7 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="Avatar Reflection" subtitle="அவதார பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ color: '#888', fontSize: 11, lineHeight: 17 }}>
