@@ -57,6 +57,60 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', chi
   );
 }
 
+// Field defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
+function Field({ label, hint, value, onChange, minH = 60, wordInputs, onSetWordInputs }: {
+  label: string; hint?: string; value: string;
+  onChange: (v: string) => void; minH?: number;
+  wordInputs: Record<string, string>;
+  onSetWordInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  const wordInput = wordInputs[label] ?? '';
+  const addWord = () => {
+    const w = wordInput.trim();
+    if (!w) return;
+    onChange(value.trim() ? `${value.trim()}, ${w}` : w);
+    onSetWordInputs(prev => ({ ...prev, [label]: '' }));
+  };
+  const copyValue = async () => {
+    if (!value.trim()) return;
+    await Clipboard.setStringAsync(value);
+    Alert.alert('✅ Copy ஆனது', 'Text clipboard-க்கு copy ஆயிடுச்சு');
+  };
+  return (
+    <View style={styles.fieldWrap}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <TouchableOpacity onPress={copyValue} style={{ paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 13 }}>📋 Copy</Text>
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        style={[styles.fieldInput, { minHeight: minH }]}
+        value={value}
+        onChangeText={onChange}
+        multiline
+        textAlignVertical="top"
+        placeholderTextColor="#bbb"
+      />
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+        <TextInput
+          style={styles.wordAddInput}
+          value={wordInput}
+          onChangeText={(t) => onSetWordInputs(prev => ({ ...prev, [label]: t }))}
+          placeholder="புதுசா வார்த்தை சேர்..."
+          placeholderTextColor="#bbb"
+          onSubmitEditing={addWord}
+          returnKeyType="done"
+        />
+        <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 // Extract button — uses multimedia_gemini_1..5 keys only (separate from chat gemini_1..13 keys)
 const EXTRACT_API: string = (process.env['EXPO_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
 async function sendExtractMessage(content: string): Promise<string> {
@@ -572,57 +626,6 @@ export default function EditCharacterScreen() {
 
   // Per-field "+ வார்த்தை சேர்" quick-add input value, keyed by field label.
   const [wordInputs, setWordInputs] = useState<Record<string, string>>({});
-
-  const Field = ({ label, hint, value, onChange, minH = 60 }: {
-    label: string; hint?: string; value: string;
-    onChange: (v: string) => void; minH?: number;
-  }) => {
-    const wordInput = wordInputs[label] ?? '';
-    const addWord = () => {
-      const w = wordInput.trim();
-      if (!w) return;
-      onChange(value.trim() ? `${value.trim()}, ${w}` : w);
-      setWordInputs(prev => ({ ...prev, [label]: '' }));
-    };
-    const copyValue = async () => {
-      if (!value.trim()) return;
-      await Clipboard.setStringAsync(value);
-      Alert.alert('✅ Copy ஆனது', 'Text clipboard-க்கு copy ஆயிடுச்சு');
-    };
-    return (
-      <View style={styles.fieldWrap}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.fieldLabel}>{label}</Text>
-          <TouchableOpacity onPress={copyValue} style={{ paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 13 }}>📋 Copy</Text>
-          </TouchableOpacity>
-        </View>
-        <TextInput
-          style={[styles.fieldInput, { minHeight: minH }]}
-          value={value}
-          onChangeText={onChange}
-          multiline
-          textAlignVertical="top"
-          placeholderTextColor="#bbb"
-        />
-        {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-          <TextInput
-            style={styles.wordAddInput}
-            value={wordInput}
-            onChangeText={(t) => setWordInputs(prev => ({ ...prev, [label]: t }))}
-            placeholder="புதுசா வார்த்தை சேர்..."
-            placeholderTextColor="#bbb"
-            onSubmitEditing={addWord}
-            returnKeyType="done"
-          />
-          <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
 
 
   if (!persona) {
@@ -1233,7 +1236,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Mode Avatars / Image Generation" subtitle="Mode அவதார்கள் / Image உருவாக்கம்" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
           <View style={{ alignItems: 'center' }}>
             <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
@@ -1265,11 +1268,11 @@ export default function EditCharacterScreen() {
               <Text style={{ color:'#1565C0', fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
             </View>
           )}
-          <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} />
+          <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
           <View style={styles.divider} />
-          <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} />
+          <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
           <View style={styles.divider} />
-          <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} />
+          <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
         </SectionCard>
 
         <Text style={styles.footerNote}>
