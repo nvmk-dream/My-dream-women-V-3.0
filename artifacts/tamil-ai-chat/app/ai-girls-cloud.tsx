@@ -98,6 +98,7 @@ export default function AIGirlsCloudScreen() {
   // Custom delete confirm (Alert.alert blocked on Chrome web)
   const [deleteTarget, setDeleteTarget] = useState<CloudPhoto | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: string; name: string; type: 'char' | 'style' } | null>(null);
+  const [hiddenStyles, setHiddenStyles] = useState<Set<string>>(new Set()); // built-in styles hidden per char
 
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -152,7 +153,7 @@ export default function AIGirlsCloudScreen() {
   }));
 
   const personas = [...basePersonas, ...customChars];
-  const photoStyles = [...PHOTO_STYLES, ...customStyles];
+  const photoStyles = [...PHOTO_STYLES, ...customStyles].filter(s => !hiddenStyles.has(s.id));
 
   const handleNewFolder = () => {
     setFolderName('');
@@ -451,6 +452,9 @@ export default function AIGirlsCloudScreen() {
   const selectChar = (char: typeof personas[0]) => {
     setSelectedChar(char);
     setDepth(1);
+    AsyncStorage.getItem(`hidden_styles_${char.id}`).then(raw => {
+      setHiddenStyles(new Set(raw ? JSON.parse(raw) : []));
+    }).catch(() => {});
   };
 
   const selectStyle = (style: typeof PHOTO_STYLES[0]) => {
@@ -530,6 +534,14 @@ export default function AIGirlsCloudScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
+      // If built-in style: hide it from this character's folder list
+      const isBuiltInStyle = PHOTO_STYLES.some(s => s.id === id);
+      if (isBuiltInStyle && selectedChar) {
+        const newHidden = new Set(hiddenStyles);
+        newHidden.add(id);
+        setHiddenStyles(newHidden);
+        await AsyncStorage.setItem(`hidden_styles_${selectedChar.id}`, JSON.stringify([...newHidden]));
+      }
       // Delete all Cloudinary photos in this style folder (for current character)
       if (selectedChar) {
         try {
