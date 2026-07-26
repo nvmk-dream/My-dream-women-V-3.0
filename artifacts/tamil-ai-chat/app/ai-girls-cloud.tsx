@@ -210,6 +210,7 @@ export default function AIGirlsCloudScreen() {
     }
 
     // CUT: delete originals from device after successful upload
+    let cutDeleteFailed = false;
     if (action === 'cut' && done > 0) {
       try {
         const writePerm = await MediaLibrary.requestPermissionsAsync(true);
@@ -219,9 +220,11 @@ export default function AIGirlsCloudScreen() {
             .filter(a => a.assetId)
             .map(a => a.assetId as string);
           if (assetIds.length > 0) {
-            await MediaLibrary.deleteAssetsAsync(assetIds);
+            // deleteAssetsAsync returns boolean — false means user dismissed system popup
+            const deleted = await MediaLibrary.deleteAssetsAsync(assetIds);
+            if (!deleted) cutDeleteFailed = true;
           } else {
-            // Method 2: file:// URI → FileSystem.deleteAsync directly
+            // Method 2: file:// URI → FileSystem.deleteAsync directly (no system popup)
             for (const a of pickedAssets) {
               if (a.uri.startsWith('file://')) {
                 await FileSystem.deleteAsync(a.uri, { idempotent: true }).catch(() => {});
@@ -239,11 +242,17 @@ export default function AIGirlsCloudScreen() {
                 }
                 cursor = res.hasNextPage ? res.endCursor : undefined;
               } while (cursor && toDelete.length < pickedAssets.length);
-              if (toDelete.length > 0) await MediaLibrary.deleteAssetsAsync(toDelete);
+              if (toDelete.length > 0) {
+                const deleted = await MediaLibrary.deleteAssetsAsync(toDelete);
+                if (!deleted) cutDeleteFailed = true;
+              }
             }
           }
         }
-      } catch { /* deletion failed — upload still succeeded */ }
+      } catch {
+        // Some devices need MANAGE_MEDIA permission — mark as failed, don't silently ignore
+        cutDeleteFailed = true;
+      }
     }
 
     setUploading(false);
@@ -253,16 +262,28 @@ export default function AIGirlsCloudScreen() {
     const reasonsText = failures.length
       ? '\n\nFail reasons:\n' + failures.slice(0, 3).map(f => `• ${f.name}: ${f.reason}`).join('\n')
       : '';
-    if (done > 0) {
-      const head = action === 'cut'
-        ? `${done}/${total} photos cloud-ல் save ஆச்சு. Mobile-ல் delete ஆச்சு.`
-        : `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.`;
+    if (done === 0) {
+      Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.` + reasonsText);
+    } else if (action !== 'cut') {
       Alert.alert(
         failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
-        head + (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
+        `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.` +
+          (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
+      );
+    } else if (!cutDeleteFailed) {
+      // CUT success — upload + phone delete both done
+      Alert.alert(
+        failures.length ? '⚠️ Partial Cut' : '✅ Cut & Upload ஆச்சு!',
+        `${done}/${total} photos cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` +
+          (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
       );
     } else {
-      Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.` + reasonsText);
+      // CUT — upload succeeded but phone delete failed
+      Alert.alert(
+        '⚠️ Upload ஆச்சு, ஆனா Delete ஆகல',
+        `${done}/${total} photos cloud-ல் save ஆச்சு. Phone-ல் delete ஆகல.\n\nSystem popup வந்தால் Allow press பண்ணுங்க, இல்லன்னா Settings → My Girls → Permissions → Files → Delete allow செய்யுங்க.` +
+          (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
+      );
     }
   };
 
