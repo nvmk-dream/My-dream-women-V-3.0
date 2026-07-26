@@ -504,7 +504,7 @@ export default function AIGirlsCloudScreen() {
     const isBuiltIn = type === 'char'
       ? basePersonas.some(p => p.id === id)
       : PHOTO_STYLES.some(s => s.id === id);
-    if (isBuiltIn) return; // built-in folders cannot be deleted
+    if (isBuiltIn && type === 'char') return; // only block built-in character folders
     setDeleteFolderTarget({ id, name, type });
   };
 
