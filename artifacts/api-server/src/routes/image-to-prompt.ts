@@ -148,6 +148,7 @@ router.post("/image-to-prompt", async (req, res) => {
         req.log.warn({ err: e?.message?.slice(0, 100) }, "Gemini init failed");
       }
     }
+    } // close: if (geminiKeys.length > 0)
 
     // Fallback to OpenRouter (cheaper, good quality)
     const orKeyFromHeader = (req.headers['x-openrouter-key'] as string)?.trim();
