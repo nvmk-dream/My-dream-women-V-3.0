@@ -224,9 +224,7 @@ export default function AIGirlsCloudScreen() {
           cutDeleteFailed = true;
           Alert.alert(
             '⚙️ Media Delete Permission தேவை',
-            'Phone-ல் photos delete செய்ய, Settings-ல் ஒரு முறை permission allow செய்யுங்க:
-
-Settings → Apps → My Dream Women → Permissions → Media Management → Allow',
+            'Phone-ல் photos delete செய்ய, Settings-ல் ஒரு முறை permission allow செய்யுங்க:\n\nSettings \u2192 Apps \u2192 My Dream Women \u2192 Permissions \u2192 Media Management \u2192 Allow',
             [
               { text: 'Settings திற', onPress: () => Linking.openSettings() },
               { text: 'Cancel', style: 'cancel' },
