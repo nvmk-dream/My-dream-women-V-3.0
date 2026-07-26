@@ -239,6 +239,7 @@ export default function AIGirlsCloudScreen() {
 
           if (assetIds.length > 0) {
             const deleted = await MediaLibrary.deleteAssetsAsync(assetIds);
+            console.log("deleteResult:", deleted);
             if (!deleted) cutDeleteFailed = true;
           } else {
             // Method 2: Fallback — scan MediaLibrary by filename
@@ -255,6 +256,7 @@ export default function AIGirlsCloudScreen() {
               } while (cursor && toDelete.length < pickedAssets.length);
               if (toDelete.length > 0) {
                 const deleted = await MediaLibrary.deleteAssetsAsync(toDelete);
+                console.log("deleteResult:", deleted);
                 if (!deleted) cutDeleteFailed = true;
               } else {
                 cutDeleteFailed = true;
@@ -264,7 +266,8 @@ export default function AIGirlsCloudScreen() {
             }
           }
         }
-      } catch {
+      } catch (error) {
+        console.log("deleteError:", error);
         cutDeleteFailed = true;
       }
     }
@@ -329,6 +332,9 @@ export default function AIGirlsCloudScreen() {
     }
 
     if (result.canceled || result.assets.length === 0) return;
+
+    console.log("assetId:", result.assets[0].assetId);
+    console.log("uri:", result.assets[0].uri);
 
     const count = result.assets.length;
     const picked = result.assets;
