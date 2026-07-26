@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
+  PermissionsAndroid, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -213,24 +214,36 @@ export default function AIGirlsCloudScreen() {
     let cutDeleteFailed = false;
     if (action === 'cut' && done > 0) {
       try {
-        const writePerm = await MediaLibrary.requestPermissionsAsync(true);
-        if (writePerm.granted) {
-          // Method 1: Use assetId directly (most reliable on Android/HarmonyOS)
+        // Check MANAGE_MEDIA permission (Android 11+ — allows silent delete without system popup)
+        const hasManageMedia = Platform.OS === 'android'
+          ? await PermissionsAndroid.check('android.permission.MANAGE_MEDIA')
+          : false;
+
+        if (!hasManageMedia) {
+          // MANAGE_MEDIA not granted — guide user to Settings
+          cutDeleteFailed = true;
+          Alert.alert(
+            '⚙️ Media Delete Permission தேவை',
+            'Phone-ல் photos delete செய்ய, Settings-ல் ஒரு முறை permission allow செய்யுங்க:
+
+Settings → Apps → My Dream Women → Permissions → Media Management → Allow',
+            [
+              { text: 'Settings திற', onPress: () => Linking.openSettings() },
+              { text: 'Cancel', style: 'cancel' },
+            ],
+          );
+        } else {
+          // MANAGE_MEDIA granted — delete silently without system popup
+          // Method 1: Use assetId directly (most reliable on Android)
           const assetIds = pickedAssets
             .filter(a => a.assetId)
             .map(a => a.assetId as string);
+
           if (assetIds.length > 0) {
-            // deleteAssetsAsync returns boolean — false means user dismissed system popup
             const deleted = await MediaLibrary.deleteAssetsAsync(assetIds);
             if (!deleted) cutDeleteFailed = true;
           } else {
-            // Method 2: file:// URI → FileSystem.deleteAsync directly (no system popup)
-            for (const a of pickedAssets) {
-              if (a.uri.startsWith('file://')) {
-                await FileSystem.deleteAsync(a.uri, { idempotent: true }).catch(() => {});
-              }
-            }
-            // Method 3: Fallback — scan MediaLibrary by filename
+            // Method 2: Fallback — scan MediaLibrary by filename
             const filenames = new Set(pickedAssets.map(a => a.uri.split('/').pop()).filter(Boolean));
             if (filenames.size > 0) {
               const toDelete: string[] = [];
@@ -245,12 +258,15 @@ export default function AIGirlsCloudScreen() {
               if (toDelete.length > 0) {
                 const deleted = await MediaLibrary.deleteAssetsAsync(toDelete);
                 if (!deleted) cutDeleteFailed = true;
+              } else {
+                cutDeleteFailed = true;
               }
+            } else {
+              cutDeleteFailed = true;
             }
           }
         }
       } catch {
-        // Some devices need MANAGE_MEDIA permission — mark as failed, don't silently ignore
         cutDeleteFailed = true;
       }
     }
