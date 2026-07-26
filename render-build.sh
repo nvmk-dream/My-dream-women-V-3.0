@@ -13,6 +13,9 @@ echo ">>> Installing pnpm@10.26.1 to $PNPM_DIR ..."
 npm install -g pnpm@10.26.1 --prefix "$PNPM_DIR"
 echo ">>> pnpm installed: $($PNPM_BIN --version)"
 
+echo ">>> Removing stale pnpm-lock.yaml to force clean dependency resolution..."
+rm -f pnpm-lock.yaml
+
 echo ">>> Installing workspace dependencies..."
 $PNPM_BIN install --no-frozen-lockfile
 
