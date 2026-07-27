@@ -980,11 +980,13 @@ export default function ChatScreen() {
       // Request MediaLibrary permission
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission வேணும் 📷', 'Gallery-ல் save பண்ண permission allow பண்ணுங்க — Settings → Apps → Permissions');
+        Alert.alert('Permission வேணும் 📷', 'Settings → My Girls → Permissions → Files & Media → Allow all');
         return;
       }
-      // Download image to cache
-      const filename = `ai_girl_${Date.now()}.jpg`;
+      // Extract extension from URL
+      const urlClean = imageUrl.split('?')[0];
+      const ext = urlClean.match(/.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
+      const filename = `ai_girl_${Date.now()}.${ext}`;
       const localUri = FileSystem.cacheDirectory + filename;
       const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
       // Save to gallery
