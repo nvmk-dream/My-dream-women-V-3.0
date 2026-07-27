@@ -559,13 +559,16 @@ export default function AIGirlsCloudScreen() {
   const doDeleteFolder = async () => {
     if (!deleteFolderTarget) return;
     const { id, name, type } = deleteFolderTarget;
+    // Snapshot selectedChar NOW — before any setState calls that trigger re-renders
+    // and could produce stale closure values in async code below.
+    const charSnapshot = selectedChar;
     setDeleteFolderTarget(null);
+
     if (type === 'char') {
       const updated = customChars.filter(c => c.id !== id);
       setCustomChars(updated);
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_chars', updated).catch(() => {}); // sync to cloud
-      // Delete all Cloudinary photos in each style subfolder
+      setCloudinaryMeta('custom_chars', updated).catch(() => {});
       try {
         const allStyles = [...PHOTO_STYLES, ...customStyles];
         for (const style of allStyles) {
@@ -574,29 +577,38 @@ export default function AIGirlsCloudScreen() {
         }
       } catch {}
     } else {
+      // ── Custom style: remove from customStyles list ───────────────────────
       const updated = customStyles.filter(s => s.id !== id);
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
-      // If built-in style: hide it from this character's folder list
+      setCloudinaryMeta('custom_styles', updated).catch(() => {});
+
+      // ── Built-in style: add to hiddenStyles so it disappears from the list ─
       const isBuiltInStyle = PHOTO_STYLES.some(s => s.id === id);
-      if (isBuiltInStyle && selectedChar) {
-        const newHidden = new Set(hiddenStyles);
-        newHidden.add(id);
-        setHiddenStyles(newHidden);
-        await AsyncStorage.setItem(`hidden_styles_${selectedChar.id}`, JSON.stringify([...newHidden]));
-      }
-      // Delete all Cloudinary photos in this style folder (for current character)
-      if (selectedChar) {
+      if (isBuiltInStyle && charSnapshot) {
+        // FIX: functional updater avoids stale-closure bug on hiddenStyles state
+        setHiddenStyles(prev => new Set([...prev, id]));
+        // Persist to AsyncStorage by reading current saved value (not stale closure)
         try {
-          const imgs = await listCloudinaryImages(`my-girls/${selectedChar.id}/${id}`).catch(() => []);
+          const raw = await AsyncStorage.getItem(`hidden_styles_${charSnapshot.id}`);
+          const arr: string[] = raw ? JSON.parse(raw) : [];
+          if (!arr.includes(id)) arr.push(id);
+          await AsyncStorage.setItem(`hidden_styles_${charSnapshot.id}`, JSON.stringify(arr));
+        } catch {}
+      }
+
+      // Delete Cloudinary photos in this style folder for the current character
+      if (charSnapshot) {
+        try {
+          const imgs = await listCloudinaryImages(`my-girls/${charSnapshot.id}/${id}`).catch(() => []);
           for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
         } catch {}
       }
     }
-    // Clear local AsyncStorage cache for deleted folder
-    const cacheKey = type === 'style' && selectedChar
-      ? `cloud_photos_${selectedChar.id}_${id}`
+
+    // Clear local photo cache for the deleted folder
+    const cacheKey = type === 'style' && charSnapshot
+      ? `cloud_photos_${charSnapshot.id}_${id}`
       : null;
     if (cacheKey) AsyncStorage.removeItem(cacheKey).catch(() => {});
   };
@@ -870,13 +882,18 @@ export default function AIGirlsCloudScreen() {
         </View>
       )}
 
-      {/* Folder delete confirm modal */}
-      {deleteFolderTarget && (
+      {/* Folder delete confirm — proper Modal so Android FlatList touches don't block it */}
+      <Modal
+        visible={!!deleteFolderTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteFolderTarget(null)}
+      >
         <View style={s.confirmOverlay}>
           <View style={s.confirmBox}>
             <Text style={s.confirmIcon}>🗑️</Text>
             <Text style={s.confirmTitle}>Folder Delete பண்ணட்டுமா?</Text>
-            <Text style={s.confirmSub}>"{deleteFolderTarget.name}" folder remove ஆகும்.</Text>
+            <Text style={s.confirmSub}>"{deleteFolderTarget?.name}" folder remove ஆகும்.</Text>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancel} onPress={() => setDeleteFolderTarget(null)}>
                 <Text style={s.confirmCancelTxt}>Cancel</Text>
@@ -887,7 +904,7 @@ export default function AIGirlsCloudScreen() {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* New Folder dialog */}
       <Modal visible={folderDialog} transparent animationType="fade" onRequestClose={() => setFolderDialog(false)}>
