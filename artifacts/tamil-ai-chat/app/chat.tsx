@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -90,16 +90,21 @@ const BUBBLE_STYLES_LIST = [
 ];
 
 const BUILTIN_PHOTO_STYLES = [
-  { id: 'normal',    label: 'Normal Photo',          prompt: 'normal photo, fully clothed, casual' },
-  { id: 'nude',      label: 'Nude 🔞',               prompt: 'nude, fully naked, explicit' },
-  { id: 'seminude',  label: 'Semi-nude',             prompt: 'semi nude, partially undressed' },
-  { id: 'breast',    label: 'Breast show',           prompt: 'topless, showing breasts, bare chest' },
-  { id: 'seductive', label: 'Seductive pose',        prompt: 'seductive pose, alluring, provocative look' },
-  { id: 'wet',       label: 'Wet clothes',           prompt: 'wet clothes, drenched, see through wet fabric' },
-  { id: 'legs',      label: 'Legs spread',           prompt: 'legs spread wide, revealing pose' },
-  { id: 'saree',     label: 'சேலை தூக்கி காட்டு',  prompt: 'lifting saree up, revealing thighs, traditional saree' },
-  { id: 'sleeping',  label: 'Sleeping exposed',      prompt: 'sleeping pose, exposed, lying down' },
-  { id: 'halfbreast',label: 'Half breast visible',   prompt: 'half breast visible, deep cleavage, low cut top' },
+  { id: 'normal',    label: 'Normal Photo',   prompt: 'normal photo, fully clothed, casual' },
+  { id: 'nude',      label: 'Nude 🔞',        prompt: 'nude, fully naked, explicit' },
+  { id: 'seminude',  label: 'Semi Nude',      prompt: 'semi nude, partially undressed' },
+  { id: 'breast',    label: 'Breast Show',    prompt: 'topless, showing breasts, bare chest' },
+  { id: 'halfbreast',label: 'Half Breast',    prompt: 'half breast visible, deep cleavage, low cut top' },
+  { id: 'cleavage',  label: 'Cleavage',       prompt: 'deep cleavage, low neckline, cleavage showing' },
+  { id: 'lowneck',   label: 'Low Neckline',   prompt: 'low neckline, low cut dress, revealing neckline' },
+  { id: 'lingerie',  label: 'Lingerie',       prompt: 'wearing lingerie, bra and panties, underwear' },
+  { id: 'buttocks',  label: 'Buttocks',       prompt: 'showing buttocks, from behind, revealing buttocks' },
+  { id: 'highslit',  label: 'High Slit',      prompt: 'high slit dress, thigh high slit, leg revealing slit' },
+  { id: 'seductive', label: 'Seductive',      prompt: 'seductive pose, alluring, provocative look' },
+  { id: 'wet',       label: 'Wet Clothes',    prompt: 'wet clothes, drenched, see through wet fabric' },
+  { id: 'legs',      label: 'Legs Spread',    prompt: 'legs spread wide, revealing pose' },
+  { id: 'saree',     label: 'Saree Tuck',     prompt: 'lifting saree up, revealing thighs, traditional saree' },
+  { id: 'sleeping',  label: 'Sleeping',       prompt: 'sleeping pose, exposed, lying down' },
 ];
 const CUSTOM_STYLES_KEY = 'custom_photo_styles_v1';
 type CustomStyle = { id: string; label: string; prompt?: string };
@@ -558,6 +563,10 @@ export default function ChatScreen() {
       const updated = [...customStyles, newStyle];
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
+    }
+    // Auto-create Cloudinary folder for current character when new style is added
+    if (personaId) {
+      createCloudinaryFolder(`my-girls/${personaId}/${newStyle.id}`).catch(() => {});
     }
     setNewStyleName('');
     setNewStylePrompt('');
