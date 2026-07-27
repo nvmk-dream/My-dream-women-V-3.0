@@ -607,17 +607,22 @@ export default function AIGirlsCloudScreen() {
     if (savingPhoto) return;
     setSavingPhoto(true);
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync(true);
+      const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission இல்லை', 'Gallery-ல் save பண்ண permission தேவை');
+        Alert.alert('Permission இல்லை', 'Settings → My Girls → Permissions → Files & Media → Allow all');
+        setSavingPhoto(false);
         return;
       }
-      const fileUri = FileSystem.cacheDirectory + 'save_' + Date.now() + '.jpg';
+      // Extract extension from URL to avoid mime-type mismatch
+      const urlClean = photo.url.split('?')[0];
+      const ext = urlClean.match(/.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
+      const fileUri = FileSystem.cacheDirectory + 'save_' + Date.now() + '.' + ext;
       const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
-      await MediaLibrary.createAssetAsync(uri);
-      Alert.alert('✅ Saved!', 'Photo Camera Roll-ல் save ஆச்சு');
-    } catch {
-      Alert.alert('Error', 'Save பண்ண முடியல — Try again');
+      await MediaLibrary.saveToLibraryAsync(uri);
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      Alert.alert('✅ Saved!', 'Photo Gallery-ல் save ஆச்சு! 🎉');
+    } catch (e: any) {
+      Alert.alert('Error', 'Save பண்ண முடியல: ' + (e?.message || 'Unknown error'));
     } finally {
       setSavingPhoto(false);
     }
