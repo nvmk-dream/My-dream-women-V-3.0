@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
+  PermissionsAndroid, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -76,6 +77,36 @@ export default function AIGirlsCloudScreen() {
     setDepth(1);
   }, [charId]);
 
+  // ── MANAGE_EXTERNAL_STORAGE permission check on mount ────────────────────
+  // Android 16 + MagicOS requires "All files access" for reliable gallery delete.
+  // This permission cannot be requested inline — user must go to Settings.
+  useEffect(() => {
+    if (Platform.OS !== 'android') { setManageStorageGranted(true); return; }
+    const checkPerm = async () => {
+      try {
+        const granted = await PermissionsAndroid.check(
+          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
+        );
+        console.log(`[PERM] MANAGE_EXTERNAL_STORAGE granted=${granted}`);
+        setManageStorageGranted(granted);
+        if (!granted) {
+          Alert.alert(
+            '⚙️ "All Files Access" தேவை',
+            'Cut செய்து phone gallery-ல் delete பண்ண "All files access" permission வேணும்.\n\nSettings → My Girls → All files access → Allow பண்ணுங்க.',
+            [
+              { text: '⚙️ Settings திற', onPress: () => Linking.openSettings() },
+              { text: 'Later', style: 'cancel' },
+            ],
+          );
+        }
+      } catch (e) {
+        console.log(`[PERM] MANAGE_EXTERNAL_STORAGE check error: ${e}`);
+        setManageStorageGranted(false);
+      }
+    };
+    checkPerm();
+  }, []);
+
   // Photos state (depth 2)
   const [photos, setPhotos] = useState<CloudPhoto[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -103,6 +134,9 @@ export default function AIGirlsCloudScreen() {
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
+
+  // MANAGE_EXTERNAL_STORAGE permission state (null = checking, true/false = result)
+  const [manageStorageGranted, setManageStorageGranted] = useState<boolean | null>(null);
 
 
   // Load custom folders — AsyncStorage first (instant), then merge from Cloudinary (survives reinstall)
@@ -209,68 +243,86 @@ export default function AIGirlsCloudScreen() {
       }
     }
 
-    // CUT: delete originals from device after successful upload
-    // FIX: No longer gated on MANAGE_MEDIA.
-    //   • Android 10–12: deleteAssetsAsync shows system confirmation dialog automatically.
-    //   • Android 11+ with MANAGE_MEDIA granted: deletes silently (no dialog).
-    //   • gating on MANAGE_MEDIA was wrong — it blocked ALL deletes and suppressed the dialog.
+    // CUT: delete originals from device after successful upload.
+    // Strategy for Android 16 / MagicOS (Honor X9c):
+    //   1. getAssetInfoAsync → real file path (localUri)
+    //   2. FileSystem.deleteAsync (works with MANAGE_EXTERNAL_STORAGE)
+    //   3. Verify deletion via getInfoAsync regardless of return value
+    //   4. Fallback: deleteAssetsAsync + re-verify
+    //   5. Detailed Logcat logging at every step
     let cutDeleteFailed = false;
+    let cutDeleteErrorMsg = '';
     if (action === 'cut' && done > 0) {
-      try {
-        // ── Step 1: resolve MediaStore asset IDs from picker results ──────────
-        const resolvedIds: string[] = [];
-        const unresolved: ImagePicker.ImagePickerAsset[] = [];
+      for (const asset of pickedAssets) {
+        const logAssetId = asset.assetId ?? 'none';
+        const logUri = asset.uri;
+        let localUri: string | null = null;
+        let fileDeleted = false;
 
-        for (const a of pickedAssets) {
-          if (a.assetId) {
-            // expo-image-picker populated assetId (MediaStore numeric ID)
-            resolvedIds.push(a.assetId);
-          } else {
-            // assetId is null — try to parse numeric ID from content URI.
-            // Handles:
-            //   content://media/external/images/media/1234       → "1234"
-            //   content://media/picker/.../media/1234            → "1234"
-            const match = a.uri.match(/\/media\/(\d+)$/);
-            if (match) {
-              resolvedIds.push(match[1]);
+        // ── Step 1: resolve real file path via MediaLibrary ──────────────────
+        try {
+          if (asset.assetId) {
+            const info = await MediaLibrary.getAssetInfoAsync(asset.assetId);
+            localUri = info?.localUri ?? null;
+          }
+          console.log(`[CUT] assetId=${logAssetId} | uri=${logUri} | localUri=${localUri}`);
+        } catch (e) {
+          console.log(`[CUT] getAssetInfoAsync FAILED | assetId=${logAssetId} | err=${e}`);
+        }
+
+        // ── Step 2a: FileSystem.deleteAsync (Android 16 + MANAGE_EXTERNAL_STORAGE) ──
+        if (localUri) {
+          try {
+            await FileSystem.deleteAsync(localUri, { idempotent: false });
+            const check = await FileSystem.getInfoAsync(localUri);
+            if (!check.exists) {
+              fileDeleted = true;
+              console.log(`[CUT] FileSystem.deleteAsync ✅ SUCCESS | ${localUri}`);
             } else {
-              unresolved.push(a);
+              console.log(`[CUT] FileSystem.deleteAsync ran but file STILL EXISTS | ${localUri}`);
             }
+          } catch (e) {
+            console.log(`[CUT] FileSystem.deleteAsync THREW | ${localUri} | err=${e}`);
           }
         }
 
-        // ── Step 2: filename scan for any still-unresolved assets ─────────────
-        if (unresolved.length > 0) {
-          const filenames = new Set(
-            unresolved.map(a => a.uri.split('/').pop()).filter(Boolean)
-          );
-          let cursor: string | undefined;
-          do {
-            const page = await MediaLibrary.getAssetsAsync({
-              // FIX: include both photo AND video (was photo-only before)
-              mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
-              first: 500,
-              after: cursor,
-            });
-            for (const ma of page.assets) {
-              if (filenames.has(ma.filename)) resolvedIds.push(ma.id);
+        // ── Step 2b: Fallback → deleteAssetsAsync + verify ────────────────────
+        if (!fileDeleted) {
+          const idToDelete =
+            asset.assetId ?? asset.uri.match(/\/media\/(\d+)$/)?.[1] ?? null;
+          console.log(`[CUT] fallback deleteAssetsAsync | id=${idToDelete}`);
+          if (idToDelete) {
+            try {
+              const delResult = await MediaLibrary.deleteAssetsAsync([idToDelete]);
+              console.log(`[CUT] deleteAssetsAsync(${idToDelete}) returned: ${delResult}`);
+              // Verify actual deletion — MagicOS/Android 16 may return false even when deleted
+              if (localUri) {
+                const check = await FileSystem.getInfoAsync(localUri);
+                fileDeleted = !check.exists;
+                console.log(`[CUT] verify after deleteAssetsAsync: exists=${check.exists} | deleted=${fileDeleted}`);
+              } else {
+                fileDeleted = delResult;
+                console.log(`[CUT] no localUri to verify — trusting return value: ${delResult}`);
+              }
+            } catch (e) {
+              const errStr = String(e);
+              console.log(`[CUT] deleteAssetsAsync THREW | assetId=${idToDelete} | err=${errStr}`);
+              if (!cutDeleteErrorMsg) cutDeleteErrorMsg = errStr.slice(0, 200);
             }
-            cursor = page.hasNextPage ? page.endCursor : undefined;
-          } while (cursor && resolvedIds.length < pickedAssets.length);
+          } else {
+            const msg = `No asset ID for uri: ${logUri}`;
+            console.log(`[CUT] ${msg}`);
+            if (!cutDeleteErrorMsg) cutDeleteErrorMsg = msg;
+          }
         }
 
-        console.log("resolvedIds for delete:", resolvedIds);
-
-        if (resolvedIds.length > 0) {
-          const deleted = await MediaLibrary.deleteAssetsAsync(resolvedIds);
-          console.log("deleteResult:", deleted);
-          if (!deleted) cutDeleteFailed = true;
-        } else {
+        if (!fileDeleted) {
           cutDeleteFailed = true;
+          if (!cutDeleteErrorMsg) {
+            cutDeleteErrorMsg = `File still present after all attempts.\nassetId=${logAssetId}\nlocalUri=${localUri ?? logUri}`;
+          }
+          console.log(`[CUT] ❌ FAILED to delete | assetId=${logAssetId} | localUri=${localUri ?? logUri}`);
         }
-      } catch (error) {
-        console.log("deleteError:", error);
-        cutDeleteFailed = true;
       }
     }
 
@@ -299,9 +351,13 @@ export default function AIGirlsCloudScreen() {
     } else {
       // CUT — upload succeeded but phone delete failed
       Alert.alert(
-        '⚠️ Upload ஆச்சு, ஆனா Delete ஆகல',
-        `${done}/${total} photos cloud-ல் save ஆச்சு. Phone-ல் delete ஆகல.\n\nSystem popup வந்தால் Allow press பண்ணுங்க, இல்லன்னா Settings → My Girls → Permissions → Files → Delete allow செய்யுங்க.` +
+        '⚠️ Upload ஆச்சு, Delete ஆகல',
+        `${done}/${total} photos cloud-ல் save ஆச்சு.\n\nPhone-ல் delete ஆகல:\n${cutDeleteErrorMsg || 'Unknown error'}\n\nSettings → My Girls → All files access → Allow பண்ணுங்க.` +
           (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
+        [
+          { text: '⚙️ Settings திற', onPress: () => Linking.openSettings() },
+          { text: 'OK', style: 'cancel' },
+        ],
       );
     }
   };
@@ -342,20 +398,25 @@ export default function AIGirlsCloudScreen() {
     const count = result.assets.length;
     const picked = result.assets;
 
+    const cutBlocked = manageStorageGranted === false;
     Alert.alert(
       `${count} photo${count > 1 ? 's' : ''} select ஆச்சு`,
-      'Cloud-ல் எப்படி save பண்ணணும்?',
+      cutBlocked
+        ? '"All files access" permission இல்லை — Cut பண்ண முடியாது.\n\nSettings → My Girls → All files access → Allow பண்ணுங்க.'
+        : 'Cloud-ல் எப்படி save பண்ணணும்?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: '📋 Copy  (Phone-ல் இருக்கும்)',
           onPress: () => doUpload(picked, charId, styleId, styleLabel, 'copy'),
         },
-        {
-          text: '✂️ Cut  (Phone-ல் delete ஆகும்)',
-          style: 'destructive',
-          onPress: () => doUpload(picked, charId, styleId, styleLabel, 'cut'),
-        },
+        cutBlocked
+          ? { text: '⚙️ Settings திற', onPress: () => Linking.openSettings() }
+          : {
+              text: '✂️ Cut  (Phone-ல் delete ஆகும்)',
+              style: 'destructive' as const,
+              onPress: () => doUpload(picked, charId, styleId, styleLabel, 'cut'),
+            },
       ],
     );
   };
@@ -470,6 +531,20 @@ export default function AIGirlsCloudScreen() {
       const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
       return () => sub.remove();
     }, [goBack])
+  );
+
+  // Re-check MANAGE_EXTERNAL_STORAGE when screen regains focus
+  // (user may return from Settings after granting the permission)
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return;
+      PermissionsAndroid.check('android.permission.MANAGE_EXTERNAL_STORAGE' as any)
+        .then(granted => {
+          console.log(`[PERM] focus re-check MANAGE_EXTERNAL_STORAGE granted=${granted}`);
+          setManageStorageGranted(granted);
+        })
+        .catch(e => console.log(`[PERM] focus re-check error: ${e}`));
+    }, [])
   );
 
   // Web: intercept browser back button via History API
