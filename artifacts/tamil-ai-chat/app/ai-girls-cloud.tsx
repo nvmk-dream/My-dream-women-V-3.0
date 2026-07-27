@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
-  PermissionsAndroid, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -211,60 +210,63 @@ export default function AIGirlsCloudScreen() {
     }
 
     // CUT: delete originals from device after successful upload
+    // FIX: No longer gated on MANAGE_MEDIA.
+    //   • Android 10–12: deleteAssetsAsync shows system confirmation dialog automatically.
+    //   • Android 11+ with MANAGE_MEDIA granted: deletes silently (no dialog).
+    //   • gating on MANAGE_MEDIA was wrong — it blocked ALL deletes and suppressed the dialog.
     let cutDeleteFailed = false;
     if (action === 'cut' && done > 0) {
       try {
-        // Check MANAGE_MEDIA permission (Android 11+ — allows silent delete without system popup)
-        const hasManageMedia = Platform.OS === 'android'
-          ? await PermissionsAndroid.check('android.permission.MANAGE_MEDIA')
-          : false;
+        // ── Step 1: resolve MediaStore asset IDs from picker results ──────────
+        const resolvedIds: string[] = [];
+        const unresolved: ImagePicker.ImagePickerAsset[] = [];
 
-        if (!hasManageMedia) {
-          // MANAGE_MEDIA not granted — guide user to Settings
-          cutDeleteFailed = true;
-          Alert.alert(
-            '⚙️ Media Delete Permission தேவை',
-            'Phone-ல் photos delete செய்ய, Settings-ல் ஒரு முறை permission allow செய்யுங்க:\n\nSettings \u2192 Apps \u2192 My Dream Women \u2192 Permissions \u2192 Media Management \u2192 Allow',
-            [
-              { text: 'Settings திற', onPress: () => Linking.openSettings() },
-              { text: 'Cancel', style: 'cancel' },
-            ],
-          );
-        } else {
-          // MANAGE_MEDIA granted — delete silently without system popup
-          // Method 1: Use assetId directly (most reliable on Android)
-          const assetIds = pickedAssets
-            .filter(a => a.assetId)
-            .map(a => a.assetId as string);
-
-          if (assetIds.length > 0) {
-            const deleted = await MediaLibrary.deleteAssetsAsync(assetIds);
-            console.log("deleteResult:", deleted);
-            if (!deleted) cutDeleteFailed = true;
+        for (const a of pickedAssets) {
+          if (a.assetId) {
+            // expo-image-picker populated assetId (MediaStore numeric ID)
+            resolvedIds.push(a.assetId);
           } else {
-            // Method 2: Fallback — scan MediaLibrary by filename
-            const filenames = new Set(pickedAssets.map(a => a.uri.split('/').pop()).filter(Boolean));
-            if (filenames.size > 0) {
-              const toDelete: string[] = [];
-              let cursor: string | undefined;
-              do {
-                const res = await MediaLibrary.getAssetsAsync({ mediaType: 'photo', first: 500, after: cursor });
-                for (const ma of res.assets) {
-                  if (filenames.has(ma.filename)) toDelete.push(ma.id);
-                }
-                cursor = res.hasNextPage ? res.endCursor : undefined;
-              } while (cursor && toDelete.length < pickedAssets.length);
-              if (toDelete.length > 0) {
-                const deleted = await MediaLibrary.deleteAssetsAsync(toDelete);
-                console.log("deleteResult:", deleted);
-                if (!deleted) cutDeleteFailed = true;
-              } else {
-                cutDeleteFailed = true;
-              }
+            // assetId is null — try to parse numeric ID from content URI.
+            // Handles:
+            //   content://media/external/images/media/1234       → "1234"
+            //   content://media/picker/.../media/1234            → "1234"
+            const match = a.uri.match(/\/media\/(\d+)$/);
+            if (match) {
+              resolvedIds.push(match[1]);
             } else {
-              cutDeleteFailed = true;
+              unresolved.push(a);
             }
           }
+        }
+
+        // ── Step 2: filename scan for any still-unresolved assets ─────────────
+        if (unresolved.length > 0) {
+          const filenames = new Set(
+            unresolved.map(a => a.uri.split('/').pop()).filter(Boolean)
+          );
+          let cursor: string | undefined;
+          do {
+            const page = await MediaLibrary.getAssetsAsync({
+              // FIX: include both photo AND video (was photo-only before)
+              mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+              first: 500,
+              after: cursor,
+            });
+            for (const ma of page.assets) {
+              if (filenames.has(ma.filename)) resolvedIds.push(ma.id);
+            }
+            cursor = page.hasNextPage ? page.endCursor : undefined;
+          } while (cursor && resolvedIds.length < pickedAssets.length);
+        }
+
+        console.log("resolvedIds for delete:", resolvedIds);
+
+        if (resolvedIds.length > 0) {
+          const deleted = await MediaLibrary.deleteAssetsAsync(resolvedIds);
+          console.log("deleteResult:", deleted);
+          if (!deleted) cutDeleteFailed = true;
+        } else {
+          cutDeleteFailed = true;
         }
       } catch (error) {
         console.log("deleteError:", error);
@@ -321,7 +323,7 @@ export default function AIGirlsCloudScreen() {
       // ActivityResultLauncher registration settle panna wait pannrom
       await new Promise(r => setTimeout(r, 350));
       result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'] as any,
+        mediaTypes: ['images', 'videos'] as any,
         allowsMultipleSelection: true,
         quality: 0.9,
         exif: false,
@@ -335,6 +337,7 @@ export default function AIGirlsCloudScreen() {
 
     console.log("assetId:", result.assets[0].assetId);
     console.log("uri:", result.assets[0].uri);
+    console.log("mediaType:", result.assets[0].type); // 'image' | 'video'
 
     const count = result.assets.length;
     const picked = result.assets;
