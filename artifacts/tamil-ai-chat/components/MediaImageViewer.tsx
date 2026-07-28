@@ -1,10 +1,10 @@
 import React, { useRef, useCallback } from 'react';
 import {
   Modal, View, TouchableOpacity, Text, StatusBar,
-  StyleSheet, Dimensions, ScrollView, Image, Platform,
+  StyleSheet, Dimensions, ScrollView, Image, Platform, Alert,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -38,15 +38,25 @@ export default function MediaImageViewer({ uri, onClose, onPrompt }: Props) {
     if (!uri) return;
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') return;
+      if (status !== 'granted') {
+        Alert.alert('Permission வேணும்', 'Settings → My Girls → Permissions → Files & Media → Allow all');
+        return;
+      }
       let localUri = uri;
       if (uri.startsWith('http')) {
-        const dest = FileSystem.cacheDirectory + 'save_img_' + Date.now() + '.jpg';
+        // Extract real extension from URL to avoid mime-type mismatch
+        const urlClean = uri.split('?')[0];
+        const ext = urlClean.match(/\.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
+        const dest = FileSystem.cacheDirectory + 'save_img_' + Date.now() + '.' + ext;
         const dl = await FileSystem.downloadAsync(uri, dest);
         localUri = dl.uri;
       }
       await MediaLibrary.saveToLibraryAsync(localUri);
-    } catch {}
+      FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
+      Alert.alert('✅ Saved!', 'படம் Gallery-ல் save ஆச்சு! 🎉');
+    } catch (e: any) {
+      Alert.alert('❌ Save பண்ண முடியல', e?.message || 'மீண்டும் try பண்ணுங்க.');
+    }
   };
 
   return (
