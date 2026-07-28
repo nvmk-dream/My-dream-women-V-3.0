@@ -44,7 +44,6 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.MANAGE_MEDIA",
         "android.permission.MANAGE_EXTERNAL_STORAGE"
       ]
@@ -77,7 +76,8 @@
           "savePhotosPermission": "Allow My Dream Women to save photos and media files.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "./plugins/removeVisualUserSelected"
     ],
     "experiments": {
       "typedRoutes": true
