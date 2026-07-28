@@ -7,7 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import * as Notifications from "expo-notifications";
+import * as MediaLibrary from "expo-media-library";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,7 +61,10 @@ if (typeof window !== 'undefined' && typeof (window as any).addEventListener ===
 
 const { width } = Dimensions.get("window");
 const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
-const ALL_FILES_ONBOARD_KEY = 'perm_allfiles_onboarded';
+
+// Permission onboarding — one-time on first install
+const PERMISSIONS_ONBOARDED_KEY = 'permissions_onboarded_v2';
+type OnboardStep = 'intro' | 'requesting' | 'allfiles';
 
 const AUTO_GREETINGS = [
   'என்ன பண்ற? miss ஆகுது 😊',
@@ -85,71 +90,92 @@ export default function RootLayout() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // ── All Files Access one-time onboarding ─────────────────────
-  const [allFilesOnboarded, setAllFilesOnboarded] = useState<boolean | null>(null);
-  const [checkingReturn, setCheckingReturn] = useState(false);
+  // ── Permission onboarding (one-time, Meta AI style) ──────────
+  // null = still checking AsyncStorage; undefined = done (no overlay)
+  const [onboardStep, setOnboardStep] = useState<OnboardStep | null | undefined>(undefined);
+  const appStateRef = useRef(AppState.currentState);
+
+  // Check on mount whether onboarding is needed
+  useEffect(() => {
+    if (Platform.OS !== 'android') { setOnboardStep(undefined); return; }
+    AsyncStorage.getItem(PERMISSIONS_ONBOARDED_KEY)
+      .then(val => {
+        if (val === 'true') { setOnboardStep(undefined); return; }
+        setOnboardStep('intro');
+      })
+      .catch(() => setOnboardStep(undefined));
+  }, []);
+
+  // AppState listener — re-check All Files Access when returning from Settings
+  useEffect(() => {
+    if (onboardStep !== 'allfiles') return;
+    const sub = AppState.addEventListener('change', async nextState => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        try {
+          const granted = await PermissionsAndroid.check(
+            'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
+          );
+          if (granted) {
+            await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true');
+            setOnboardStep(undefined);
+          }
+        } catch {}
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [onboardStep]);
+
+  // "Next" tapped on intro screen — request permissions sequentially
+  const handleStartPermissions = useCallback(async () => {
+    setOnboardStep('requesting');
+
+    // Step 1: Notifications (system dialog)
+    try { await Notifications.requestPermissionsAsync(); } catch {}
+
+    // Step 2: Photos & Videos (system dialog)
+    try { await MediaLibrary.requestPermissionsAsync(); } catch {}
+
+    // Step 3: Check All Files Access (special permission — needs Settings)
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.check(
+          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
+        );
+        if (!granted) {
+          setOnboardStep('allfiles');
+          return;
+        }
+      } catch {}
+    }
+
+    // All done
+    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true').catch(() => {});
+    setOnboardStep(undefined);
+  }, []);
+
+  // "Settings திற" for All Files Access
+  const handleOpenAllFilesSettings = useCallback(() => {
+    appStateRef.current = 'background'; // prime the AppState listener
+    Linking.openSettings();
+  }, []);
+
+  // "பிறகு செய்கிறேன்" — skip All Files Access
+  const handleSkipAllFiles = useCallback(async () => {
+    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true').catch(() => {});
+    setOnboardStep(undefined);
+  }, []);
 
   // ── Crash log state ──────────────────────────────────────────
   const [crashLog, setCrashLog] = useState<string | null>(null);
   const [crashChecked, setCrashChecked] = useState(false);
 
   useEffect(() => {
-    // Read saved crash on every launch
     AsyncStorage.getItem(CRASH_KEY).then(log => {
       if (log) setCrashLog(log);
       setCrashChecked(true);
     }).catch(() => setCrashChecked(true));
   }, []);
-
-  // Check if All Files Access onboarding done (or permission already granted)
-  useEffect(() => {
-    if (Platform.OS !== 'android') { setAllFilesOnboarded(true); return; }
-    AsyncStorage.getItem(ALL_FILES_ONBOARD_KEY)
-      .then(async val => {
-        if (val === 'true') { setAllFilesOnboarded(true); return; }
-        try {
-          const granted = await PermissionsAndroid.check(
-            'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
-          );
-          if (granted) {
-            await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true');
-            setAllFilesOnboarded(true);
-            return;
-          }
-        } catch {}
-        setAllFilesOnboarded(false);
-      })
-      .catch(() => setAllFilesOnboarded(true));
-  }, []);
-
-  // Re-check permission when user returns from Settings
-  useEffect(() => {
-    if (allFilesOnboarded !== false || !checkingReturn) return;
-    const sub = AppState.addEventListener('change', async state => {
-      if (state !== 'active') return;
-      try {
-        const granted = await PermissionsAndroid.check(
-          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
-        );
-        if (granted) {
-          await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true');
-          setAllFilesOnboarded(true);
-        }
-      } catch {}
-      setCheckingReturn(false);
-    });
-    return () => sub.remove();
-  }, [allFilesOnboarded, checkingReturn]);
-
-  const handleOpenAllFilesSettings = () => {
-    setCheckingReturn(true);
-    Linking.openSettings();
-  };
-
-  const handleSkipAllFiles = async () => {
-    await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true').catch(() => {});
-    setAllFilesOnboarded(true);
-  };
 
   useEffect(() => {
     AsyncStorage.getItem('app_pin').then(pin => {
@@ -243,27 +269,85 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
           </Stack>
 
-          {/* ── All Files Access one-time onboarding ── */}
-          {allFilesOnboarded === false && (
-            <View style={onboard.overlay}>
+          {/* ── Permission onboarding overlay (one-time, first install) ── */}
+
+          {/* Step 1: Intro — explain all permissions */}
+          {onboardStep === 'intro' && (
+            <View style={ob.overlay}>
               <StatusBar backgroundColor="#000" barStyle="light-content" />
-              <Text style={onboard.appName}>My Dream Women ☁️</Text>
-              <View style={onboard.card}>
-                <Text style={onboard.icon}>📁</Text>
-                <Text style={onboard.title}>"All Files Access" தேவை</Text>
-                <Text style={onboard.desc}>
-                  {'Photos-ஐ "Cut" செய்து phone gallery-ல் delete பண்ண இந்த permission ஒரு முறை மட்டும் allow பண்ணுங்க.'}
-                </Text>
-                <View style={onboard.stepsBox}>
-                  <Text style={onboard.stepsTitle}>Settings-ல் என்ன செய்யணும்:</Text>
-                  <Text style={onboard.stepsText}>{'My Girls → All files access → Allow ✓'}</Text>
+              <Text style={ob.appName}>My Dream Women ☁️</Text>
+              <Text style={ob.heading}>Permissions தேவை</Text>
+              <Text style={ob.subheading}>இந்த app சரியாக வேலை செய்ய கீழே உள்ள permissions தேவை. ஒரு முறை மட்டும் கேட்கும்.</Text>
+
+              <View style={ob.card}>
+                <View style={ob.row}>
+                  <Text style={ob.rowIcon}>🔔</Text>
+                  <View style={ob.rowText}>
+                    <Text style={ob.rowTitle}>Notifications</Text>
+                    <Text style={ob.rowDesc}>Auto-messages & updates receive பண்ண</Text>
+                  </View>
+                </View>
+                <View style={ob.divider} />
+                <View style={ob.row}>
+                  <Text style={ob.rowIcon}>🖼️</Text>
+                  <View style={ob.rowText}>
+                    <Text style={ob.rowTitle}>Photos & Videos</Text>
+                    <Text style={ob.rowDesc}>Gallery-ல் upload & save பண்ண</Text>
+                  </View>
+                </View>
+                <View style={ob.divider} />
+                <View style={ob.row}>
+                  <Text style={ob.rowIcon}>📁</Text>
+                  <View style={ob.rowText}>
+                    <Text style={ob.rowTitle}>All Files Access</Text>
+                    <Text style={ob.rowDesc}>Cut பண்ணும்போது phone-ல் delete ஆக</Text>
+                  </View>
+                </View>
+                <View style={ob.noteBox}>
+                  <Text style={ob.noteText}>⚙️ Settings-ல் எந்த நேரத்திலும் மாற்றலாம்</Text>
                 </View>
               </View>
-              <TouchableOpacity style={onboard.settingsBtn} onPress={handleOpenAllFilesSettings}>
-                <Text style={onboard.settingsBtnTxt}>⚙️ Settings திற</Text>
+
+              <TouchableOpacity style={ob.nextBtn} onPress={handleStartPermissions} activeOpacity={0.85}>
+                <Text style={ob.nextBtnTxt}>Next →</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={onboard.skipBtn} onPress={handleSkipAllFiles}>
-                <Text style={onboard.skipTxt}>பிறகு செய்கிறேன்</Text>
+            </View>
+          )}
+
+          {/* Step 2: Requesting — system dialogs are showing, show minimal UI */}
+          {onboardStep === 'requesting' && (
+            <View style={ob.overlay}>
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
+              <Text style={ob.appName}>My Dream Women ☁️</Text>
+              <View style={ob.card}>
+                <Text style={ob.requestingIcon}>⏳</Text>
+                <Text style={ob.requestingText}>Permissions கேட்கிறோம்...</Text>
+                <Text style={ob.requestingDesc}>System dialogs-ல் Allow பண்ணுங்க</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Step 3: All Files Access — must go to Settings (Android limitation) */}
+          {onboardStep === 'allfiles' && (
+            <View style={ob.overlay}>
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
+              <Text style={ob.appName}>My Dream Women ☁️</Text>
+              <View style={ob.card}>
+                <Text style={[ob.allFilesIcon]}>📁</Text>
+                <Text style={ob.allFilesTitle}>"All Files Access" தேவை</Text>
+                <Text style={ob.allFilesDesc}>
+                  {'Photos-ஐ "Cut" செய்து phone gallery-ல் delete பண்ண இந்த permission தேவை.'}
+                </Text>
+                <View style={ob.stepsBox}>
+                  <Text style={ob.stepsTitle}>Settings-ல் என்ன செய்யணும்:</Text>
+                  <Text style={ob.stepsText}>{'My Girls → All files access → Allow ✓'}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={ob.settingsBtn} onPress={handleOpenAllFilesSettings} activeOpacity={0.85}>
+                <Text style={ob.settingsBtnTxt}>⚙️ Settings திற</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ob.skipBtn} onPress={handleSkipAllFiles}>
+                <Text style={ob.skipTxt}>பிறகு செய்கிறேன்</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -321,28 +405,46 @@ const crash = StyleSheet.create({
   clearTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
 
-const onboard = StyleSheet.create({
+// Permission onboarding styles
+const ob = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0a0a0a',
     zIndex: 9998,
     alignItems: 'center',
-    paddingTop: 70,
+    paddingTop: 60,
     paddingHorizontal: 24,
   },
   appName: {
-    color: '#fff', fontSize: 26, fontWeight: 'bold',
-    marginBottom: 32,
+    color: '#fff', fontSize: 26, fontWeight: 'bold', marginBottom: 8,
     textShadowColor: '#E91E8C', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 },
   },
+  heading: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  subheading: { color: '#6b7280', fontSize: 13, lineHeight: 20, textAlign: 'center', marginBottom: 24 },
   card: {
-    backgroundColor: '#141414', borderRadius: 20, padding: 24,
-    width: '100%', borderWidth: 1, borderColor: '#1f2937',
-    alignItems: 'center', marginBottom: 24,
+    backgroundColor: '#141414', borderRadius: 20, padding: 20,
+    width: '100%', borderWidth: 1, borderColor: '#1f2937', marginBottom: 24,
   },
-  icon: { fontSize: 48, marginBottom: 12 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
-  desc: { color: '#9ca3af', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  rowIcon: { fontSize: 28, marginRight: 14 },
+  rowText: { flex: 1 },
+  rowTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  rowDesc: { color: '#6b7280', fontSize: 12, lineHeight: 17 },
+  divider: { height: 1, backgroundColor: '#1f2937', marginVertical: 2 },
+  noteBox: { marginTop: 14, backgroundColor: '#1f2937', borderRadius: 10, padding: 10 },
+  noteText: { color: '#4b5563', fontSize: 12, textAlign: 'center' },
+  nextBtn: {
+    backgroundColor: '#25D366', borderRadius: 16, paddingVertical: 16,
+    width: '100%', alignItems: 'center',
+  },
+  nextBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.5 },
+  // Requesting step
+  requestingIcon: { fontSize: 40, textAlign: 'center', marginBottom: 12 },
+  requestingText: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  requestingDesc: { color: '#6b7280', fontSize: 13, textAlign: 'center' },
+  // All Files step
+  allFilesTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
+  allFilesDesc: { color: '#9ca3af', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 16 },
   stepsBox: { backgroundColor: '#1f2937', borderRadius: 12, padding: 14, width: '100%' },
   stepsTitle: { color: '#6b7280', fontSize: 12, marginBottom: 6 },
   stepsText: { color: '#25D366', fontSize: 13, fontWeight: '600' },
@@ -353,6 +455,7 @@ const onboard = StyleSheet.create({
   settingsBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
   skipBtn: { paddingVertical: 12, width: '100%', alignItems: 'center' },
   skipTxt: { color: '#4b5563', fontSize: 14 },
+  allFilesIcon: { fontSize: 48, marginBottom: 12, textAlign: 'center' as const },
 });
 
 const pin = StyleSheet.create({
