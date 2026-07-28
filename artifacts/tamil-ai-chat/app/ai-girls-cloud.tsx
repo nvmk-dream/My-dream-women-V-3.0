@@ -79,32 +79,18 @@ export default function AIGirlsCloudScreen() {
 
   // ── MANAGE_EXTERNAL_STORAGE permission check on mount ────────────────────
   // Android 16 + MagicOS requires "All files access" for reliable gallery delete.
-  // This permission cannot be requested inline — user must go to Settings.
+  // One-time onboarding handled in _layout.tsx — silent check only here, no dialog.
   useEffect(() => {
     if (Platform.OS !== 'android') { setManageStorageGranted(true); return; }
-    const checkPerm = async () => {
-      try {
-        const granted = await PermissionsAndroid.check(
-          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
-        );
+    PermissionsAndroid.check('android.permission.MANAGE_EXTERNAL_STORAGE' as any)
+      .then(granted => {
         console.log(`[PERM] MANAGE_EXTERNAL_STORAGE granted=${granted}`);
         setManageStorageGranted(granted);
-        if (!granted) {
-          Alert.alert(
-            '⚙️ "All Files Access" தேவை',
-            'Cut செய்து phone gallery-ல் delete பண்ண "All files access" permission வேணும்.\n\nSettings → My Girls → All files access → Allow பண்ணுங்க.',
-            [
-              { text: '⚙️ Settings திற', onPress: () => Linking.openSettings() },
-              { text: 'Later', style: 'cancel' },
-            ],
-          );
-        }
-      } catch (e) {
+      })
+      .catch(e => {
         console.log(`[PERM] MANAGE_EXTERNAL_STORAGE check error: ${e}`);
         setManageStorageGranted(false);
-      }
-    };
-    checkPerm();
+      });
   }, []);
 
   // Photos state (depth 2)
