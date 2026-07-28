@@ -13,6 +13,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Dimensions, ScrollView,
+  Platform, Linking, PermissionsAndroid, AppState,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -58,6 +59,7 @@ if (typeof window !== 'undefined' && typeof (window as any).addEventListener ===
 
 const { width } = Dimensions.get("window");
 const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+const ALL_FILES_ONBOARD_KEY = 'perm_allfiles_onboarded';
 
 const AUTO_GREETINGS = [
   'என்ன பண்ற? miss ஆகுது 😊',
@@ -83,6 +85,10 @@ export default function RootLayout() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
+  // ── All Files Access one-time onboarding ─────────────────────
+  const [allFilesOnboarded, setAllFilesOnboarded] = useState<boolean | null>(null);
+  const [checkingReturn, setCheckingReturn] = useState(false);
+
   // ── Crash log state ──────────────────────────────────────────
   const [crashLog, setCrashLog] = useState<string | null>(null);
   const [crashChecked, setCrashChecked] = useState(false);
@@ -94,6 +100,56 @@ export default function RootLayout() {
       setCrashChecked(true);
     }).catch(() => setCrashChecked(true));
   }, []);
+
+  // Check if All Files Access onboarding done (or permission already granted)
+  useEffect(() => {
+    if (Platform.OS !== 'android') { setAllFilesOnboarded(true); return; }
+    AsyncStorage.getItem(ALL_FILES_ONBOARD_KEY)
+      .then(async val => {
+        if (val === 'true') { setAllFilesOnboarded(true); return; }
+        try {
+          const granted = await PermissionsAndroid.check(
+            'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
+          );
+          if (granted) {
+            await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true');
+            setAllFilesOnboarded(true);
+            return;
+          }
+        } catch {}
+        setAllFilesOnboarded(false);
+      })
+      .catch(() => setAllFilesOnboarded(true));
+  }, []);
+
+  // Re-check permission when user returns from Settings
+  useEffect(() => {
+    if (allFilesOnboarded !== false || !checkingReturn) return;
+    const sub = AppState.addEventListener('change', async state => {
+      if (state !== 'active') return;
+      try {
+        const granted = await PermissionsAndroid.check(
+          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
+        );
+        if (granted) {
+          await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true');
+          setAllFilesOnboarded(true);
+        }
+      } catch {}
+      setCheckingReturn(false);
+    });
+    return () => sub.remove();
+  }, [allFilesOnboarded, checkingReturn]);
+
+  const handleOpenAllFilesSettings = () => {
+    setCheckingReturn(true);
+    Linking.openSettings();
+  };
+
+  const handleSkipAllFiles = async () => {
+    await AsyncStorage.setItem(ALL_FILES_ONBOARD_KEY, 'true').catch(() => {});
+    setAllFilesOnboarded(true);
+  };
 
   useEffect(() => {
     AsyncStorage.getItem('app_pin').then(pin => {
@@ -187,6 +243,31 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
           </Stack>
 
+          {/* ── All Files Access one-time onboarding ── */}
+          {allFilesOnboarded === false && (
+            <View style={onboard.overlay}>
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
+              <Text style={onboard.appName}>My Dream Women ☁️</Text>
+              <View style={onboard.card}>
+                <Text style={onboard.icon}>📁</Text>
+                <Text style={onboard.title}>"All Files Access" தேவை</Text>
+                <Text style={onboard.desc}>
+                  {'Photos-ஐ "Cut" செய்து phone gallery-ல் delete பண்ண இந்த permission ஒரு முறை மட்டும் allow பண்ணுங்க.'}
+                </Text>
+                <View style={onboard.stepsBox}>
+                  <Text style={onboard.stepsTitle}>Settings-ல் என்ன செய்யணும்:</Text>
+                  <Text style={onboard.stepsText}>{'My Girls → All files access → Allow ✓'}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={onboard.settingsBtn} onPress={handleOpenAllFilesSettings}>
+                <Text style={onboard.settingsBtnTxt}>⚙️ Settings திற</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={onboard.skipBtn} onPress={handleSkipAllFiles}>
+                <Text style={onboard.skipTxt}>பிறகு செய்கிறேன்</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* ── 4-Digit PIN Lock Overlay ── */}
           {pinLocked && (
             <View style={pin.overlay}>
@@ -238,6 +319,40 @@ const crash = StyleSheet.create({
   btnRow: { padding: 16, paddingBottom: 32 },
   clearBtn: { backgroundColor: '#b71c1c', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   clearTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+});
+
+const onboard = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a0a0a',
+    zIndex: 9998,
+    alignItems: 'center',
+    paddingTop: 70,
+    paddingHorizontal: 24,
+  },
+  appName: {
+    color: '#fff', fontSize: 26, fontWeight: 'bold',
+    marginBottom: 32,
+    textShadowColor: '#E91E8C', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 },
+  },
+  card: {
+    backgroundColor: '#141414', borderRadius: 20, padding: 24,
+    width: '100%', borderWidth: 1, borderColor: '#1f2937',
+    alignItems: 'center', marginBottom: 24,
+  },
+  icon: { fontSize: 48, marginBottom: 12 },
+  title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
+  desc: { color: '#9ca3af', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 16 },
+  stepsBox: { backgroundColor: '#1f2937', borderRadius: 12, padding: 14, width: '100%' },
+  stepsTitle: { color: '#6b7280', fontSize: 12, marginBottom: 6 },
+  stepsText: { color: '#25D366', fontSize: 13, fontWeight: '600' },
+  settingsBtn: {
+    backgroundColor: '#E67E22', borderRadius: 16, paddingVertical: 16,
+    width: '100%', alignItems: 'center', marginBottom: 12,
+  },
+  settingsBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  skipBtn: { paddingVertical: 12, width: '100%', alignItems: 'center' },
+  skipTxt: { color: '#4b5563', fontSize: 14 },
 });
 
 const pin = StyleSheet.create({
