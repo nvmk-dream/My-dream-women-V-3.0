@@ -659,13 +659,13 @@ export default function FaceSwapScreen() {
           style={s.altLink}
           onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
         >
-          <Text style={s.altLinkTxt}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
+          <Text style={s.altLinkTxtBlue}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={s.altLink}
           onPress={() => Linking.openURL('https://remaker.ai/features/batche-face-swap/')}
         >
-          <Text style={s.altLinkTxt}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
+          <Text style={s.altLinkTxtGreen}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -721,5 +721,6 @@ const s = StyleSheet.create({
   retryBtn: { backgroundColor: '#1a1a2e', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#7c3aed44' },
   retryBtnTxt: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
   altLink: { marginTop: 16, paddingVertical: 10, alignItems: 'center' },
-  altLinkTxt: { color: '#555', fontSize: 12, textDecorationLine: 'underline' },
+  altLinkTxtBlue: { color: '#3b82f6', fontSize: 12, textDecorationLine: 'underline' },
+  altLinkTxtGreen: { color: '#22c55e', fontSize: 12, textDecorationLine: 'underline' },
 });
