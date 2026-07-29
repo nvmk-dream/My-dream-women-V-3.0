@@ -2112,22 +2112,7 @@ export default function ChatScreen() {
         <View style={{ position: 'relative' }}>
           {/* Floating action buttons — absolute right side, above input bar */}
           <View style={styles.chatFabs}>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#E91E8C' }]}
-              onPress={() => router.push('/prompt-image')}
-            >
-              <Text style={styles.cameraIcon}>🎨</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#7B1FA2' }]}
-              onPress={pickImageForPrompt}
-              disabled={promptLoading}
-            >
-              {promptLoading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.cameraIcon}>📋</Text>
-              }
-            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.chatFabItem, { backgroundColor: '#E53935' }]}
               onPress={() => setShowGenModal(true)}
@@ -2154,12 +2139,7 @@ export default function ChatScreen() {
                 : <Text style={styles.cameraIcon}>🔤</Text>
               }
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#FF6D00' }]}
-              onPress={() => router.push('/face-swap')}
-            >
-              <Text style={styles.cameraIcon}>🔄</Text>
-            </TouchableOpacity>
+
           </View>
           {/* Compact input bar — WhatsApp style */}
           <View style={styles.inputBar}>
