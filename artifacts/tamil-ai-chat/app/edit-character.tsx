@@ -253,6 +253,8 @@ export default function EditCharacterScreen() {
   const [avatarReflectionEnabled, setAvatarReflectionEnabled] = useState(true);
   const [avatarReflectionPrompt, setAvatarReflectionPrompt] = useState('');
   const [imageVideoPrompt, setImageVideoPrompt] = useState('');
+  const [charFontColor, setCharFontColor] = useState('');
+  const [charFontSize, setCharFontSize] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -334,6 +336,8 @@ export default function EditCharacterScreen() {
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoPrompt(data.imageVideoPrompt ?? DEFAULT_IMAGE_VIDEO_PROMPT);
+        setCharFontColor(data.charFontColor ?? '');
+        setCharFontSize(data.charFontSize ?? 0);
       } catch {}
     };
     load();
@@ -452,6 +456,7 @@ export default function EditCharacterScreen() {
         basePromptEdit: basePromptEdit.trim() || BASE_PROMPT,
         avatarReflectionEnabled, avatarReflectionPrompt,
         imageVideoPrompt,
+        charFontColor, charFontSize,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
       // Save கல்லாட்டம் engine data
@@ -994,6 +999,77 @@ export default function EditCharacterScreen() {
             placeholder="e.g. User 30 வயது, medium height, athletic build, dark skin. Character இதை அறிஞ்சு interact பண்ணும்."
             placeholderTextColor="#bbb"
           />
+
+          {/* ── Character Message Font Style ── */}
+          <View style={styles.divider} />
+          <Text style={[styles.sectionLabel, { color: '#1565C0', marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
+          <Text style={{ color: '#888', fontSize: 11, marginBottom: 10 }}>Character reply messages-ல் font color & size set பண்ணுங்க.</Text>
+
+          <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>🖌️ Font Color</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+            {[
+              { color: '#111111', label: 'Black' },
+              { color: '#1565C0', label: 'Blue' },
+              { color: '#075E54', label: 'Green' },
+              { color: '#B71C1C', label: 'Red' },
+              { color: '#7c3aed', label: 'Purple' },
+              { color: '#f59e0b', label: 'Amber' },
+              { color: '#06b6d4', label: 'Cyan' },
+              { color: '#ec4899', label: 'Pink' },
+              { color: '#15803d', label: 'Forest' },
+              { color: '#ea580c', label: 'Orange' },
+              { color: '#78350f', label: 'Brown' },
+              { color: '#6b7280', label: 'Gray' },
+            ].map(({ color }) => (
+              <TouchableOpacity
+                key={color}
+                onPress={() => setCharFontColor(charFontColor === color ? '' : color)}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: color,
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: charFontColor === color ? 3 : 1.5,
+                  borderColor: charFontColor === color ? '#075E54' : '#ddd',
+                }}
+              >
+                {charFontColor === color && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+          {!!charFontColor && (
+            <TouchableOpacity onPress={() => setCharFontColor('')} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, backgroundColor: '#f0f0f0', borderRadius: 10, marginBottom: 8 }}>
+              <Text style={{ fontSize: 11, color: '#555' }}>↺ Default Color Reset</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={[styles.sectionLabel, { marginBottom: 8, marginTop: 4 }]}>📏 Font Size</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            {[{ label: 'Small', size: 12 }, { label: 'Medium', size: 14 }, { label: 'Large', size: 16 }, { label: 'XL', size: 18 }].map(({ label, size }) => (
+              <TouchableOpacity
+                key={size}
+                onPress={() => setCharFontSize(charFontSize === size ? 0 : size)}
+                style={{
+                  flex: 1, paddingVertical: 10, borderRadius: 10,
+                  alignItems: 'center',
+                  borderWidth: 1.5,
+                  borderColor: charFontSize === size ? '#1565C0' : '#ddd',
+                  backgroundColor: charFontSize === size ? '#e3f2fd' : '#fafafa',
+                }}
+              >
+                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? '#1565C0' : '#555' }}>{label}</Text>
+                <Text style={{ fontSize: 9, color: '#999', marginTop: 2 }}>{size}px</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {(!!charFontColor || charFontSize > 0) && (
+            <View style={{ backgroundColor: '#f8f9fa', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#e0e0e0' }}>
+              <Text style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>👀 Preview:</Text>
+              <Text style={{ fontSize: charFontSize || 15, color: charFontColor || '#111', fontWeight: '500' }}>
+                நான் உன்னை ரொம்ப miss பண்றேன்! 💕
+              </Text>
+            </View>
+          )}
         </SectionCard>
 
         <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
