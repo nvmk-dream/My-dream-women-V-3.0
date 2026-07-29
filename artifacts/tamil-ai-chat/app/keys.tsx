@@ -36,7 +36,6 @@ const DEFAULT_KEYS: Omit<ApiKeyEntry, 'value' | 'expanded' | 'status'>[] = [
   { id: 'hf',         label: 'HuggingFace',  site: 'huggingface.co',    enabled: false },
   { id: 'openrouter',  label: 'OpenRouter API', site: 'openrouter.ai',   enabled: false },
   { id: 'groq',         label: 'Groq AI',         site: 'groq.com',          enabled: false },
-  { id: 'img_prompt_gemini', label: '📸 Image to Prompt', site: 'aistudio.google.com', enabled: false },
 ];
 
 async function testGeminiKey(key: string): Promise<KeyStatus> {
@@ -70,7 +69,7 @@ async function testOpenRouterKey(key: string): Promise<KeyStatus> {
 
 async function testKey(id: string, value: string): Promise<KeyStatus> {
   if (!value.trim()) return 'idle';
-  if (id.startsWith('gemini') || id === 'img_prompt_gemini') return testGeminiKey(value);
+  if (id.startsWith('gemini')) return testGeminiKey(value);
   if (id === 'hf') return testHuggingFaceKey(value);
   if (id === 'openrouter') return testOpenRouterKey(value);
   return 'ok';
