@@ -654,12 +654,18 @@ export default function FaceSwapScreen() {
           </View>
         ) : null}
 
-        {/* Always-visible alternative link */}
+        {/* Always-visible alternative links */}
         <TouchableOpacity
           style={s.altLink}
           onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
         >
           <Text style={s.altLinkTxt}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.altLink}
+          onPress={() => Linking.openURL('https://remaker.ai/features/batche-face-swap/')}
+        >
+          <Text style={s.altLinkTxt}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
