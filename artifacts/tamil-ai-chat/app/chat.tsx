@@ -321,6 +321,8 @@ export default function ChatScreen() {
         setUserNormalBeh(data.userNormalBeh ?? '');
         setUserPresanaBeh(data.userPresanaBeh ?? '');
         setUserBodyDesc(data.userBodyDesc ?? '');
+        setCharFontColor(data.charFontColor ?? '');
+        setCharFontSize(data.charFontSize ?? 0);
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
@@ -481,6 +483,8 @@ export default function ChatScreen() {
   const [chatWallpaper, setChatWallpaper] = useState('default');
   const [bubbleStyle, setBubbleStyle] = useState('classic');
   const [showStyleSheet, setShowStyleSheet] = useState(false);
+  const [charFontColor, setCharFontColor] = useState('');
+  const [charFontSize, setCharFontSize] = useState(0);
 
   // ── Birthday ──
   const [birthday, setBirthday] = useState('');
@@ -1727,6 +1731,8 @@ export default function ChatScreen() {
   const aiBubbleBg   = bubbleStyle === 'modern' ? (isDark ? '#2c2c2e' : '#fff') : (isDark ? '#2c2c2e' : '#fff');
   const userBubbleBg = bubbleStyle === 'modern' ? (isDark ? '#1a3d2b' : '#d4f5d4') : '#DCF8C6';
   const msgTextColor = isDark ? '#f0f0f0' : '#111';
+  const aiMsgTextColor = charFontColor || msgTextColor;
+  const aiMsgFontSize = charFontSize > 0 ? charFontSize : 15;
   const timeTextColor = isDark ? '#888' : '#888';
 
   // ── Copy helper ────────────────────────────────────────────────
@@ -1844,6 +1850,7 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
+    const aiTextStyle = isUser ? { color: msgTextColor } : { color: aiMsgTextColor, fontSize: aiMsgFontSize };
     return (
       <View style={[styles.msgRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && persona && (
@@ -1871,7 +1878,7 @@ export default function ChatScreen() {
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
               <ActivityIndicator color="#075E54" size="small" />
-              <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
             </View>
           ) : item.imageUrl ? (
             <View>
@@ -1879,7 +1886,7 @@ export default function ChatScreen() {
                 <Image source={{ uri: item.imageUrl }} style={styles.generatedImg} resizeMode="cover" />
               </TouchableOpacity>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 8 }}>
-                <Text selectable style={[styles.msgText, { color: msgTextColor, flex: 1 }]}>{item.content}</Text>
+                <Text selectable style={[styles.msgText, aiTextStyle, { flex: 1 }]}>{item.content}</Text>
                 <TouchableOpacity
                   onPress={() => saveAiImageToGallery(item.imageUrl!)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(37,211,102,0.15)', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(37,211,102,0.4)' }}
@@ -1911,17 +1918,17 @@ export default function ChatScreen() {
                   <Text style={{ color: '#fff', fontSize: 10, marginTop: 6, fontWeight: '600', opacity: 0.9 }}>🎬 Video</Text>
                 </View>
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, { color: msgTextColor, marginTop: 6 }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 6 }]}>{item.content}</Text>
             </View>
           ) : item.sentMediaType === 'image' && item.sentMediaUri ? (
             <View>
               <TouchableOpacity activeOpacity={0.88} onPress={() => setFullViewImg(item.sentMediaUri!)}>
                 <Image source={{ uri: item.sentMediaUri }} style={{ width: 200, height: 200, borderRadius: 10 }} resizeMode="cover" />
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, { color: msgTextColor, marginTop: 4 }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 4 }]}>{item.content}</Text>
             </View>
           ) : (
-            <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+            <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
           )}
           {item.videoUrl && (
             <View style={{ marginBottom: 6 }}>
