@@ -463,6 +463,10 @@ export default function AIGirlsCloudScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
+      // Auto-create Cloudinary folder for current character
+      if (selectedChar) {
+        createCloudinaryFolder(`my-girls/${selectedChar.id}/${id}`).catch(() => {});
+      }
     }
     Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
