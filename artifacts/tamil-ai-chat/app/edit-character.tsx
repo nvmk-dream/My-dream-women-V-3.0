@@ -255,6 +255,8 @@ export default function EditCharacterScreen() {
   const [imageVideoPrompt, setImageVideoPrompt] = useState('');
   const [charFontColor, setCharFontColor] = useState('');
   const [charFontSize, setCharFontSize] = useState(0);
+  const [promptFontSize, setPromptFontSize] = useState(0);
+  const [promptFontColor, setPromptFontColor] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -338,6 +340,8 @@ export default function EditCharacterScreen() {
         setImageVideoPrompt(data.imageVideoPrompt ?? DEFAULT_IMAGE_VIDEO_PROMPT);
         setCharFontColor(data.charFontColor ?? '');
         setCharFontSize(data.charFontSize ?? 0);
+        setPromptFontSize(data.promptFontSize ?? 0);
+        setPromptFontColor(data.promptFontColor ?? '');
       } catch {}
     };
     load();
@@ -457,6 +461,7 @@ export default function EditCharacterScreen() {
         avatarReflectionEnabled, avatarReflectionPrompt,
         imageVideoPrompt,
         charFontColor, charFontSize,
+        promptFontSize, promptFontColor,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
       // Save கல்லாட்டம் engine data
@@ -1229,8 +1234,44 @@ export default function EditCharacterScreen() {
 
         <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
+          {/* ── Font Size + Color Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
+            {[{ label: 'S', size: 11 }, { label: 'M', size: 14 }, { label: 'L', size: 17 }, { label: 'XL', size: 20 }].map(({ label, size }) => (
+              <TouchableOpacity
+                key={size}
+                onPress={() => setPromptFontSize(promptFontSize === size ? 0 : size)}
+                style={{
+                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: promptFontSize === size ? '#1565C0' : '#ccc',
+                  backgroundColor: promptFontSize === size ? '#bbdefb' : '#fff',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: promptFontSize === size ? '#1565C0' : '#666' }}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
+            {['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#555555'].map((clr) => (
+              <TouchableOpacity
+                key={clr}
+                onPress={() => setPromptFontColor(promptFontColor === clr ? '' : clr)}
+                style={{
+                  width: 22, height: 22, borderRadius: 11,
+                  backgroundColor: clr,
+                  borderWidth: promptFontColor === clr ? 3 : 1,
+                  borderColor: promptFontColor === clr ? '#1565C0' : '#ddd',
+                }}
+              />
+            ))}
+            {(promptFontSize > 0 || !!promptFontColor) ? (
+              <TouchableOpacity onPress={() => { setPromptFontSize(0); setPromptFontColor(''); }} style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+                <Text style={{ fontSize: 10, color: '#c62828' }}>↺ Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <TextInput
-            style={[styles.fieldInput, { minHeight: 200, fontSize: 11, lineHeight: 18, color: '#555', backgroundColor: '#fff5f5' }]}
+            style={[styles.fieldInput, { minHeight: 200, fontSize: promptFontSize || 11, lineHeight: (promptFontSize || 11) + 7, color: promptFontColor || '#555', backgroundColor: '#fff5f5' }]}
             value={basePromptEdit}
             onChangeText={setBasePromptEdit}
             multiline
@@ -1267,8 +1308,44 @@ export default function EditCharacterScreen() {
               <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
+          {/* ── Font Size + Color Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
+            {[{ label: 'S', size: 11 }, { label: 'M', size: 14 }, { label: 'L', size: 17 }, { label: 'XL', size: 20 }].map(({ label, size }) => (
+              <TouchableOpacity
+                key={size}
+                onPress={() => setPromptFontSize(promptFontSize === size ? 0 : size)}
+                style={{
+                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: promptFontSize === size ? '#1565C0' : '#ccc',
+                  backgroundColor: promptFontSize === size ? '#bbdefb' : '#fff',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: promptFontSize === size ? '#1565C0' : '#666' }}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
+            {['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#555555'].map((clr) => (
+              <TouchableOpacity
+                key={clr}
+                onPress={() => setPromptFontColor(promptFontColor === clr ? '' : clr)}
+                style={{
+                  width: 22, height: 22, borderRadius: 11,
+                  backgroundColor: clr,
+                  borderWidth: promptFontColor === clr ? 3 : 1,
+                  borderColor: promptFontColor === clr ? '#1565C0' : '#ddd',
+                }}
+              />
+            ))}
+            {(promptFontSize > 0 || !!promptFontColor) ? (
+              <TouchableOpacity onPress={() => { setPromptFontSize(0); setPromptFontColor(''); }} style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+                <Text style={{ fontSize: 10, color: '#c62828' }}>↺ Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <TextInput
-            style={[styles.fieldInput, { minHeight: 200, backgroundColor: '#f9fff9' }]}
+            style={[styles.fieldInput, { minHeight: 200, backgroundColor: '#f9fff9', fontSize: promptFontSize || 14, lineHeight: (promptFontSize || 14) + 7, color: promptFontColor || '#333' }]}
             value={charOnly}
             onChangeText={setCharOnly}
             multiline
