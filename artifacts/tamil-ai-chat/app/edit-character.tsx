@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
+import { RichEditor } from 'react-native-pell-rich-editor';
 import { ParamsStore } from '../context/params-store';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
 
@@ -28,6 +29,10 @@ sexual / romantic / NSFW fully allowed
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
+
 }
 
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
@@ -199,6 +204,8 @@ export default function EditCharacterScreen() {
   const [showModeCloud, setShowModeCloud] = useState<'normal' | 'presana' | null>(null);
   const [modeCloudInput, setModeCloudInput] = useState('');
   const [relationship, setRelationship] = useState('');
+  const baseRulesEditorRef = useRef<RichEditor>(null);
+  const charPromptEditorRef = useRef<RichEditor>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [analyzingFields, setAnalyzingFields] = useState(false);
@@ -451,7 +458,7 @@ export default function EditCharacterScreen() {
     setSaving(true);
     try {
       const data = {
-        name, avatarLetter, greeting, prompt: (basePromptEdit.trim() || BASE_PROMPT) + '\n**இப்போ உன்னோட character:**\n' + charOnly,
+        name, avatarLetter, greeting, prompt: (stripHtml(basePromptEdit).trim() || stripHtml(BASE_PROMPT)) + '\n**இப்போ உன்னோட character:**\n' + stripHtml(charOnly),
         faceDesc, bodyDesc, attireDesc, avatarPhotoUri,
         normalAvatarUri, presanaAvatarUri, relationship,
         presanaBehaviour, normalBehaviour,
@@ -1233,56 +1240,34 @@ export default function EditCharacterScreen() {
         </SectionCard>
 
         <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
-          {/* ── Font Size + Color Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
+          {/* ── Rich Format Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
-            {[{ label: 'S', size: 11 }, { label: 'M', size: 14 }, { label: 'L', size: 17 }, { label: 'XL', size: 20 }].map(({ label, size }) => (
-              <TouchableOpacity
-                key={size}
-                onPress={() => setPromptFontSize(promptFontSize === size ? 0 : size)}
-                style={{
-                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
-                  borderWidth: 1.5,
-                  borderColor: promptFontSize === size ? '#1565C0' : '#ccc',
-                  backgroundColor: promptFontSize === size ? '#bbdefb' : '#fff',
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: promptFontSize === size ? '#1565C0' : '#666' }}>{label}</Text>
+            {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
+              <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
-            {['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#555555'].map((clr) => (
-              <TouchableOpacity
-                key={clr}
-                onPress={() => setPromptFontColor(promptFontColor === clr ? '' : clr)}
-                style={{
-                  width: 22, height: 22, borderRadius: 11,
-                  backgroundColor: clr,
-                  borderWidth: promptFontColor === clr ? 3 : 1,
-                  borderColor: promptFontColor === clr ? '#1565C0' : '#ddd',
-                }}
-              />
+            {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
+              <TouchableOpacity key={clr} onPress={() => baseRulesEditorRef.current?.setForeColor(clr)}
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
             ))}
-            {(promptFontSize > 0 || !!promptFontColor) ? (
-              <TouchableOpacity onPress={() => { setPromptFontSize(0); setPromptFontColor(''); }} style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
-                <Text style={{ fontSize: 10, color: '#c62828' }}>↺ Reset</Text>
-              </TouchableOpacity>
-            ) : null}
+            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setForeColor('#111111')}
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+            </TouchableOpacity>
           </View>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 200, fontSize: promptFontSize || 11, lineHeight: (promptFontSize || 11) + 7, color: promptFontColor || '#555', backgroundColor: '#fff5f5' }]}
-            value={basePromptEdit}
-            onChangeText={setBasePromptEdit}
-            multiline
-            textAlignVertical="top"
-            editable={true}
-            selectTextOnFocus={false}
-            contextMenuHidden={false}
-            scrollEnabled={false}
+          <RichEditor
+            ref={baseRulesEditorRef}
+            initialContentHTML={basePromptEdit}
+            onChange={setBasePromptEdit}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#ffcdd2', backgroundColor: '#fff5f5' }}
+            editorStyle={{ backgroundColor: '#fff5f5', color: '#555', fontSize: 13 }}
+            useContainer={false}
             autoCorrect={false}
-            autoCapitalize="none"
-            spellCheck={false}
           />
           <TouchableOpacity
             onPress={() => setBasePromptEdit(BASE_PROMPT)}
@@ -1308,57 +1293,34 @@ export default function EditCharacterScreen() {
               <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
-          {/* ── Font Size + Color Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+          {/* ── Rich Format Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
-            {[{ label: 'S', size: 11 }, { label: 'M', size: 14 }, { label: 'L', size: 17 }, { label: 'XL', size: 20 }].map(({ label, size }) => (
-              <TouchableOpacity
-                key={size}
-                onPress={() => setPromptFontSize(promptFontSize === size ? 0 : size)}
-                style={{
-                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
-                  borderWidth: 1.5,
-                  borderColor: promptFontSize === size ? '#1565C0' : '#ccc',
-                  backgroundColor: promptFontSize === size ? '#bbdefb' : '#fff',
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: promptFontSize === size ? '#1565C0' : '#666' }}>{label}</Text>
+            {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
+              <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
-            {['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#555555'].map((clr) => (
-              <TouchableOpacity
-                key={clr}
-                onPress={() => setPromptFontColor(promptFontColor === clr ? '' : clr)}
-                style={{
-                  width: 22, height: 22, borderRadius: 11,
-                  backgroundColor: clr,
-                  borderWidth: promptFontColor === clr ? 3 : 1,
-                  borderColor: promptFontColor === clr ? '#1565C0' : '#ddd',
-                }}
-              />
+            {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
+              <TouchableOpacity key={clr} onPress={() => charPromptEditorRef.current?.setForeColor(clr)}
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
             ))}
-            {(promptFontSize > 0 || !!promptFontColor) ? (
-              <TouchableOpacity onPress={() => { setPromptFontSize(0); setPromptFontColor(''); }} style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
-                <Text style={{ fontSize: 10, color: '#c62828' }}>↺ Reset</Text>
-              </TouchableOpacity>
-            ) : null}
+            <TouchableOpacity onPress={() => charPromptEditorRef.current?.setForeColor('#111111')}
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+            </TouchableOpacity>
           </View>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 200, backgroundColor: '#f9fff9', fontSize: promptFontSize || 14, lineHeight: (promptFontSize || 14) + 7, color: promptFontColor || '#333' }]}
-            value={charOnly}
-            onChangeText={setCharOnly}
-            multiline
-            textAlignVertical="top"
-            editable={true}
-            selectTextOnFocus={false}
-            contextMenuHidden={false}
-            scrollEnabled={false}
-            autoCorrect={false}
-            autoCapitalize="none"
-            spellCheck={false}
+          <RichEditor
+            ref={charPromptEditorRef}
+            initialContentHTML={charOnly}
+            onChange={setCharOnly}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#c8e6c9', backgroundColor: '#f9fff9' }}
+            editorStyle={{ backgroundColor: '#f9fff9', color: '#333', fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
-            placeholderTextColor="#bbb"
+            useContainer={false}
+            autoCorrect={false}
           />
         </SectionCard>
 
