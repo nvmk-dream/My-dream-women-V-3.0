@@ -568,6 +568,14 @@ export default function ChatScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
     }
+    // Sync to cloud_custom_styles key (used by Cloud Storage screen)
+    try {
+      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
+      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
+      if (!cloudList.some(s => s.id === newStyle.id)) {
+        await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, newStyle]));
+      }
+    } catch {}
     // Auto-create Cloudinary folder for current character when new style is added
     if (personaId) {
       createCloudinaryFolder(`my-girls/${personaId}/${newStyle.id}`).catch(() => {});
