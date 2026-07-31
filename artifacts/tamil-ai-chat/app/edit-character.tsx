@@ -458,13 +458,13 @@ export default function EditCharacterScreen() {
     setSaving(true);
     try {
       const data = {
-        name, avatarLetter, greeting, prompt: (stripHtml(basePromptEdit).trim() || stripHtml(BASE_PROMPT)) + '\n**இப்போ உன்னோட character:**\n' + stripHtml(charOnly),
+        name, avatarLetter, greeting, prompt: (stripHtml(basePromptEdit ?? '').trim() || stripHtml(BASE_PROMPT)) + '\n**இப்போ உன்னோட character:**\n' + stripHtml(charOnly ?? ''),
         faceDesc, bodyDesc, attireDesc, avatarPhotoUri,
         normalAvatarUri, presanaAvatarUri, relationship,
         presanaBehaviour, normalBehaviour,
         userWhatsappBeh, userNormalBeh, userPresanaBeh, userBodyDesc,
         todayStory,
-        basePromptEdit: basePromptEdit.trim() || BASE_PROMPT,
+        basePromptEdit: (basePromptEdit ?? '').trim() || BASE_PROMPT,
         avatarReflectionEnabled, avatarReflectionPrompt,
         imageVideoPrompt,
         charFontColor, charFontSize,
@@ -495,8 +495,8 @@ export default function EditCharacterScreen() {
   };
 
   const saveDefaultPrompt = async () => {
-    if (!charOnly.trim()) { Alert.alert('Prompt இல்லை', 'Green box-ல் முதலில் prompt type பண்ணுங்க'); return; }
-    await AsyncStorage.setItem('default_char_prompt', charOnly.trim());
+    if (!(charOnly ?? '').trim()) { Alert.alert('Prompt இல்லை', 'Green box-ல் முதலில் prompt type பண்ணுங்க'); return; }
+    await AsyncStorage.setItem('default_char_prompt', (charOnly ?? '').trim());
     setDefaultPromptExists(true);
     Alert.alert('✅ Default Save ஆச்சு!', 'இந்த prompt புதிய characters-க்கு green box-ல் auto-load ஆகும்.');
   };
@@ -1243,6 +1243,10 @@ export default function EditCharacterScreen() {
           <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
           {/* ── Rich Format Toolbar ── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setBold()}
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+            </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
@@ -1263,7 +1267,7 @@ export default function EditCharacterScreen() {
           <RichEditor
             ref={baseRulesEditorRef}
             initialContentHTML={basePromptEdit}
-            onChange={setBasePromptEdit}
+            onChange={(html) => setBasePromptEdit(html ?? '')}
             style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#ffcdd2', backgroundColor: '#fff5f5' }}
             editorStyle={{ backgroundColor: '#fff5f5', color: '#555', fontSize: 13 }}
             useContainer={false}
@@ -1295,6 +1299,10 @@ export default function EditCharacterScreen() {
           </View>
           {/* ── Rich Format Toolbar ── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <TouchableOpacity onPress={() => charPromptEditorRef.current?.setBold()}
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+            </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
@@ -1315,7 +1323,7 @@ export default function EditCharacterScreen() {
           <RichEditor
             ref={charPromptEditorRef}
             initialContentHTML={charOnly}
-            onChange={setCharOnly}
+            onChange={(html) => setCharOnly(html ?? '')}
             style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#c8e6c9', backgroundColor: '#f9fff9' }}
             editorStyle={{ backgroundColor: '#f9fff9', color: '#333', fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
