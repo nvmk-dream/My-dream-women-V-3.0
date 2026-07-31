@@ -1243,7 +1243,7 @@ export default function EditCharacterScreen() {
           <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
           {/* ── Rich Format Toolbar ── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
-            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setBold()}
+            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
               style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
               <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
             </TouchableOpacity>
@@ -1299,7 +1299,7 @@ export default function EditCharacterScreen() {
           </View>
           {/* ── Rich Format Toolbar ── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
-            <TouchableOpacity onPress={() => charPromptEditorRef.current?.setBold()}
+            <TouchableOpacity onPress={() => charPromptEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
               style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
               <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
             </TouchableOpacity>
