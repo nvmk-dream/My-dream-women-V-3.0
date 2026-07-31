@@ -290,7 +290,7 @@ export async function generateImage(params: {
   mode?: 'single' | 'together';
 }): Promise<{ b64_json: string; mimeType: string }> {
   // Use our own API server → fal.ai Flux Schnell (~$0.003/image, ~10s)
-  const startRes = await fetch('/api/generate-image/start', {
+  const startRes = await fetch(`${REPLIT_API}/api/generate-image/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -309,7 +309,7 @@ export async function generateImage(params: {
   for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 3000));
     try {
-      const pollRes = await fetch(`/api/generate-image/status/${jobId}`);
+      const pollRes = await fetch(`${REPLIT_API}/api/generate-image/status/${jobId}`);
       if (!pollRes.ok) continue;
       const data = await pollRes.json() as any;
       if (data.status === 'done' && data.result) return data.result;
