@@ -94,23 +94,8 @@ export async function imageToPrompt(
   imageUrl: string,
   onProgress?: (msg: string) => void,
 ): Promise<string> {
-  const AS = (await import('@react-native-async-storage/async-storage')).default;
-  const [keysRaw, enabledRaw] = await Promise.all([
-    AS.getItem('api_keys_store').catch(() => null),
-    AS.getItem('api_keys_enabled_v1').catch(() => null),
-  ]);
-  const parsed = keysRaw ? (JSON.parse(keysRaw) as Record<string, string>) : {};
-  const enabled = enabledRaw ? (JSON.parse(enabledRaw) as Record<string, boolean>) : {};
-
-  // Collect ALL active Gemini keys — default enabled if not explicitly disabled
-  const allGeminiKeys: string[] = [];
-  for (let i = 1; i <= 13; i++) {
-    const k = parsed[`gemini_${i}`];
-    if (k?.trim() && enabled[`gemini_${i}`] !== false) allGeminiKeys.push(k.trim());
-  }
-  const openrouterKey = parsed['openrouter']?.trim() || '';
-
-  // Extract base64 + mime from data URI — strip whitespace from base64
+  // ── Render Multimedia environment வழியாக — GEMINI_API_KEY_1..5 + OpenRouter ──
+  // Phone-ல் user keys தேவையில்லை; Render server Multimedia group keys use பண்ணும்
   let b64 = '';
   let mime = 'image/jpeg';
   if (imageUrl.startsWith('data:')) {
@@ -119,72 +104,31 @@ export async function imageToPrompt(
   }
   if (!b64) throw new Error('Image data missing');
 
-  // ── Try ALL Gemini keys one by one until one succeeds ──
-  const total = allGeminiKeys.length;
-  for (let idx = 0; idx < total; idx++) {
-    const geminiKey = allGeminiKeys[idx];
-    onProgress?.(`🔑 Gemini key ${idx + 1}/${total} try பண்றேன்...`);
-    try {
-      const ctrl = new AbortController();
-      const tmr = setTimeout(() => ctrl.abort(), 30000);
-      const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { inline_data: { mime_type: mime, data: b64 } },
-              { text: PHOTO_SCRIPT_PROMPT },
-            ]}],
-            generationConfig: { maxOutputTokens: 1024 },
-          }),
-          signal: ctrl.signal,
-        },
-      );
-      clearTimeout(tmr);
-      if (res.status === 429) { continue; }
-      if (!res.ok) { continue; }
-      const data = await res.json() as any;
-      const prompt = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (prompt && prompt.length > 20) return prompt;
-    } catch { continue; }
-  }
+  onProgress?.('🎬 Render Multimedia AI analyze பண்றது...');
 
-  // ── OpenRouter fallback ──
-  if (openrouterKey) {
-    onProgress?.('OpenRouter via Gemini try பண்றேன்...');
-    try {
-      const ctrl = new AbortController();
-      const tmr = setTimeout(() => ctrl.abort(), 60000);
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openrouterKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp:free',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
-            { type: 'text', text: PHOTO_SCRIPT_PROMPT },
-          ]}],
-        }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(tmr);
-      if (res.ok) {
-        const data = await res.json() as any;
-        const prompt = (data?.choices?.[0]?.message?.content ?? '').trim();
-        if (prompt && prompt.length > 20) return prompt;
-      }
-    } catch {}
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    const res = await fetch(`${REPLIT_API}/api/image-to-prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ b64, mime }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as any;
+      throw new Error(err?.error || `Server error: ${res.status}`);
+    }
+    const data = await res.json() as any;
+    if (!data.prompt) throw new Error('Prompt generate ஆகல — மீண்டும் try பண்ணுங்க.');
+    return data.prompt as string;
+  } catch (e: any) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('⏱ Timeout — மீண்டும் try பண்ணுங்க.');
+    throw e;
   }
-
-  if (allGeminiKeys.length === 0 && !openrouterKey) {
-    throw new Error('🔑 Home → Keys → Gemini API key 1 enter பண்ணுங்க (aistudio.google.com இல் free)');
-  }
-  throw new Error('__ALL_KEYS_EXHAUSTED__');
 }
-
 export async function sendMessage(
   messages: { role: string; content: string }[],
   _provider: string = 'gemini',
