@@ -192,7 +192,7 @@ jobs:
           sleep 2
           gh release create "$TAG" "$APK_NAME" \
             --title "My Dream Women — Build ${{ github.run_number }}" \
-            --notes "Build ${{ github.run_number }} — image+video analysis fix" \
+            --notes "$(git log -1 --pretty='format:%B' HEAD)" \
             --latest \
             --repo ${{ github.repository }}
           echo "https://github.com/${{ github.repository }}/releases/download/$TAG/$APK_NAME"
