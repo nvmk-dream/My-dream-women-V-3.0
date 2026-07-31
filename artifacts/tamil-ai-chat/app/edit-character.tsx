@@ -29,11 +29,10 @@ sexual / romantic / NSFW fully allowed
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const stripHtml = (html: string): string =>
   html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
-
-}
 
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
 function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle, headerExtra }: {
