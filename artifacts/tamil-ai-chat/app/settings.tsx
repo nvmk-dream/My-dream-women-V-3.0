@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary } from '../services/api';
+import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, deleteStyleFolderGlobally, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
 
 const APP_VERSION = '1.2.0';
 const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
@@ -20,6 +20,24 @@ const CUSTOM_SERVER_KEY = 'custom_server_url';
 const DEFAULT_SERVER = 'https://my-dream-women-v2.onrender.com';
 
 type BuildStatus = 'idle' | 'triggering' | 'queued' | 'in_progress' | 'success' | 'failure';
+
+const BUILTIN_PHOTO_STYLES: GlobalStyleEntry[] = [
+  { id: 'normal',     label: 'Normal Photo',   prompt: 'normal photo, fully clothed, casual' },
+  { id: 'nude',       label: 'Nude 🔞',        prompt: 'nude, fully naked, explicit' },
+  { id: 'seminude',   label: 'Semi Nude',      prompt: 'semi nude, partially undressed' },
+  { id: 'breast',     label: 'Breast Show',    prompt: 'topless, showing breasts, bare chest' },
+  { id: 'halfbreast', label: 'Half Breast',    prompt: 'half breast visible, deep cleavage, low cut top' },
+  { id: 'cleavage',   label: 'Cleavage',       prompt: 'deep cleavage, low neckline, cleavage showing' },
+  { id: 'lowneck',    label: 'Low Neckline',   prompt: 'low neckline, low cut dress, revealing neckline' },
+  { id: 'lingerie',   label: 'Lingerie',       prompt: 'wearing lingerie, bra and panties, underwear' },
+  { id: 'buttocks',   label: 'Buttocks',       prompt: 'showing buttocks, from behind, revealing buttocks' },
+  { id: 'highslit',   label: 'High Slit',      prompt: 'high slit dress, thigh high slit, leg revealing slit' },
+  { id: 'seductive',  label: 'Seductive',      prompt: 'seductive pose, alluring, provocative look' },
+  { id: 'wet',        label: 'Wet Clothes',    prompt: 'wet clothes, drenched, see through wet fabric' },
+  { id: 'legs',       label: 'Legs Spread',    prompt: 'legs spread wide, revealing pose' },
+  { id: 'saree',      label: 'Saree Tuck',     prompt: 'lifting saree up, revealing thighs, traditional saree' },
+  { id: 'sleeping',   label: 'Sleeping',       prompt: 'sleeping pose, exposed, lying down' },
+];
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -46,6 +64,15 @@ export default function SettingsScreen() {
   const [hfSaved, setHfSaved] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Photo Styles Global Management ──────────────────────────────────────
+  const [globalStyles, setGlobalStyles] = useState<GlobalPhotoStyles>({ hidden: [], custom: [] });
+  const [stylesLoading, setStylesLoading] = useState(false);
+  const [showAddStyleModal, setShowAddStyleModal] = useState(false);
+  const [newStyleLabel, setNewStyleLabel] = useState('');
+  const [newStylePrompt, setNewStylePrompt] = useState('');
+  const [savingStyle, setSavingStyle] = useState(false);
+  const [deletingStyleId, setDeletingStyleId] = useState<string | null>(null);
+
   useEffect(() => {
     // Load saved custom server URL
     AsyncStorage.getItem(CUSTOM_SERVER_KEY).then(v => { if (v && v !== DEFAULT_SERVER) setCustomServerUrl(v); }).catch(() => {});
@@ -60,6 +87,7 @@ export default function SettingsScreen() {
     }).catch(() => {});
     // Auto-load server defaults (GitHub token + HuggingFace token)
     loadServerDefaults();
+    loadGlobalStyles();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
@@ -163,6 +191,95 @@ export default function SettingsScreen() {
       setHfSaved(false);
       Alert.alert('🗑️ Removed', 'HuggingFace token remove ஆச்சு');
     } catch {}
+  };
+
+  // ── Photo Styles Global Management functions ─────────────────────────────
+  const loadGlobalStyles = async () => {
+    setStylesLoading(true);
+    try {
+      const data = await getGlobalPhotoStyles();
+      setGlobalStyles(data);
+    } catch (e) {
+      // server offline — silently skip
+    } finally {
+      setStylesLoading(false);
+    }
+  };
+
+  const toggleHideBuiltinStyle = async (styleId: string) => {
+    const current = { ...globalStyles };
+    const isHidden = current.hidden.includes(styleId);
+    const newHidden = isHidden
+      ? current.hidden.filter(id => id !== styleId)
+      : [...current.hidden, styleId];
+    const updated: GlobalPhotoStyles = { ...current, hidden: newHidden };
+    setGlobalStyles(updated);
+    try {
+      await saveGlobalPhotoStyles(updated);
+    } catch {
+      Alert.alert('பிழை', 'Style update save ஆகல. மீண்டும் try பண்ணுங்க.');
+      setGlobalStyles(current);
+    }
+  };
+
+  const addGlobalStyle = async () => {
+    const label = newStyleLabel.trim();
+    if (!label) { Alert.alert('பிழை', 'Style name உள்ளிடுங்க'); return; }
+    setSavingStyle(true);
+    try {
+      const newEntry: GlobalStyleEntry = {
+        id: 'custom_' + Date.now().toString(36),
+        label,
+        prompt: newStylePrompt.trim() || label.toLowerCase(),
+      };
+      const updated: GlobalPhotoStyles = {
+        ...globalStyles,
+        custom: [...globalStyles.custom, newEntry],
+      };
+      await saveGlobalPhotoStyles(updated);
+      setGlobalStyles(updated);
+      setShowAddStyleModal(false);
+      setNewStyleLabel('');
+      setNewStylePrompt('');
+      Alert.alert('✅ Added', '"' + label + '" style அனைத்து characters-க்கும் கிடைக்கும்.');
+    } catch {
+      Alert.alert('பிழை', 'Style save ஆகல. Server connection check பண்ணுங்க.');
+    } finally {
+      setSavingStyle(false);
+    }
+  };
+
+  const deleteGlobalStyle = (styleId: string, isBuiltin: boolean) => {
+    Alert.alert(
+      '🗑️ Style Delete',
+      isBuiltin
+        ? 'இந்த built-in style-ஐ globally hide பண்ணணுமா? (Photos delete ஆகாது)'
+        : 'இந்த custom style-ஐ delete பண்ணணுமா? அனைத்து characters-ல் உள்ள photos-ம் Cloudinary-ல் இருந்து delete ஆகும்.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isBuiltin ? 'Hide' : '🗑️ Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingStyleId(styleId);
+            try {
+              if (!isBuiltin) {
+                await deleteStyleFolderGlobally(styleId);
+              }
+              const updated: GlobalPhotoStyles = isBuiltin
+                ? { ...globalStyles, hidden: [...globalStyles.hidden, styleId] }
+                : { ...globalStyles, custom: globalStyles.custom.filter(s => s.id !== styleId) };
+              await saveGlobalPhotoStyles(updated);
+              setGlobalStyles(updated);
+            } catch {
+              Alert.alert('பிழை', 'Delete ஆகல. மீண்டும் try பண்ணுங்க.');
+            } finally {
+              setDeletingStyleId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // GitHub key-ஐ save பண்ணி build start பண்றோம்
@@ -721,6 +838,69 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* ── Photo Styles Global Management ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardIcon}>📸</Text>
+            <Text style={s.cardTitle}>Photo Styles</Text>
+          </View>
+          <Text style={s.cardDesc}>
+            Chat மற்றும் AI Girls-ல் காண்பிக்கும் Photo Style list-ஐ globally manage பண்ணலாம். 🗑️ = hide/delete • 👁️ = மீண்டும் show
+          </Text>
+          {stylesLoading ? (
+            <ActivityIndicator color="#6C63FF" style={{ marginVertical: 10 }} />
+          ) : (
+            <>
+              <Text style={s.stylesSectionLabel}>Built-in Styles ({BUILTIN_PHOTO_STYLES.length})</Text>
+              {BUILTIN_PHOTO_STYLES.map(style => {
+                const isHidden = globalStyles.hidden.includes(style.id);
+                return (
+                  <View key={style.id} style={[s.styleRow, isHidden && s.styleRowHidden]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.styleRowLabel, isHidden && { color: '#555' }]}>{style.label}</Text>
+                      {isHidden && <Text style={s.styleHiddenBadge}>🚫 Hidden Globally</Text>}
+                    </View>
+                    <TouchableOpacity
+                      style={s.styleToggleBtn}
+                      onPress={() => toggleHideBuiltinStyle(style.id)}
+                    >
+                      <Text style={{ fontSize: 18 }}>{isHidden ? '👁️' : '🗑️'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              {globalStyles.custom.length > 0 && (
+                <>
+                  <Text style={[s.stylesSectionLabel, { marginTop: 14 }]}>Custom Styles ({globalStyles.custom.length})</Text>
+                  {globalStyles.custom.map(style => (
+                    <View key={style.id} style={s.styleRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.styleRowLabel}>{style.label}</Text>
+                        {style.prompt ? <Text style={s.stylePromptHint} numberOfLines={1}>{style.prompt}</Text> : null}
+                      </View>
+                      <TouchableOpacity
+                        style={s.styleToggleBtn}
+                        disabled={deletingStyleId === style.id}
+                        onPress={() => deleteGlobalStyle(style.id, false)}
+                      >
+                        {deletingStyleId === style.id
+                          ? <ActivityIndicator color="#f85149" size="small" />
+                          : <Text style={{ fontSize: 18 }}>🗑️</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
+              )}
+              <TouchableOpacity
+                style={s.addStyleBtn}
+                onPress={() => { setNewStyleLabel(''); setNewStylePrompt(''); setShowAddStyleModal(true); }}
+              >
+                <Text style={s.addStyleBtnTxt}>➕ Add Custom Style</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         <View style={s.tipsCard}>
           <Text style={s.tipsTitle}>💡 Tips</Text>
           <Text style={s.tip}>• GitHub Token Keys screen-ல் save பண்ணினா auto build trigger ஆகும்</Text>
@@ -729,6 +909,50 @@ export default function SettingsScreen() {
           <Text style={s.tip}>• Cloud-ல் images save ஆக Cloudinary configured ஆகிட்டது</Text>
         </View>
       </ScrollView>
+      {/* ── Add Custom Style Modal ── */}
+      <Modal visible={showAddStyleModal} transparent animationType="slide" onRequestClose={() => setShowAddStyleModal(false)}>
+        <View style={s.keyModalOverlay}>
+          <View style={s.keyModalBox}>
+            <Text style={s.keyModalTitle}>➕ Custom Style சேர்</Text>
+            <Text style={s.keyModalDesc}>
+              Style name மட்டும் கொடு. Prompt optional — கொடுத்தா image generation-ல் use ஆகும்.
+            </Text>
+            <TextInput
+              style={s.keyModalInput}
+              placeholder="Style name (e.g. Bikini)"
+              placeholderTextColor="#555"
+              value={newStyleLabel}
+              onChangeText={setNewStyleLabel}
+              autoCapitalize="words"
+              autoFocus
+            />
+            <TextInput
+              style={[s.keyModalInput, { minHeight: 60, textAlignVertical: 'top' }]}
+              placeholder="Image prompt (optional, e.g. wearing bikini at beach)"
+              placeholderTextColor="#555"
+              value={newStylePrompt}
+              onChangeText={setNewStylePrompt}
+              autoCapitalize="none"
+              multiline
+            />
+            <View style={s.keyModalBtns}>
+              <TouchableOpacity style={s.keyModalCancel} onPress={() => setShowAddStyleModal(false)}>
+                <Text style={s.keyModalCancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.keyModalSave, savingStyle && { opacity: 0.6 }]}
+                onPress={addGlobalStyle}
+                disabled={savingStyle}
+              >
+                {savingStyle
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={s.keyModalSaveTxt}>✅ Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -866,4 +1090,29 @@ const s = StyleSheet.create({
     padding: 10, marginBottom: 8,
   },
   serverOfflineTxt: { color: '#f85149', fontSize: 12, textAlign: 'center' },
+  // ── Photo Styles ──────────────────────────────────────────────────────────
+  stylesSectionLabel: {
+    color: '#8b949e', fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
+    textTransform: 'uppercase', marginBottom: 8, marginTop: 4,
+  },
+  styleRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1117', borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 11, marginBottom: 6,
+    borderWidth: 1, borderColor: '#21262d',
+  },
+  styleRowHidden: { borderColor: '#2a1f1f', backgroundColor: '#0d0d0d' },
+  styleRowLabel: { color: '#e6edf3', fontSize: 14, fontWeight: '600' },
+  styleHiddenBadge: { color: '#6e4040', fontSize: 10, marginTop: 2 },
+  stylePromptHint: { color: '#555', fontSize: 11, marginTop: 2 },
+  styleToggleBtn: {
+    width: 36, height: 36, borderRadius: 8,
+    backgroundColor: '#161b22', justifyContent: 'center', alignItems: 'center',
+  },
+  addStyleBtn: {
+    backgroundColor: '#1c2a1c', borderRadius: 10, borderWidth: 1,
+    borderColor: '#238636', borderStyle: 'dashed',
+    paddingVertical: 12, alignItems: 'center', marginTop: 8,
+  },
+  addStyleBtnTxt: { color: '#3fb950', fontWeight: '700', fontSize: 14 },
 });
