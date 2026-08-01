@@ -151,7 +151,13 @@ export default function AIGirlsCloudScreen() {
           setCustomChars(merged);
           await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(merged)).catch(() => {});
         }
-        if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
+        // Load global photo styles from Settings screen (overrides local custom styles)
+        const globalStyles = await getGlobalPhotoStyles().catch(() => null);
+        if (globalStyles && globalStyles.custom.length > 0) {
+          setCustomStyles(globalStyles.custom);
+          await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(globalStyles.custom)).catch(() => {});
+        } else if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
+          // Fallback: old custom_styles Cloudinary meta key
           const merged = [...localStyles];
           for (const cs of cloudStyles) {
             if (!merged.some((s: any) => s.id === cs.id)) merged.push(cs);
