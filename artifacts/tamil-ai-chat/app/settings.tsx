@@ -1120,5 +1120,3 @@ const s = StyleSheet.create({
   },
   addStyleBtnTxt: { color: '#3fb950', fontWeight: '700', fontSize: 14 },
 });
-
----SHA:7da640b22ebe89750535c05430b5fb744585dfd4
