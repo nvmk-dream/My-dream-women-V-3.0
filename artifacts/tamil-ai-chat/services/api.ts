@@ -924,3 +924,32 @@ export async function deleteStyleFolderGlobally(
     return { ok: false };
   }
 }
+
+---SHA:892b43f9b988f052906b9b8f3ebd275a99d564fc
+
+// ── Delete a custom photo-style folder globally from Cloudinary ─────────────
+// Calls DELETE /api/cloudinary/delete-folder which:
+//   a) deletes all assets under my-girls/global_styles/{styleId}/
+//   b) deletes the empty folder itself
+//   c) removes the style entry from the global_photo_styles meta store
+export async function deleteCustomStyleFolder(
+  styleId: string,
+): Promise<{ ok: boolean }> {
+  try {
+    const res = await fetch(`${REPLIT_API}/api/cloudinary/delete-folder`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ styleId }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.warn('[deleteCustomStyleFolder] server error', res.status, txt.slice(0, 200));
+      return { ok: false };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn('[deleteCustomStyleFolder] failed:', styleId, e);
+    return { ok: false };
+  }
+}
+

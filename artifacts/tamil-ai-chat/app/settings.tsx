@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, deleteStyleFolderGlobally, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
+import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, createCloudinaryFolder, deleteCustomStyleFolder, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
 
 const APP_VERSION = '1.2.0';
 const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
@@ -237,6 +237,8 @@ export default function SettingsScreen() {
         custom: [...globalStyles.custom, newEntry],
       };
       await saveGlobalPhotoStyles(updated);
+      // Force Cloudinary folder creation — upload 1×1 placeholder so folder appears in console
+      createCloudinaryFolder('my-girls/global_styles/' + newEntry.id).catch(() => {});
       setGlobalStyles(updated);
       setShowAddStyleModal(false);
       setNewStyleLabel('');
@@ -254,7 +256,7 @@ export default function SettingsScreen() {
       '🗑️ Style Delete',
       isBuiltin
         ? 'இந்த built-in style-ஐ globally hide பண்ணணுமா? (Photos delete ஆகாது)'
-        : 'இந்த custom style-ஐ delete பண்ணணுமா? அனைத்து characters-ல் உள்ள photos-ம் Cloudinary-ல் இருந்து delete ஆகும்.',
+        : 'இந்த custom style-ஐ permanently delete பண்ணணுமா? Cloudinary folder + உள்ளே உள்ள photos யாவும் delete ஆகும்.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -263,14 +265,16 @@ export default function SettingsScreen() {
           onPress: async () => {
             setDeletingStyleId(styleId);
             try {
-              if (!isBuiltin) {
-                await deleteStyleFolderGlobally(styleId);
+              if (isBuiltin) {
+                // Built-in styles: add to hidden list (no Cloudinary deletion)
+                const updated: GlobalPhotoStyles = { ...globalStyles, hidden: [...globalStyles.hidden, styleId] };
+                await saveGlobalPhotoStyles(updated);
+                setGlobalStyles(updated);
+              } else {
+                // Custom styles: real delete — backend removes Cloudinary folder + meta entry atomically
+                await deleteCustomStyleFolder(styleId);
+                setGlobalStyles(prev => ({ ...prev, custom: prev.custom.filter(s => s.id !== styleId) }));
               }
-              const updated: GlobalPhotoStyles = isBuiltin
-                ? { ...globalStyles, hidden: [...globalStyles.hidden, styleId] }
-                : { ...globalStyles, custom: globalStyles.custom.filter(s => s.id !== styleId) };
-              await saveGlobalPhotoStyles(updated);
-              setGlobalStyles(updated);
             } catch {
               Alert.alert('பிழை', 'Delete ஆகல. மீண்டும் try பண்ணுங்க.');
             } finally {
@@ -1116,3 +1120,5 @@ const s = StyleSheet.create({
   },
   addStyleBtnTxt: { color: '#3fb950', fontWeight: '700', fontSize: 14 },
 });
+
+---SHA:7da640b22ebe89750535c05430b5fb744585dfd4

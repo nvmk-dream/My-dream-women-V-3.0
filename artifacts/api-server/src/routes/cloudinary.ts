@@ -516,4 +516,65 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
   return res.json({ ok: true, styleId, charCount: charIds.length, results });
 });
 
+
+// ── DELETE /api/cloudinary/delete-folder ───────────────────────────────────
+// Permanently deletes a custom photo-style global folder from Cloudinary and
+// removes the style entry from the meta store.
+// Cloudinary path: my-girls/global_styles/{styleId}/
+router.delete("/cloudinary/delete-folder", async (req, res) => {
+  const { styleId } = req.body as { styleId?: string };
+  if (!styleId || typeof styleId !== 'string') {
+    return res.status(400).json({ error: 'styleId required' });
+  }
+  const cl = cfg();
+  const folderPath = `my-girls/global_styles/${styleId}`;
+
+  let assetsDeleted = 0;
+  let folderDeleted = false;
+
+  // Step a: Delete all assets inside the style folder using Admin API prefix delete
+  try {
+    const r = await (cl.api as any).delete_resources_by_prefix(`${folderPath}/`);
+    assetsDeleted = Object.keys(r?.deleted ?? {}).length;
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_resources_by_prefix failed');
+  }
+  // Clear any in-memory track cache for this folder
+  trackCache.delete(folderPath);
+
+  // Step b: Delete the now-empty Cloudinary folder itself
+  try {
+    await (cl.api as any).delete_folder(folderPath);
+    folderDeleted = true;
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_folder failed');
+  }
+
+  // Step c: Remove the style entry from the global_photo_styles meta store permanently
+  try {
+    const metaKey = 'global_photo_styles';
+    const info = await cl.api.resource(`my-girls/meta/${metaKey}`, { resource_type: 'raw' });
+    const resp = await fetch(info.secure_url + `?_t=${Date.now()}`);
+    const raw = await resp.json() as { hidden?: string[]; custom?: { id: string }[] };
+    const updated = {
+      hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
+      custom: Array.isArray(raw.custom) ? raw.custom.filter((s: any) => s.id !== styleId) : [],
+    };
+    const b64 = Buffer.from(JSON.stringify(updated)).toString('base64');
+    await cl.uploader.upload(`data:application/json;base64,${b64}`, {
+      public_id: `my-girls/meta/${metaKey}`,
+      resource_type: 'raw',
+      overwrite: true,
+      invalidate: true,
+    } as any);
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'meta update failed — style entry may remain');
+  }
+
+  return res.json({ ok: true, styleId, assetsDeleted, folderDeleted });
+});
+
 export default router;
+
+
+---SHA:5889a366c53696e028cd177c7e3010d1e2cca3cf
