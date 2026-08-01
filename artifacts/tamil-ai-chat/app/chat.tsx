@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 
@@ -521,22 +521,33 @@ export default function ChatScreen() {
 
   const loadCustomStyles = useCallback(async () => {
     try {
-      const [rawCustom, rawHidden] = await Promise.all([
-        AsyncStorage.getItem(CUSTOM_STYLES_KEY),
-        AsyncStorage.getItem(HIDDEN_BUILTIN_KEY),
-      ]);
-      if (rawCustom) {
-        const parsed = JSON.parse(rawCustom);
-        if (Array.isArray(parsed)) {
-          const valid = parsed.filter(s => s && typeof s.id === 'string' && typeof s.label === 'string');
-          setCustomStyles(valid);
+      // Primary: load from global Cloudinary meta (managed via Settings → Photo Styles)
+      const global = await getGlobalPhotoStyles();
+      setCustomStyles(global.custom);
+      setHiddenBuiltinIds(global.hidden);
+      // Mirror to AsyncStorage as offline cache
+      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(global.custom)).catch(() => {});
+      await AsyncStorage.setItem(HIDDEN_BUILTIN_KEY, JSON.stringify(global.hidden)).catch(() => {});
+    } catch {
+      // Fallback: AsyncStorage if Cloudinary unavailable
+      try {
+        const [rawCustom, rawHidden] = await Promise.all([
+          AsyncStorage.getItem(CUSTOM_STYLES_KEY),
+          AsyncStorage.getItem(HIDDEN_BUILTIN_KEY),
+        ]);
+        if (rawCustom) {
+          const parsed = JSON.parse(rawCustom);
+          if (Array.isArray(parsed)) {
+            const valid = parsed.filter(s => s && typeof s.id === 'string' && typeof s.label === 'string');
+            setCustomStyles(valid);
+          }
         }
-      }
-      if (rawHidden) {
-        const parsedHidden = JSON.parse(rawHidden);
-        if (Array.isArray(parsedHidden)) setHiddenBuiltinIds(parsedHidden);
-      }
-    } catch {}
+        if (rawHidden) {
+          const parsedHidden = JSON.parse(rawHidden);
+          if (Array.isArray(parsedHidden)) setHiddenBuiltinIds(parsedHidden);
+        }
+      } catch {}
+    }
   }, []);
 
   useEffect(() => { loadCustomStyles(); }, [loadCustomStyles]);
