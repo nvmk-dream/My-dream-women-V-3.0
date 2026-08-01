@@ -407,4 +407,113 @@ router.post("/cloudinary/create-folder", async (req, res) => {
   }
 });
 
+
+
+// ── GET /api/cloudinary/characters ─────────────────────────────────────────
+// Lists all character IDs (direct sub-folder names under my-girls/)
+router.get("/cloudinary/characters", async (_req, res) => {
+  const cl = cfg();
+  try {
+    const result = await (cl.api as any).sub_folders('my-girls');
+    const ids: string[] = (result?.folders ?? []).map((f: any) => f.name as string);
+    return res.json({ ok: true, characters: ids });
+  } catch {
+    try {
+      const r = await cl.api.resources({
+        type: 'upload', resource_type: 'image',
+        prefix: 'my-girls/', max_results: 500,
+      });
+      const ids = [...new Set(
+        (r?.resources ?? [])
+          .map((x: any) => (x.public_id as string).split('/')[1])
+          .filter(Boolean),
+      )] as string[];
+      return res.json({ ok: true, characters: ids, method: 'prefix-scan' });
+    } catch (err2: any) {
+      return res.status(500).json({ error: String(err2?.message ?? err2) });
+    }
+  }
+});
+
+// ── DELETE /api/cloudinary/delete-style-folder ─────────────────────────────
+// Deletes a photo style folder across ALL character folders:
+//   my-girls/{charId}/{styleId}/ → delete all assets + the empty folder itself
+router.delete("/cloudinary/delete-style-folder", async (req, res) => {
+  const { styleId } = req.body as { styleId?: string };
+  if (!styleId || typeof styleId !== 'string') {
+    return res.status(400).json({ error: 'styleId required' });
+  }
+  const cl = cfg();
+
+  // Collect all character IDs from Cloudinary sub-folders
+  let charIds: string[] = [];
+  try {
+    const result = await (cl.api as any).sub_folders('my-girls');
+    charIds = (result?.folders ?? []).map((f: any) => f.name as string);
+  } catch {
+    try {
+      const r = await cl.api.resources({
+        type: 'upload', resource_type: 'image',
+        prefix: 'my-girls/', max_results: 500,
+      });
+      charIds = [...new Set(
+        (r?.resources ?? [])
+          .map((x: any) => (x.public_id as string).split('/')[1])
+          .filter(Boolean),
+      )] as string[];
+    } catch { /* no chars found */ }
+  }
+
+  const results: { charId: string; deleted: number; folderDeleted: boolean; error?: string }[] = [];
+
+  for (const charId of charIds) {
+    const folder = `my-girls/${charId}/${styleId}`;
+    let deleted = 0;
+    let folderDeleted = false;
+    try {
+      // Collect assets: from track cache first, then Admin API prefix scan
+      let publicIds: string[] = [];
+      try {
+        const tracked = await getTracked(folder, cl);
+        publicIds = tracked.map(t => t.public_id);
+      } catch {}
+      if (publicIds.length === 0) {
+        try {
+          const r = await cl.api.resources({
+            type: 'upload', resource_type: 'image',
+            prefix: folder + '/', max_results: 500,
+          });
+          publicIds = (r?.resources ?? []).map((x: any) => x.public_id as string);
+        } catch {}
+      }
+      // Delete each asset (try image, fallback to video)
+      for (const pid of publicIds) {
+        try {
+          const r: any = await cl.uploader.destroy(pid, { resource_type: 'image', invalidate: true });
+          if (r?.result !== 'ok') {
+            await cl.uploader.destroy(pid, { resource_type: 'video', invalidate: true });
+          }
+          deleted++;
+        } catch {}
+      }
+      // Clear track cache for this folder
+      trackCache.delete(folder);
+      // Delete _keep placeholder if it exists
+      try {
+        await cl.uploader.destroy(`${folder}/_keep`, { resource_type: 'image', invalidate: true });
+      } catch {}
+      // Delete the now-empty folder via Admin API
+      try {
+        await (cl.api as any).delete_folder(folder);
+        folderDeleted = true;
+      } catch {}
+      results.push({ charId, deleted, folderDeleted });
+    } catch (err: any) {
+      results.push({ charId, deleted, folderDeleted, error: String(err?.message ?? err) });
+    }
+  }
+
+  return res.json({ ok: true, styleId, charCount: charIds.length, results });
+});
+
 export default router;
