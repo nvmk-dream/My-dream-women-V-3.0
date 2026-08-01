@@ -216,7 +216,6 @@ export async function sendMessage(
   throw lastError || new Error('பதில் வரல. மீண்டும் try பண்ணுங்க.');
 }
 
-
 export async function pingServer(): Promise<void> {
   try {
     const ctrl = new AbortController();
@@ -598,7 +597,6 @@ export async function flushPendingMeta(): Promise<void> {
   } catch {}
 }
 
-
 export async function listCloudinaryVideos(
   characterName: string,
 ): Promise<{ url: string; public_id: string; format?: string }[]> {
@@ -925,8 +923,6 @@ export async function deleteStyleFolderGlobally(
   }
 }
 
----SHA:892b43f9b988f052906b9b8f3ebd275a99d564fc
-
 // ── Delete a custom photo-style folder globally from Cloudinary ─────────────
 // Calls DELETE /api/cloudinary/delete-folder which:
 //   a) deletes all assets under my-girls/global_styles/{styleId}/
@@ -952,4 +948,3 @@ export async function deleteCustomStyleFolder(
     return { ok: false };
   }
 }
-
