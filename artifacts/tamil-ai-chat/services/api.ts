@@ -877,3 +877,50 @@ export async function createCloudinaryFolder(folderPath: string): Promise<boolea
     return false;
   }
 }
+
+// ── Global Photo Styles ─────────────────────────────────────────────────────
+// Stored in Cloudinary meta key 'global_photo_styles':
+//   { hidden: string[], custom: { id, label, prompt? }[] }
+// Settings screen manages this; all consumers (chat, ai-girls-cloud) read from here.
+
+export type GlobalStyleEntry = { id: string; label: string; prompt?: string };
+export type GlobalPhotoStyles = { hidden: string[]; custom: GlobalStyleEntry[] };
+
+export async function getGlobalPhotoStyles(): Promise<GlobalPhotoStyles> {
+  try {
+    const raw = await getCloudinaryMeta('global_photo_styles') as any;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return {
+        hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
+        custom: Array.isArray(raw.custom) ? raw.custom : [],
+      };
+    }
+  } catch {}
+  return { hidden: [], custom: [] };
+}
+
+export async function saveGlobalPhotoStyles(data: GlobalPhotoStyles): Promise<void> {
+  await setCloudinaryMeta('global_photo_styles', data);
+}
+
+export async function deleteStyleFolderGlobally(
+  styleId: string,
+): Promise<{ ok: boolean; results?: unknown }> {
+  try {
+    const res = await fetch(`${REPLIT_API}/api/cloudinary/delete-style-folder`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ styleId }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.warn('[deleteStyleFolderGlobally] server error', res.status, txt.slice(0, 200));
+      return { ok: false };
+    }
+    const json = await res.json();
+    return { ok: true, results: json.results };
+  } catch (e) {
+    console.warn('[deleteStyleFolderGlobally] failed:', styleId, e);
+    return { ok: false };
+  }
+}
