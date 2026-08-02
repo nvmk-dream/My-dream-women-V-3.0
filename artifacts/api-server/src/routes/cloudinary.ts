@@ -373,37 +373,26 @@ router.post("/cloudinary/create-folder", async (req, res) => {
   }
   const cl = cfg();
 
-  // Method 1: Admin API create_folder (fastest, no asset created)
+  // IMPORTANT: Cloudinary Admin API create_folder() creates an invisible system
+  // entry that does NOT appear in the Media Library console. The ONLY reliable way
+  // to make a folder visible in the Cloudinary console is to upload an actual file.
+  // We use a signed upload (api_key + api_secret) of a 1×1 transparent placeholder
+  // PNG so the folder appears immediately in the console after creation.
   try {
-    await (cl.api as any).create_folder(folderPath);
-    return res.json({ ok: true, folder: folderPath, method: 'admin' });
+    await cl.uploader.upload(
+      `data:image/png;base64,${PLACEHOLDER_B64}`,
+      {
+        public_id: `${folderPath}/placeholder`,
+        resource_type: 'image',
+        overwrite: true,
+        invalidate: true,
+      }
+    );
+    return res.json({ ok: true, folder: folderPath, method: 'signed_upload' });
   } catch (err: any) {
     const msg: string = err?.message || err?.error?.message || JSON.stringify(err).slice(0, 300);
-    // Already exists = success
-    if (msg.includes('already exists') || (err?.http_code ?? err?.error?.http_code) === 409) {
-      return res.json({ ok: true, folder: folderPath, existed: true });
-    }
-    req.log.warn({ err: msg, folderPath }, 'Admin create_folder failed, trying upload fallback');
-  }
-
-  // Method 2: Unsigned upload fallback — upload tiny placeholder to create folder
-  try {
-    // Note: public_id must NOT start with '.' — Cloudinary rejects it.
-    // Use '_keep' as a valid placeholder name.
-    await cl.uploader.unsigned_upload(
-      `data:image/png;base64,${PLACEHOLDER_B64}`,
-      PRESET_NAME,
-      { folder: folderPath, public_id: '_keep', resource_type: 'image' }
-    );
-    return res.json({ ok: true, folder: folderPath, method: 'upload' });
-  } catch (err2: any) {
-    const msg2: string = err2?.message || err2?.error?.message || JSON.stringify(err2).slice(0, 300);
-    // Already exists = success
-    if (msg2.includes('already exists') || (err2?.http_code ?? err2?.error?.http_code) === 409) {
-      return res.json({ ok: true, folder: folderPath, existed: true, method: 'upload' });
-    }
-    req.log.error({ err: msg2, folderPath }, 'Both folder creation methods failed');
-    return res.status(500).json({ error: msg2, folderPath });
+    req.log.error({ err: msg, folderPath }, 'Signed placeholder upload failed');
+    return res.status(500).json({ error: msg, folderPath });
   }
 });
 
