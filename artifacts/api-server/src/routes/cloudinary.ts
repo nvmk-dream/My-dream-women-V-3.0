@@ -298,7 +298,6 @@ router.get("/cloudinary/videos", async (req, res) => {
   }
 });
 
-
 // ── POST /api/cloudinary/track ────────────────────────────────────────────
 // Saves upload metadata to Cloudinary meta (survives Render redeploy + reinstall)
 router.post("/cloudinary/track", async (req, res) => {
@@ -395,8 +394,6 @@ router.post("/cloudinary/create-folder", async (req, res) => {
     return res.status(500).json({ error: msg, folderPath });
   }
 });
-
-
 
 // ── GET /api/cloudinary/characters ─────────────────────────────────────────
 // Lists all character IDs (direct sub-folder names under my-girls/)
@@ -505,7 +502,6 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
   return res.json({ ok: true, styleId, charCount: charIds.length, results });
 });
 
-
 // ── DELETE /api/cloudinary/delete-folder ───────────────────────────────────
 // Permanently deletes a custom photo-style global folder from Cloudinary and
 // removes the style entry from the meta store.
@@ -564,6 +560,3 @@ router.delete("/cloudinary/delete-folder", async (req, res) => {
 });
 
 export default router;
-
-
----SHA:5889a366c53696e028cd177c7e3010d1e2cca3cf
