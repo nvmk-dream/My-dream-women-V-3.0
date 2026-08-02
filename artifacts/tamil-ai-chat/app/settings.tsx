@@ -8,6 +8,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, createCloudinaryFolder, deleteCustomStyleFolder, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
+import { ALL_PERSONAS } from '../constants/personas';
 
 const APP_VERSION = '1.2.0';
 const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
@@ -237,8 +238,12 @@ export default function SettingsScreen() {
         custom: [...globalStyles.custom, newEntry],
       };
       await saveGlobalPhotoStyles(updated);
-      // Force Cloudinary folder creation — upload 1×1 placeholder so folder appears in console
+      // Force Cloudinary folder creation — global reference folder
       createCloudinaryFolder('my-girls/global_styles/' + newEntry.id).catch(() => {});
+      // Create per-character folders so the style appears in Cloud Storage for every AI girl
+      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
+        createCloudinaryFolder(`my-girls/${p.id}/${newEntry.id}`).catch(() => {});
+      });
       setGlobalStyles(updated);
       setShowAddStyleModal(false);
       setNewStyleLabel('');
