@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { ParamsStore } from '../context/params-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -441,10 +442,10 @@ export default function EditCharacterScreen() {
       const existing = existingRaw ? JSON.parse(existingRaw) : {};
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory }));
       await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
-      Alert.alert('✅ கதை Save ஆனது!', 'Story successfully saved.');
-      // Auto-open CHARACTER DETAILS section
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setOpenSections(prev => ({ ...prev, kallaatamEngine: true }));
+      // Navigate to chat — auto-send "கதையில் உள்ள கதாபாத்திரம் என்ன?" and save reply to kChars
+      ParamsStore.setAutoStoryQuery(true);
+      ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
+      router.push('/chat');
     } catch {
       Alert.alert('Error', 'Story save failed. Try again.');
     } finally {
