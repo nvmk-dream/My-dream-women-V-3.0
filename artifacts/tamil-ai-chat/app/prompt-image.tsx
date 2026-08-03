@@ -9,7 +9,11 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateImage } from '../services/api';
+import {
+  generateImage,
+  HF_IMAGE_MODEL,
+  HF_NSFW_MODELS,
+} from '../services/api';
 
 const { width } = Dimensions.get('window');
 
