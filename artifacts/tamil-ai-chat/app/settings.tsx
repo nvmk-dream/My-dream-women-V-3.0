@@ -238,6 +238,22 @@ export default function SettingsScreen() {
         custom: [...globalStyles.custom, newEntry],
       };
       await saveGlobalPhotoStyles(updated);
+      // Save to AsyncStorage immediately — Cloud Storage + Chat screens work offline/instantly
+      try {
+        const styleEntry = { id: newEntry.id, label: newEntry.label, prompt: newEntry.prompt };
+        // cloud_custom_styles key (used by ai-girls-cloud.tsx)
+        const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles').catch(() => null);
+        const cloudList: any[] = cloudRaw ? JSON.parse(cloudRaw) : [];
+        if (!cloudList.some((s: any) => s.id === newEntry.id)) {
+          await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, styleEntry]));
+        }
+        // custom_photo_styles_v1 key (used by chat.tsx)
+        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1').catch(() => null);
+        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
+        if (!chatList.some((s: any) => s.id === newEntry.id)) {
+          await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, styleEntry]));
+        }
+      } catch {}
       // Force Cloudinary folder creation — global reference folder
       createCloudinaryFolder('my-girls/global_styles/' + newEntry.id).catch(() => {});
       // Create per-character folders so the style appears in Cloud Storage for every AI girl
