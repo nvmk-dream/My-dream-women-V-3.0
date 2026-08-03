@@ -9,6 +9,7 @@ let _groupPersonaIds: string[] = [];
 let _editPersonaId: string | null = null;
 let _offlineChatPersonaId: string | null = null;
 let _pendingPhotoStyle: string = '';
+let _autoStoryQuery: boolean = false;
 
 export const ParamsStore = {
   setChatParams: (p: ChatParams) => { _chatParams = p; },
@@ -26,4 +27,8 @@ export const ParamsStore = {
   setPendingPhotoStyle: (style: string) => { _pendingPhotoStyle = style; },
   getPendingPhotoStyle: () => _pendingPhotoStyle,
   clearPendingPhotoStyle: () => { _pendingPhotoStyle = ''; },
+
+  setAutoStoryQuery: (v: boolean) => { _autoStoryQuery = v; },
+  getAutoStoryQuery: () => _autoStoryQuery,
+  clearAutoStoryQuery: () => { _autoStoryQuery = false; },
 };
