@@ -126,7 +126,8 @@ export default function AIGirlsCloudScreen() {
 
 
   // Load custom folders — AsyncStorage first (instant), then merge from Cloudinary (survives reinstall)
-  useEffect(() => {
+  // useFocusEffect: re-runs when navigating back from Settings (picks up newly added styles)
+  useFocusEffect(useCallback(() => {
     const loadFolders = async () => {
       // Step 1: Load from AsyncStorage immediately (fast, works offline)
       const localCharsRaw = await AsyncStorage.getItem(CUSTOM_CHARS_KEY).catch(() => null);
@@ -168,7 +169,7 @@ export default function AIGirlsCloudScreen() {
       } catch { /* cloud fetch failed — local data still shown */ }
     };
     loadFolders();
-  }, []);
+  }, []));
 
   // Base personas
   const basePersonas = ALL_PERSONAS.filter(p => p.gender === 'female').map(p => ({
