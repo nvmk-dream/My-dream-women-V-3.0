@@ -470,10 +470,18 @@ export default function AIGirlsCloudScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
-      // Auto-create Cloudinary folder for current character
-      if (selectedChar) {
-        createCloudinaryFolder(`my-girls/${selectedChar.id}/${id}`).catch(() => {});
-      }
+      // Sync to custom_photo_styles_v1 (used by chat.tsx)
+      try {
+        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
+        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
+        if (!chatList.some((s: any) => s.id === id)) {
+          await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, newStyle]));
+        }
+      } catch {}
+      // Auto-create Cloudinary folder for ALL female personas (global style)
+      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
+        createCloudinaryFolder(`my-girls/${p.id}/${id}`).catch(() => {});
+      });
     }
     Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
@@ -674,13 +682,20 @@ export default function AIGirlsCloudScreen() {
         } catch {}
       }
 
-      // Delete Cloudinary photos in this style folder for the current character
-      if (charSnapshot) {
+      // Sync removal to custom_photo_styles_v1 (used by chat.tsx)
+      try {
+        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
+        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
+        const chatUpdated = chatList.filter((s: any) => s.id !== id);
+        await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify(chatUpdated));
+      } catch {}
+      // Delete Cloudinary photos for ALL female personas (global style)
+      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(async (p) => {
         try {
-          const imgs = await listCloudinaryImages(`my-girls/${charSnapshot.id}/${id}`).catch(() => []);
+          const imgs = await listCloudinaryImages(`my-girls/${p.id}/${id}`).catch(() => []);
           for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
         } catch {}
-      }
+      });
     }
 
     // Clear local photo cache for the deleted folder
