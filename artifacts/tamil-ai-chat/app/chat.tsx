@@ -709,6 +709,62 @@ export default function ChatScreen() {
     }
   }, [persona?.id]);
 
+  // ── கல்லாட்டம்: auto story query — triggered when Story Save navigates here ──
+  useEffect(() => {
+    if (!historyLoaded || persona?.id !== 'kallaatam') return;
+    if (!ParamsStore.getAutoStoryQuery()) return;
+    ParamsStore.clearAutoStoryQuery();
+
+    const queryText = 'கதையில் உள்ள கதாபாத்திரம் என்ன?';
+    const ts = new Date();
+    setMessages(prev => [...prev, {
+      id: `auto-sq-u-${Date.now()}`,
+      role: 'user' as const,
+      content: queryText,
+      timestamp: ts,
+    }]);
+
+    setTimeout(async () => {
+      setLoading(true);
+      try {
+        const storyCtx = todayStory.trim()
+          ? `
+
+கதை:
+${todayStory.trim()}
+
+கதையில் உள்ள ஒவ்வொரு கதாபாத்திரத்தையும் **பெயர்** — [User/AI] format-ல் list செய்.`
+          : '';
+        const introHistory = [{ role: 'user' as const, content: queryText }];
+        const introPrompt = ((persona as any).prompt ?? '') + storyCtx;
+        const reply = await sendMessage(introHistory, provider, introPrompt, 'story');
+        setMessages(prev => [...prev, {
+          id: `auto-sq-a-${Date.now()}`,
+          role: 'assistant' as const,
+          content: reply,
+          timestamp: new Date(),
+        }]);
+        // Extract **Name** patterns → save to kallaatam_engine kChars
+        const names = [...reply.matchAll(/\*\*([^*
+]+)\*\*/g)]
+          .map(m => m[1].trim())
+          .filter(n => n.length > 0);
+        if (names.length > 0) {
+          const raw = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
+          const engine = raw ? JSON.parse(raw) : {};
+          const chars: any[] = Array.isArray(engine.kChars) ? [...engine.kChars] : [];
+          names.forEach((nm, i) => {
+            if (i < chars.length) chars[i] = { ...chars[i], name: nm };
+            else chars.push({ name: nm, role: '', aiPlay: true });
+          });
+          await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: chars })).catch(() => {});
+        }
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    }, 400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyLoaded, persona?.id]);
+
   const toggleDialect = async () => {
     const next = !dialectMode;
     setDialectMode(next);
