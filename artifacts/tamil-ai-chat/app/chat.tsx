@@ -587,10 +587,10 @@ export default function ChatScreen() {
         await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, newStyle]));
       }
     } catch {}
-    // Auto-create Cloudinary folder for current character when new style is added
-    if (personaId) {
-      createCloudinaryFolder(`my-girls/${personaId}/${newStyle.id}`).catch(() => {});
-    }
+    // Auto-create Cloudinary folder for ALL female personas (global style)
+    ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
+      createCloudinaryFolder(`my-girls/${p.id}/${newStyle.id}`).catch(() => {});
+    });
     setNewStyleName('');
     setNewStylePrompt('');
     setShowAddStyleModal(false);
@@ -609,6 +609,13 @@ export default function ChatScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
     }
+    // Sync removal to cloud_custom_styles (used by Cloud Storage screen)
+    try {
+      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
+      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
+      const cloudUpdated = cloudList.filter(s => s.id !== id);
+      await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify(cloudUpdated));
+    } catch {}
   };
 
   const removeBuiltinStyle = async (id: string) => {
