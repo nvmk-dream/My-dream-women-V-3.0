@@ -745,8 +745,7 @@ ${todayStory.trim()}
           timestamp: new Date(),
         }]);
         // Extract **Name** patterns → save to kallaatam_engine kChars
-        const names = [...reply.matchAll(/\*\*([^*
-]+)\*\*/g)]
+        const names = [...reply.matchAll(/\*\*([^*]+)\*\*/g)]
           .map(m => m[1].trim())
           .filter(n => n.length > 0);
         if (names.length > 0) {
