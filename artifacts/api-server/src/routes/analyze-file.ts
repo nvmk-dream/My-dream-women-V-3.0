@@ -392,9 +392,12 @@ router.post("/analyze-file", async (req, res) => {
     }
 
     // If URL provided instead of base64 — fetch from Cloudinary (server-to-server, fast)
+    // 25s timeout prevents hanging indefinitely on slow/large Cloudinary downloads
     if (!fileBase64 && fileUrl) {
       try {
-        const resp = await fetch(fileUrl as string);
+        const dlCtrl = new AbortController();
+        const dlTimer = setTimeout(() => dlCtrl.abort(), 25000);
+        const resp = await fetch(fileUrl as string, { signal: dlCtrl.signal }).finally(() => clearTimeout(dlTimer));
         if (!resp.ok) throw new Error(`URL fetch failed: ${resp.status}`);
         const buf = await resp.arrayBuffer();
         fileBase64 = Buffer.from(buf).toString("base64");
@@ -521,8 +524,16 @@ router.post("/analyze-file", async (req, res) => {
       // Gemini inline supports up to ~20MB; larger videos skip to Groq text.
       if (videoSizeMB < 20) {
         const inlineKeys = allGeminiKeys.slice(0, 3);
+        const videoStartMs = Date.now();
         console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
         for (const inlineKey of inlineKeys) {
+          // Guard: stop trying more keys if we've already used 22s (leaves ~7s buffer before Render's limit)
+          const elapsedMs = Date.now() - videoStartMs;
+          if (elapsedMs > 22000) {
+            console.log(`[analyze-file][video] elapsed ${elapsedMs}ms — time budget full, skipping remaining keys`);
+            videoErrors.push(`Time budget exceeded after ${Math.round(elapsedMs / 1000)}s — skipped remaining keys`);
+            break;
+          }
           try {
             const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 20000 } } as any);
             console.log(`[analyze-file][video] inline key=...${inlineKey.slice(-6)}`);

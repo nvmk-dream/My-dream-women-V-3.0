@@ -1317,9 +1317,12 @@ ${todayStory.trim()}
       }]);
     } catch (e: any) {
       const errMsg = e?.message || 'Unknown error';
+      const isColdStart = e?.name === 'AbortError' || errMsg === 'Aborted' || errMsg === 'Network request failed';
       setMessages(prev => [...prev, {
         id: (Date.now()+1).toString(), role: 'assistant',
-        content: `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`,
+        content: isColdStart
+          ? `${persona.name}: Server கொஞ்சம் தூக்கத்திலிருக்கு ⏳\n\n30-60 seconds wait பண்ணி மீண்டும் அனுப்புங்க!`
+          : `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`,
         timestamp: new Date(),
       }]);
     } finally {
