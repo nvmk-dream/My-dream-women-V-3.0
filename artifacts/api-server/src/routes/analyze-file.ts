@@ -402,7 +402,7 @@ router.post("/analyze-file", async (req, res) => {
         const buf = await resp.arrayBuffer();
         fileBase64 = Buffer.from(buf).toString("base64");
       } catch (fetchErr: any) {
-        return res.status(400).json({ error: `Could not fetch file from URL: ${fetchErr?.message}` });
+        return res.status(400).json({ error: `Could not fetch file from URL: ${fetchErr?.message}`, step: "download" });
       }
     }
 
@@ -696,7 +696,7 @@ router.post("/analyze-file", async (req, res) => {
       error: "fileType must be: image | video | document",
     });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || "File analysis failed" });
+    return res.status(500).json({ error: err.message || "File analysis failed", step: "server" });
   }
 });
 

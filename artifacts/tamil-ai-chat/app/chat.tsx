@@ -1317,12 +1317,23 @@ ${todayStory.trim()}
       }]);
     } catch (e: any) {
       const errMsg = e?.message || 'Unknown error';
+      const step = e?.step as string | undefined;
       const isColdStart = e?.name === 'AbortError' || errMsg === 'Aborted' || errMsg === 'Network request failed';
+
+      let errorContent: string;
+      if (isColdStart) {
+        errorContent = `${persona.name}: ⏳ Server கொஞ்சம் தூக்கத்திலிருக்கு\n\n30-60 seconds wait பண்ணி மீண்டும் அனுப்புங்க!`;
+      } else if (step === 'download') {
+        errorContent = `${persona.name}: ☁️ படி 3 தோல்வி — Video download ஆகல\n\nServer உங்க video-ஐ Cloudinary-லிருந்து download பண்ண முடியல.\n\nகாரணம்: ${errMsg}\n\n💡 மீண்டும் try பண்ணுங்க!`;
+      } else if (step === 'server') {
+        errorContent = `${persona.name}: 🖥️ படி 4 தோல்வி — Server crash\n\nServer-ல் எதோ problem வந்துச்சு.\n\nகாரணம்: ${errMsg}\n\n💡 சில seconds wait பண்ணி மீண்டும் try பண்ணுங்க!`;
+      } else {
+        errorContent = `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`;
+      }
+
       setMessages(prev => [...prev, {
         id: (Date.now()+1).toString(), role: 'assistant',
-        content: isColdStart
-          ? `${persona.name}: Server கொஞ்சம் தூக்கத்திலிருக்கு ⏳\n\n30-60 seconds wait பண்ணி மீண்டும் அனுப்புங்க!`
-          : `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`,
+        content: errorContent,
         timestamp: new Date(),
       }]);
     } finally {

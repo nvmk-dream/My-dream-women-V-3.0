@@ -806,7 +806,9 @@ export async function analyzeFile(params: {
     clearTimeout(timer);
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as any;
-      throw new Error(err?.error || `File analysis failed: ${res.status}`);
+      const e: any = new Error(err?.error || `File analysis failed: ${res.status}`);
+      e.step = err?.step || 'server';
+      throw e;
     }
     const data = await res.json() as any;
     return { reply: data.reply || 'பதில் வரல', docText: data.docText };
