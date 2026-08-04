@@ -13,7 +13,6 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { RichEditor } from 'react-native-pell-rich-editor';
-import { ParamsStore } from '../context/params-store';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
