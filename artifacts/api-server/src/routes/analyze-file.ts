@@ -525,7 +525,8 @@ router.post("/analyze-file", async (req, res) => {
       // Previous bug: only key[0] tried → if quota 429, fell straight to Groq text (no vision).
       // Gemini inline supports up to ~20MB; larger videos skip to Groq text.
       if (videoSizeMB < 20) {
-        const inlineKeys = allGeminiKeys.slice(0, 3);
+        // Try up to 10 keys — quota 429 replies in <1s so many keys fit in 22s budget
+        const inlineKeys = allGeminiKeys.slice(0, 10);
         const videoStartMs = Date.now();
         console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
         for (const inlineKey of inlineKeys) {
@@ -573,8 +574,25 @@ router.post("/analyze-file", async (req, res) => {
       // Note: OpenRouter Qwen video_url NOT supported ("No endpoints found that support input video")
       // Removed to avoid wasting 10s timeout on a guaranteed failure.
 
-      // ── Step 3: Groq text-only fallback
       buildDebugBlock(videoErrors); // logs to console; returns ""
+
+      // ── Quota exhausted? Show clear Tamil message — do NOT use Groq text fallback
+      // Groq text fallback says "I can't see the video, tell me about it" which is confusing.
+      // When the real cause is quota, tell the user directly so they can fix it.
+      const allErrStr = videoErrors.join(" ").toLowerCase();
+      const isQuotaIssue = allErrStr.includes("429") || allErrStr.includes("quota") ||
+        allErrStr.includes("exceeded") || allErrStr.includes("resource_exhausted") ||
+        allErrStr.includes("rate limit");
+      const isKeyIssue = allErrStr.includes("api_key") || allErrStr.includes("invalid") ||
+        allErrStr.includes("401") || allErrStr.includes("403") || allErrStr.includes("unauthenticated");
+
+      if (isQuotaIssue || isKeyIssue) {
+        return res.json({
+          reply: `${characterName}: வீடியோ பாக்க முடியல 😔${classifyErrors(videoErrors)}`,
+        });
+      }
+
+      // ── Step 3: Groq text-only fallback (only for non-quota errors — e.g. format/size issues)
       const groqPrompt = `User shared a video (${fileName}). ${userPrompt ? `They said: "${userPrompt}".` : ""} You can't play the video directly. Respond sweetly in Tamil — express excitement, ask what the video is about, stay in character as ${characterName}.`;
       const groqReply = await tryGroqText(mediaSystemInstruction, groqPrompt);
       if (groqReply) return res.json({ reply: groqReply });
