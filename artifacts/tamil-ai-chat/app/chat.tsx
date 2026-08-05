@@ -62,6 +62,8 @@ import {
 import { saveGeneratedImageToCloud } from './cloud-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
+import { Video, ResizeMode } from 'expo-av';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import * as DocumentPicker from 'expo-document-picker';
@@ -442,6 +444,16 @@ export default function ChatScreen() {
   } | null>(null);
   const [stagingCaption, setStagingCaption] = useState('');
   const [stagingUploading, setStagingUploading] = useState(false);
+
+  // ── Video Trim state ──────────────────────────────────────────────────────
+  const [trimPending, setTrimPending] = useState<{
+    uri: string; durationSec: number; mimeType: string; fileName: string;
+  } | null>(null);
+  const [trimStartSec, setTrimStartSec] = useState(0);
+  const [trimEndSec, setTrimEndSec] = useState(60);
+  const [trimCurrentSec, setTrimCurrentSec] = useState(0);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const trimVideoRef = useRef<any>(null);
   const [showGenModal, setShowGenModal] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState('normal');
@@ -1115,20 +1127,24 @@ ${todayStory.trim()}
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
                 base64: false,
                 quality: 0.8,
-                allowsEditing: true,
-                videoMaxDuration: 20,
               });
               if (result.canceled || !result.assets[0]) return;
               const asset = result.assets[0];
               const isVideo = asset.type === 'video';
 
-              // Validate video duration — 20 seconds limit (native trim handles longer videos)
-              if (isVideo && asset.duration && asset.duration > 20000) {
-                Alert.alert(
-                  '⏱️ Video Too Long',
-                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 20 seconds-க்கு கீழ் clip மட்டும் analyze ஆகும்.\n\nமீண்டும் select பண்ணும்போது trim option வரும் — 20 sec-க்கு trim செய்து அனுப்புங்க!`
-                );
-                return;
+              // If video > 60 seconds — open in-app trim modal (ffmpeg-kit local trim)
+              if (isVideo && asset.duration && asset.duration > 60000) {
+                const durSec = asset.duration / 1000;
+                setTrimStartSec(0);
+                setTrimEndSec(Math.min(60, durSec));
+                setTrimCurrentSec(0);
+                setTrimPending({
+                  uri: asset.uri,
+                  durationSec: durSec,
+                  mimeType: asset.mimeType || 'video/mp4',
+                  fileName: asset.fileName || 'video.mp4',
+                });
+                return; // staging modal opens after trim
               }
 
               // Validate file size — video limit 100MB (File API), image 25MB
@@ -1358,6 +1374,55 @@ ${todayStory.trim()}
       setFileLoading(false);
     }
   }, [stagingMedia, stagingCaption, persona]);
+
+  // ── Trim video locally with ffmpeg-kit, then hand off to staging flow ────────
+  const fmtSec = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const handleTrimAndSend = useCallback(async () => {
+    if (!trimPending) return;
+    setIsTrimming(true);
+    try {
+      const inputUri = trimPending.uri;
+      const outputPath = FileSystem.cacheDirectory + `trim_${Date.now()}.mp4`;
+      const ss = trimStartSec.toFixed(2);
+      const to = trimEndSec.toFixed(2);
+      // -c copy = stream copy (no re-encode, very fast), -avoid_negative_ts 1 = fix timestamps
+      const cmd = `-i "${inputUri}" -ss ${ss} -to ${to} -c copy -avoid_negative_ts 1 "${outputPath}"`;
+
+      const session = await FFmpegKit.execute(cmd);
+      const rc = await session.getReturnCode();
+
+      let finalUri = inputUri;
+      let finalMime = trimPending.mimeType;
+      let finalName = `trimmed_${trimPending.fileName}`;
+
+      if (ReturnCode.isSuccess(rc)) {
+        finalUri = outputPath;
+        finalMime = 'video/mp4';
+      } else {
+        const logs = await session.getAllLogsAsString();
+        console.warn('[trim] FFmpegKit failed:', logs);
+        Alert.alert('⚠️ Trim தோல்வி', 'Full video அனுப்புகிறோம் — 60 sec-க்கு கீழ் clip தேர்ந்தெடுங்க.');
+      }
+
+      // Read trimmed file as base64 and pass to existing staging flow
+      const b64 = await FileSystem.readAsStringAsync(finalUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (!b64 || b64.length < 10) {
+        Alert.alert('❌ Trim File Read பண்ண முடியல', 'மீண்டும் try பண்ணுங்க.');
+        return;
+      }
+      setTrimPending(null);
+      setStagingCaption('');
+      setStagingMedia({ uri: finalUri, isVideo: true, b64, mimeType: finalMime, fileName: finalName });
+    } catch (e: any) {
+      Alert.alert('❌ Trim Error', e?.message || 'மீண்டும் try பண்ணுங்க.');
+    } finally {
+      setIsTrimming(false);
+    }
+  }, [trimPending, trimStartSec, trimEndSec]);
 
 
   const handleSend = useCallback(async () => {
@@ -2855,6 +2920,136 @@ ${todayStory.trim()}
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* ── Video Trim Modal (ffmpeg-kit in-app trim) ── */}
+      <Modal
+        visible={!!trimPending}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTrimPending(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.90)', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            paddingBottom: 36, paddingTop: 4,
+          }}>
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              padding: 16, borderBottomWidth: 1, borderBottomColor: '#2a2a4a',
+            }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>✂️ Video Trim</Text>
+              <TouchableOpacity onPress={() => setTrimPending(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={{ fontSize: 24, color: '#888' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* expo-av Video Preview */}
+            {trimPending && (
+              <Video
+                ref={trimVideoRef}
+                source={{ uri: trimPending.uri }}
+                style={{ width: '100%', height: 200, backgroundColor: '#000' }}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                onPlaybackStatusUpdate={(status: any) => {
+                  if (status.isLoaded) {
+                    setTrimCurrentSec(status.positionMillis / 1000);
+                  }
+                }}
+              />
+            )}
+
+            {/* Current time display */}
+            <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+              <Text style={{ color: '#aaa', fontSize: 12 }}>
+                தற்போதைய நேரம்: <Text style={{ color: '#25D366', fontWeight: '700' }}>
+                  {trimPending ? fmtSec(trimCurrentSec) : '00:00'}
+                </Text>
+                {' '}/ {trimPending ? fmtSec(trimPending.durationSec) : '00:00'}
+              </Text>
+            </View>
+
+            {/* Set Start / Set End buttons */}
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 }}>
+              <TouchableOpacity
+                onPress={() => setTrimStartSec(Math.min(trimCurrentSec, trimEndSec - 1))}
+                style={{
+                  flex: 1, backgroundColor: '#1b5e20', paddingVertical: 12,
+                  borderRadius: 14, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#69f0ae', fontWeight: '700', fontSize: 13 }}>
+                  ▶ Start இங்கே வை
+                </Text>
+                <Text style={{ color: '#69f0ae', fontSize: 11, marginTop: 2 }}>
+                  {fmtSec(trimStartSec)}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTrimEndSec(Math.max(trimCurrentSec, trimStartSec + 1))}
+                style={{
+                  flex: 1, backgroundColor: '#7b1fa2', paddingVertical: 12,
+                  borderRadius: 14, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#ea80fc', fontWeight: '700', fontSize: 13 }}>
+                  ⏹ End இங்கே வை
+                </Text>
+                <Text style={{ color: '#ea80fc', fontSize: 11, marginTop: 2 }}>
+                  {fmtSec(trimEndSec)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Selected range display */}
+            <View style={{
+              marginHorizontal: 16, backgroundColor: '#0d1b2a', borderRadius: 12,
+              padding: 12, marginBottom: 14, alignItems: 'center',
+            }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                {fmtSec(trimStartSec)} → {fmtSec(trimEndSec)}
+                {'  '}
+                <Text style={{ color: '#25D366' }}>
+                  ({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)
+                </Text>
+              </Text>
+              <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+                Video play பண்ணி சரியான நேரத்தில் ▶ Start / ⏹ End button press பண்ணுங்க
+              </Text>
+            </View>
+
+            {/* Action buttons */}
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16 }}>
+              <TouchableOpacity
+                onPress={() => setTrimPending(null)}
+                style={{
+                  flex: 1, backgroundColor: '#2a2a3e', paddingVertical: 14,
+                  borderRadius: 14, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#aaa', fontWeight: '600' }}>ரத்து</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTrimAndSend}
+                disabled={isTrimming}
+                style={{
+                  flex: 2, backgroundColor: isTrimming ? '#555' : '#00897b',
+                  paddingVertical: 14, borderRadius: 14, alignItems: 'center',
+                  flexDirection: 'row', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {isTrimming
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : null}
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
+                  {isTrimming ? 'Trimming...' : '✂️ Trim & Send'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Staging Preview Modal (Photo/Video before send) ── */}
       <Modal
