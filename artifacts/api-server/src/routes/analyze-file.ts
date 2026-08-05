@@ -434,22 +434,27 @@ router.post("/analyze-file", async (req, res) => {
     }
 
     // Helper: classify errors into Tamil-friendly reason for user display
+    // Also appends the raw technical detail so the user can see the actual cause.
     function classifyErrors(apiErrors: string[]): string {
       const all = [...apiErrors, ...envIssues].join(" ").toLowerCase();
+      // Raw detail — last unique error, trimmed to 200 chars
+      const rawDetail = apiErrors.length > 0
+        ? `\n📋 Technical: ${[...new Set(apiErrors)].join(" | ").slice(0, 200)}`
+        : "";
       if (all.includes("429") || all.includes("quota") || all.includes("exceeded") || all.includes("resource_exhausted") || all.includes("rate limit")) {
-        return "\n\n⏳ காரணம்: API quota தீர்ந்துவிட்டது — நாளை மீண்டும் try பண்ணுங்க அல்லது Settings → Keys-ல் புதிய key சேர்க்கவும்.";
+        return `\n\n⏳ காரணம்: API quota தீர்ந்துவிட்டது — நாளை மீண்டும் try பண்ணுங்க அல்லது Settings → Keys-ல் புதிய key சேர்க்கவும்.${rawDetail}`;
       }
       if (all.includes("timeout") || all.includes("timed out") || all.includes("abort") || all.includes("aborted")) {
-        return "\n\n⏱️ காரணம்: Response time out ஆச்சு — சிறிய / குறுகிய video try பண்ணுங்க.";
+        return `\n\n⏱️ காரணம்: Response time out ஆச்சு — சிறிய / குறுகிய video try பண்ணுங்க.${rawDetail}`;
       }
       if (all.includes("api key") || all.includes("api_key") || all.includes("invalid") || all.includes("401") || all.includes("403") || all.includes("unauthenticated") || all.includes("permission_denied")) {
-        return "\n\n🔑 காரணம்: API key valid இல்லை — Settings → Keys-ல் check பண்ணுங்க.";
+        return `\n\n🔑 காரணம்: API key valid இல்லை — Settings → Keys-ல் check பண்ணுங்க.${rawDetail}`;
       }
       if (all.includes("safety") || all.includes("blocked") || all.includes("finish_reason")) {
-        return "\n\n🔒 காரணம்: Safety filter block ஆச்சு — வேற video / photo try பண்ணுங்க.";
+        return `\n\n🔒 காரணம்: Safety filter block ஆச்சு — வேற video / photo try பண்ணுங்க.${rawDetail}`;
       }
       if (apiErrors.length > 0) {
-        return "\n\n🔧 காரணம்: Server error — சற்று நேரம் கழிச்சு மீண்டும் try பண்ணுங்க.";
+        return `\n\n🔧 காரணம்: Server error — சற்று நேரம் கழிச்சு மீண்டும் try பண்ணுங்க.${rawDetail}`;
       }
       return "";
     }
