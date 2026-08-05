@@ -77,7 +77,22 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "./plugins/removeVisualUserSelected"
+      "./plugins/removeVisualUserSelected",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so"
+              ]
+            },
+            "extraMavenRepos": [
+              "https://jitpack.io"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
