@@ -147,6 +147,16 @@ export default function App() {
   const voiceSampleInputRef = useRef<HTMLInputElement>(null);
   const characterAvatarInputRef = useRef<HTMLInputElement>(null);
 
+  // Video Trim Modal state
+  const [showTrimModal, setShowTrimModal] = useState(false);
+  const [trimVideoFile, setTrimVideoFile] = useState<File | null>(null);
+  const [trimVideoUrl, setTrimVideoUrl] = useState("");
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
+  const [trimVideoDuration, setTrimVideoDuration] = useState(0);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const trimVideoRef = useRef<HTMLVideoElement>(null);
+
   // Map fileInputRef to imageInputRef for backward compatibility
   const fileInputRef = imageInputRef;
 
@@ -156,10 +166,7 @@ export default function App() {
   };
 
   // Process Document and Media Uploads with Real Gemini API
-  const handleRealFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "document" | "video") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFileUpload = async (file: File, type: "image" | "document" | "video") => {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
@@ -316,7 +323,98 @@ export default function App() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleRealFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "document" | "video") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processFileUpload(file, type);
     e.target.value = "";
+  };
+
+  // Open trim modal when a video is selected
+  const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setTrimVideoFile(file);
+    setTrimVideoUrl(url);
+    setTrimStart(0);
+    setTrimEnd(0);
+    setTrimVideoDuration(0);
+    setShowTrimModal(true);
+    e.target.value = "";
+  };
+
+  // Extract a video segment via MediaRecorder (browser-native, no library needed)
+  const extractVideoSegment = (videoUrl: string, startSec: number, endSec: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const videoEl = document.createElement("video");
+      videoEl.src = videoUrl;
+      videoEl.muted = true;
+      videoEl.preload = "auto";
+
+      videoEl.onloadedmetadata = () => {
+        videoEl.currentTime = startSec;
+      };
+
+      videoEl.onseeked = () => {
+        const stream =
+          (videoEl as any).captureStream?.() ||
+          (videoEl as any).mozCaptureStream?.();
+        if (!stream) {
+          reject(new Error("captureStream not supported in this browser"));
+          return;
+        }
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+          ? "video/webm;codecs=vp9"
+          : "video/webm";
+        const recorder = new MediaRecorder(stream, { mimeType });
+        const chunks: BlobPart[] = [];
+        recorder.ondataavailable = (ev) => {
+          if (ev.data.size > 0) chunks.push(ev.data);
+        };
+        recorder.onstop = () =>
+          resolve(new Blob(chunks, { type: "video/webm" }));
+        videoEl.play();
+        recorder.start(100);
+        const clipMs = (endSec - startSec) * 1000;
+        setTimeout(() => {
+          recorder.stop();
+          videoEl.pause();
+        }, clipMs);
+      };
+
+      videoEl.onerror = () => reject(new Error("Video load error"));
+    });
+  };
+
+  // Called when user clicks "Trim & Send" in the modal
+  const handleTrimConfirm = async () => {
+    if (!trimVideoFile) return;
+    setIsTrimming(true);
+    try {
+      const endSec = trimEnd > 0 ? trimEnd : trimVideoDuration;
+      let fileToSend: File = trimVideoFile;
+
+      if (trimStart > 0 || (endSec > 0 && endSec < trimVideoDuration)) {
+        const blob = await extractVideoSegment(trimVideoUrl, trimStart, endSec);
+        fileToSend = new File([blob], `trimmed_${trimVideoFile.name}`, {
+          type: "video/webm",
+        });
+      }
+
+      await processFileUpload(fileToSend, "video");
+    } catch (err) {
+      console.error("Trim extraction error, sending original:", err);
+      await processFileUpload(trimVideoFile, "video");
+    } finally {
+      setIsTrimming(false);
+      setShowTrimModal(false);
+      URL.revokeObjectURL(trimVideoUrl);
+      setTrimVideoUrl("");
+      setTrimVideoFile(null);
+    }
   };
 
   // Convert uploaded image file to preview base64 (Keep for backwards compatibility)
@@ -1597,7 +1695,7 @@ export default function App() {
                 <input
                   type="file"
                   ref={videoInputRef}
-                  onChange={(e) => handleRealFileChange(e, "video")}
+                  onChange={(e) => handleVideoFileSelect(e)}
                   accept="video/mp4,video/quicktime,video/webm"
                   className="hidden"
                   id="mobile_video_file_input"
@@ -2067,6 +2165,127 @@ export default function App() {
         </div>
 
       </aside>
+
+      {/* ─── Video Trim Modal ─── */}
+      {showTrimModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col gap-4 p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                ✂️ வீடியோ Trim
+              </h2>
+              <button
+                onClick={() => {
+                  setShowTrimModal(false);
+                  URL.revokeObjectURL(trimVideoUrl);
+                  setTrimVideoUrl("");
+                  setTrimVideoFile(null);
+                }}
+                className="text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Video preview */}
+            <video
+              ref={trimVideoRef}
+              src={trimVideoUrl}
+              controls
+              playsInline
+              className="w-full rounded-xl max-h-48 object-cover bg-black"
+              onLoadedMetadata={(e) => {
+                const dur = (e.currentTarget as HTMLVideoElement).duration;
+                setTrimVideoDuration(dur);
+                setTrimEnd(dur);
+              }}
+            />
+
+            {/* Time info */}
+            <div className="text-center text-emerald-400 text-xs font-semibold">
+              மொத்த நேரம்: {Math.floor(trimVideoDuration / 60).toString().padStart(2,"0")}:{Math.floor(trimVideoDuration % 60).toString().padStart(2,"0")} &nbsp;|&nbsp;
+              தேர்ந்தெடுக்கப்பட்டது: {Math.floor((trimEnd - trimStart) / 60).toString().padStart(2,"0")}:{Math.floor((trimEnd - trimStart) % 60).toString().padStart(2,"0")}
+            </div>
+
+            {/* Start time slider */}
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300 text-xs font-medium">
+                ▶ தொடக்க நேரம்: {Math.floor(trimStart / 60).toString().padStart(2,"0")}:{Math.floor(trimStart % 60).toString().padStart(2,"0")}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={trimVideoDuration}
+                step={0.5}
+                value={trimStart}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (val < trimEnd) {
+                    setTrimStart(val);
+                    if (trimVideoRef.current) trimVideoRef.current.currentTime = val;
+                  }
+                }}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            {/* End time slider */}
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300 text-xs font-medium">
+                ⏹ முடிவு நேரம்: {Math.floor(trimEnd / 60).toString().padStart(2,"0")}:{Math.floor(trimEnd % 60).toString().padStart(2,"0")}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={trimVideoDuration}
+                step={0.5}
+                value={trimEnd}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (val > trimStart) {
+                    setTrimEnd(val);
+                    if (trimVideoRef.current) trimVideoRef.current.currentTime = val;
+                  }
+                }}
+                className="w-full accent-rose-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3 mt-1">
+              <button
+                onClick={() => {
+                  setShowTrimModal(false);
+                  URL.revokeObjectURL(trimVideoUrl);
+                  setTrimVideoUrl("");
+                  setTrimVideoFile(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition"
+              >
+                ரத்து
+              </button>
+              <button
+                onClick={handleTrimConfirm}
+                disabled={isTrimming}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-bold transition flex items-center justify-center gap-2"
+              >
+                {isTrimming ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>Trimming...</span>
+                  </>
+                ) : (
+                  <>✂️ Trim & அனுப்பு</>
+                )}
+              </button>
+            </div>
+
+            <p className="text-slate-500 text-[10px] text-center leading-relaxed">
+              Trim இல்லாமல் முழு video அனுப்ப Start=0, End=மொத்த நேரம் வைத்து அனுப்புங்கள்
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
