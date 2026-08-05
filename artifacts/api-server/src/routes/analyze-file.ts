@@ -8,6 +8,8 @@ const router = Router();
 const GEMINI_ENV_NAMES = [
   "GEMINI_API_KEY",
   "AI_INTEGRATIONS_GEMINI_API_KEY",
+  // Multimedia-specific keys (Render env group "Multimedia(video, Image, document)")
+  ...Array.from({ length: 5 }, (_, i) => `MULTIMEDIA_GEMINI_KEY_${i + 1}`),
   ...Array.from({ length: 12 }, (_, i) => [
     `GEMINI_API_KEY_${i + 1}`,
     `Gemini_key_${i + 1}`,
