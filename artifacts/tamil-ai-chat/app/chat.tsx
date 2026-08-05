@@ -737,7 +737,13 @@ ${todayStory.trim()}
           : '';
         const introHistory = [{ role: 'user' as const, content: queryText }];
         const introPrompt = ((persona as any).prompt ?? '') + storyCtx;
-        const reply = await sendMessage(introHistory, provider, introPrompt, 'story');
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('auto_timeout')), 20000)
+        );
+        const reply = await Promise.race([
+          sendMessage(introHistory, provider, introPrompt, 'story'),
+          timeoutPromise,
+        ]);
         setMessages(prev => [...prev, {
           id: `auto-sq-a-${Date.now()}`,
           role: 'assistant' as const,
@@ -758,8 +764,17 @@ ${todayStory.trim()}
           });
           await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: chars })).catch(() => {});
         }
-      } catch { /* silent */ }
-      finally { setLoading(false); }
+      } catch (e: any) {
+        const isTimeout = e?.message === 'auto_timeout';
+        setMessages(prev => [...prev, {
+          id: `auto-sq-err-${Date.now()}`,
+          role: 'assistant' as const,
+          content: isTimeout
+            ? 'Server busy ஆக உள்ளது. கொஞ்சம் wait பண்ணி மீண்டும் message அனுப்புங்க 🔄'
+            : 'கதாபாத்திரம் load ஆகவில்லை. மீண்டும் try பண்ணுங்க.',
+          timestamp: new Date(),
+        }]);
+      } finally { setLoading(false); }
     }, 400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyLoaded, persona?.id]);
