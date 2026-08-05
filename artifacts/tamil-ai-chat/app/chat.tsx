@@ -1115,16 +1115,18 @@ ${todayStory.trim()}
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
                 base64: false,
                 quality: 0.8,
+                allowsEditing: true,
+                videoMaxDuration: 20,
               });
               if (result.canceled || !result.assets[0]) return;
               const asset = result.assets[0];
               const isVideo = asset.type === 'video';
 
-              // Validate video duration — 45 seconds limit for full analysis
-              if (isVideo && asset.duration && asset.duration > 45000) {
+              // Validate video duration — 20 seconds limit (native trim handles longer videos)
+              if (isVideo && asset.duration && asset.duration > 20000) {
                 Alert.alert(
                   '⏱️ Video Too Long',
-                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 45 seconds-க்கு கீழ் உள்ள clip மட்டும் full analyze ஆகும்.\n\nகுறுகிய clip trim பண்ணி அனுப்புங்க!`
+                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 20 seconds-க்கு கீழ் clip மட்டும் analyze ஆகும்.\n\nமீண்டும் select பண்ணும்போது trim option வரும் — 20 sec-க்கு trim செய்து அனுப்புங்க!`
                 );
                 return;
               }
