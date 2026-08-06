@@ -1388,14 +1388,18 @@ ${todayStory.trim()}
       // react-native-video-trim v8 headless: startTime/endTime in milliseconds
       const result = await videoTrim(trimPending.uri, { startTime: startMs, endTime: endMs });
       if (!result.success) throw new Error('Trim returned success=false');
-      const b64 = await FileSystem.readAsStringAsync(result.outputPath, {
+      // react-native-video-trim returns bare path; FileSystem needs file:// scheme
+      const trimmedUri = result.outputPath.startsWith('file://')
+        ? result.outputPath
+        : `file://${result.outputPath}`;
+      const b64 = await FileSystem.readAsStringAsync(trimmedUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       if (!b64 || b64.length < 10) throw new Error('Trimmed file empty');
       setTrimPending(null);
       setStagingCaption('');
       setStagingMedia({
-        uri: result.outputPath, isVideo: true, b64,
+        uri: trimmedUri, isVideo: true, b64,
         mimeType: 'video/mp4', fileName: `trimmed_${trimPending.fileName}`,
       });
     } catch (e: any) {
