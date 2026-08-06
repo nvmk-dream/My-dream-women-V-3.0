@@ -394,11 +394,11 @@ router.post("/analyze-file", async (req, res) => {
     }
 
     // If URL provided instead of base64 — fetch from Cloudinary (server-to-server, fast)
-    // 25s timeout prevents hanging indefinitely on slow/large Cloudinary downloads
+    // 12s timeout — leaves budget for Gemini File API after download
     if (!fileBase64 && fileUrl) {
       try {
         const dlCtrl = new AbortController();
-        const dlTimer = setTimeout(() => dlCtrl.abort(), 25000);
+        const dlTimer = setTimeout(() => dlCtrl.abort(), 12000);
         const resp = await fetch(fileUrl as string, { signal: dlCtrl.signal }).finally(() => clearTimeout(dlTimer));
         if (!resp.ok) throw new Error(`URL fetch failed: ${resp.status}`);
         const buf = await resp.arrayBuffer();
@@ -441,7 +441,7 @@ router.post("/analyze-file", async (req, res) => {
       const rawDetail = apiErrors.length > 0
         ? `\n📋 Technical: ${[...new Set(apiErrors)].join(" | ").slice(0, 200)}`
         : "";
-      if (all.includes("429") || all.includes("quota") || all.includes("exceeded") || all.includes("resource_exhausted") || all.includes("rate limit")) {
+      if (all.includes("429") || all.includes("quota") || all.includes("resource_exhausted") || all.includes("rate limit") || all.includes("quota exceeded")) {
         return `\n\n⏳ காரணம்: API quota தீர்ந்துவிட்டது — நாளை மீண்டும் try பண்ணுங்க அல்லது Settings → Keys-ல் புதிய key சேர்க்கவும்.${rawDetail}`;
       }
       if (all.includes("timeout") || all.includes("timed out") || all.includes("abort") || all.includes("aborted")) {
@@ -522,28 +522,23 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Inline Gemini — up to 3 keys, 20s timeout each, gemini-2.5-flash only
-      // KEY INSIGHT: 429 quota errors return in <1s → cycling keys is near-free.
-      // Measured: Gemini takes ~15-16s to process a 10MB video inline.
-      // 12s timeout was killing successful requests! 20s is safe.
-      // Budget: download(5s) + Gemini(20s) + Groq(4s) = 29s < Render 30s ✅
-      // Previous bug: only key[0] tried → if quota 429, fell straight to Groq text (no vision).
-      // Gemini inline supports up to ~20MB; larger videos skip to Groq text.
-      if (videoSizeMB < 20) {
-        // Try up to 10 keys — quota 429 replies in <1s so many keys fit in 22s budget
-        const inlineKeys = allGeminiKeys.slice(0, 10);
+      // ── Step 1: Inline Gemini — small videos only (< 10MB), max 3 keys, 15s budget
+      // For larger videos (10-20MB) inline takes 20-25s which pushes total > 30s Render limit.
+      // Those go straight to File API (Step 2) which handles any size without inline timeout.
+      if (videoSizeMB < 10) {
+        const inlineKeys = allGeminiKeys.slice(0, 3);
         const videoStartMs = Date.now();
         console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
         for (const inlineKey of inlineKeys) {
-          // Guard: stop trying more keys if we've already used 22s (leaves ~7s buffer before Render's limit)
+          // Guard: 15s budget — leaves room for File API fallback within Render's limit
           const elapsedMs = Date.now() - videoStartMs;
-          if (elapsedMs > 22000) {
-            console.log(`[analyze-file][video] elapsed ${elapsedMs}ms — time budget full, skipping remaining keys`);
-            videoErrors.push(`Time budget exceeded after ${Math.round(elapsedMs / 1000)}s — skipped remaining keys`);
+          if (elapsedMs > 15000) {
+            console.log(`[analyze-file][video] inline budget used (${elapsedMs}ms) — switching to File API`);
+            videoErrors.push(`Gemini inline timed out after ${Math.round(elapsedMs / 1000)}s`);
             break;
           }
           try {
-            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 20000 } } as any);
+            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 14000 } } as any);
             console.log(`[analyze-file][video] inline key=...${inlineKey.slice(-6)}`);
             const resp = await ai.models.generateContent({
               model: "gemini-2.5-flash",
@@ -566,28 +561,72 @@ router.post("/analyze-file", async (req, res) => {
             const msg = e.message || String(e);
             console.log(`[analyze-file][video] key=...${inlineKey.slice(-6)} failed: ${msg.slice(0, 80)}`);
             videoErrors.push(`inline ...${inlineKey.slice(-6)}: ${msg.slice(0, 100)}`);
-            // Auth error → stop; quota 429 → try next key (fast)
             if (msg.includes("API_KEY") || msg.includes("credential") ||
                 msg.includes("401") || msg.includes("403")) break;
           }
         }
       } else {
-        console.log(`[analyze-file][video] ${videoSizeMB.toFixed(1)}MB ≥ 20MB — too large for inline, Groq fallback`);
-        videoErrors.push(`Video too large for inline (${videoSizeMB.toFixed(1)}MB)`);
+        console.log(`[analyze-file][video] ${videoSizeMB.toFixed(1)}MB ≥ 10MB — skipping inline, using File API`);
+        videoErrors.push(`Video ${videoSizeMB.toFixed(1)}MB — inline skipped, using File API`);
       }
 
-      // Note: OpenRouter Qwen video_url NOT supported ("No endpoints found that support input video")
-      // Removed to avoid wasting 10s timeout on a guaranteed failure.
+      // ── Step 2: Gemini File API — handles large/complex videos that inline can't process ──
+      // Uploads video to Gemini's storage → no inline size/timeout limit → reliable for trimmed videos.
+      // This is the primary path for in-app trimmed videos (typically 10-60MB after trimming).
+      if (allGeminiKeys.length > 0) {
+        const fileApiKeys = allGeminiKeys.slice(0, 3);
+        for (const apiKey of fileApiKeys) {
+          try {
+            console.log(`[analyze-file][video] File API key=...${apiKey.slice(-6)} size=${videoSizeMB.toFixed(1)}MB`);
+            const fai = new GoogleGenAI({ apiKey } as any);
+            // Upload video buffer to Gemini File storage
+            const uploadRes = await (fai.files as any).upload(
+              {
+                data: new Blob([videoBuffer], { type: mimeType || "video/mp4" }),
+                mimeType: mimeType || "video/mp4",
+                displayName: fileName,
+              },
+            );
+            console.log(`[analyze-file][video] File API uploaded name=${uploadRes.name}`);
+            // Wait for Gemini to finish processing (ACTIVE state)
+            const { uri: fileUri } = await waitForActive(fai, uploadRes.name, 90000, 3000);
+            console.log(`[analyze-file][video] File API ACTIVE uri=${fileUri.slice(0, 60)}`);
+            const fResp = await fai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{
+                role: "user",
+                parts: [
+                  { fileData: { fileUri, mimeType: mimeType || "video/mp4" } } as any,
+                  { text: prompt },
+                ],
+              }],
+              config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
+            });
+            const fText = (fResp.text || "").trim();
+            // Clean up uploaded file (best-effort)
+            (fai.files as any).delete({ name: uploadRes.name }).catch(() => {});
+            if (fText) {
+              console.log(`[analyze-file][video] File API success key=...${apiKey.slice(-6)} len=${fText.length}`);
+              return res.json({ reply: fText });
+            }
+            console.log(`[analyze-file][video] File API empty reply — next key`);
+          } catch (e: any) {
+            const msg = e.message || String(e);
+            console.log(`[analyze-file][video] File API failed key=...${apiKey.slice(-6)}: ${msg.slice(0, 80)}`);
+            videoErrors.push(`FileAPI ...${apiKey.slice(-6)}: ${msg.slice(0, 100)}`);
+            if (msg.includes("API_KEY") || msg.includes("401") || msg.includes("403") ||
+                msg.includes("PERMISSION_DENIED")) break;
+          }
+        }
+      }
 
       buildDebugBlock(videoErrors); // logs to console; returns ""
 
-      // ── Quota exhausted? Show clear Tamil message — do NOT use Groq text fallback
-      // Groq text fallback says "I can't see the video, tell me about it" which is confusing.
-      // When the real cause is quota, tell the user directly so they can fix it.
+      // ── Classify failure reason for user display ──────────────────────────────
       const allErrStr = videoErrors.join(" ").toLowerCase();
       const isQuotaIssue = allErrStr.includes("429") || allErrStr.includes("quota") ||
-        allErrStr.includes("exceeded") || allErrStr.includes("resource_exhausted") ||
-        allErrStr.includes("rate limit");
+        allErrStr.includes("resource_exhausted") || allErrStr.includes("rate limit") ||
+        allErrStr.includes("quota exceeded");
       const isKeyIssue = allErrStr.includes("api_key") || allErrStr.includes("invalid") ||
         allErrStr.includes("401") || allErrStr.includes("403") || allErrStr.includes("unauthenticated");
 
