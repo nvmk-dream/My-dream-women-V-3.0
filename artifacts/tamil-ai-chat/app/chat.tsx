@@ -1389,17 +1389,28 @@ ${todayStory.trim()}
       const result = await videoTrim(trimPending.uri, { startTime: startMs, endTime: endMs });
       if (!result.success) throw new Error('Trim returned success=false');
       // react-native-video-trim returns bare path; FileSystem needs file:// scheme
-      const trimmedUri = result.outputPath.startsWith('file://')
+      const outputUri = result.outputPath.startsWith('file://')
         ? result.outputPath
         : `file://${result.outputPath}`;
-      const b64 = await FileSystem.readAsStringAsync(trimmedUri, {
+
+      // The native trimmer's output path can be temporary or inaccessible to
+      // Android's multipart uploader. Copy it into the app cache first so the
+      // upload and the base64 read both use one stable, local MP4.
+      const stableTrimmedUri = `${FileSystem.cacheDirectory}chat_trimmed_${Date.now()}.mp4`;
+      await FileSystem.copyAsync({ from: outputUri, to: stableTrimmedUri });
+      const trimmedInfo = await FileSystem.getInfoAsync(stableTrimmedUri);
+      if (!trimmedInfo.exists || (typeof trimmedInfo.size === 'number' && trimmedInfo.size < 1024)) {
+        throw new Error('Trimmed file could not be copied to app storage');
+      }
+
+      const b64 = await FileSystem.readAsStringAsync(stableTrimmedUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       if (!b64 || b64.length < 10) throw new Error('Trimmed file empty');
       setTrimPending(null);
       setStagingCaption('');
       setStagingMedia({
-        uri: trimmedUri, isVideo: true, b64,
+        uri: stableTrimmedUri, isVideo: true, b64,
         mimeType: 'video/mp4', fileName: `trimmed_${trimPending.fileName}`,
       });
     } catch (e: any) {
