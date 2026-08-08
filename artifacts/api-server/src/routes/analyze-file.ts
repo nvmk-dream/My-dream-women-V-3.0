@@ -522,57 +522,13 @@ router.post("/analyze-file", async (req, res) => {
 
       if (allGeminiKeys.length === 0) videoErrors.push("Gemini API key இல்லை — Home → Keys-ல் சேர்க்கவும்");
 
-      // ── Step 1: Inline Gemini — small videos only (< 10MB), max 3 keys, 15s budget
-      // For larger videos (10-20MB) inline takes 20-25s which pushes total > 30s Render limit.
-      // Those go straight to File API (Step 2) which handles any size without inline timeout.
-      if (videoSizeMB < 10) {
-        const inlineKeys = allGeminiKeys.slice(0, 3);
-        const videoStartMs = Date.now();
-        console.log(`[analyze-file][video] inline path (${videoSizeMB.toFixed(1)}MB) trying ${inlineKeys.length} key(s)`);
-        for (const inlineKey of inlineKeys) {
-          // Guard: 15s budget — leaves room for File API fallback within Render's limit
-          const elapsedMs = Date.now() - videoStartMs;
-          if (elapsedMs > 15000) {
-            console.log(`[analyze-file][video] inline budget used (${elapsedMs}ms) — switching to File API`);
-            videoErrors.push(`Gemini inline timed out after ${Math.round(elapsedMs / 1000)}s`);
-            break;
-          }
-          try {
-            const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 14000 } } as any);
-            console.log(`[analyze-file][video] inline key=...${inlineKey.slice(-6)}`);
-            const resp = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
-              contents: [{
-                role: "user",
-                parts: [
-                  { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } },
-                  { text: prompt },
-                ],
-              }],
-              config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
-            });
-            const text = (resp.text || "").trim();
-            if (text) {
-              console.log(`[analyze-file][video] inline success key=...${inlineKey.slice(-6)} len=${text.length}`);
-              return res.json({ reply: text });
-            }
-            console.log(`[analyze-file][video] key=...${inlineKey.slice(-6)} empty reply — next key`);
-          } catch (e: any) {
-            const msg = e.message || String(e);
-            console.log(`[analyze-file][video] key=...${inlineKey.slice(-6)} failed: ${msg.slice(0, 80)}`);
-            videoErrors.push(`inline ...${inlineKey.slice(-6)}: ${msg.slice(0, 100)}`);
-            if (msg.includes("API_KEY") || msg.includes("credential") ||
-                msg.includes("401") || msg.includes("403")) break;
-          }
-        }
-      } else {
-        console.log(`[analyze-file][video] ${videoSizeMB.toFixed(1)}MB ≥ 10MB — skipping inline, using File API`);
-        videoErrors.push(`Video ${videoSizeMB.toFixed(1)}MB — inline skipped, using File API`);
-      }
-
-      // ── Step 2: Gemini File API — handles large/complex videos that inline can't process ──
-      // Uploads video to Gemini's storage → no inline size/timeout limit → reliable for trimmed videos.
-      // This is the primary path for in-app trimmed videos (typically 10-60MB after trimming).
+      // ── Step 1: Gemini File API — primary path for every video ──────────────
+      // File size is not a reliable proxy for video duration: a compressed 24s
+      // clip can be smaller than a high-bitrate 11s clip. Inline analysis can
+      // therefore hit Gemini's DEADLINE_EXCEEDED time budget even for "small"
+      // files. Uploading to the File API first avoids the sequential inline
+      // timeout path and works consistently for both trimmed and pre-trimmed
+      // videos.
       if (allGeminiKeys.length > 0) {
         const fileApiKeys = allGeminiKeys.slice(0, 3);
         for (const apiKey of fileApiKeys) {
@@ -617,6 +573,34 @@ router.post("/analyze-file", async (req, res) => {
             if (msg.includes("API_KEY") || msg.includes("401") || msg.includes("403") ||
                 msg.includes("PERMISSION_DENIED")) break;
           }
+        }
+      }
+
+      // ── Step 2: Inline Gemini fallback — small files only ───────────────────
+      // Keep a fallback for transient File API failures, but never make this
+      // deadline-prone path the default for longer videos.
+      if (videoSizeMB < 10 && allGeminiKeys.length > 0) {
+        const inlineKey = allGeminiKeys[0];
+        try {
+          const ai = new GoogleGenAI({ apiKey: inlineKey, httpOptions: { timeout: 14000 } } as any);
+          console.log(`[analyze-file][video] inline fallback key=...${inlineKey.slice(-6)}`);
+          const resp = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { data: fileBase64, mimeType: mimeType || "video/mp4" } },
+                { text: prompt },
+              ],
+            }],
+            config: { systemInstruction: mediaSystemInstruction, safetySettings: laxSafety },
+          });
+          const text = (resp.text || "").trim();
+          if (text) return res.json({ reply: text });
+        } catch (e: any) {
+          const msg = e.message || String(e);
+          console.log(`[analyze-file][video] inline fallback failed: ${msg.slice(0, 100)}`);
+          videoErrors.push(`inline fallback: ${msg.slice(0, 120)}`);
         }
       }
 
