@@ -1,37 +1,127 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from "react";
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert,
-  ActivityIndicator, Image, Dimensions, ScrollView, FlatList,
-  Platform, TextInput, Modal, BackHandler, StatusBar,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
-import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Dimensions,
+  ScrollView,
+  FlatList,
+  Platform,
+  TextInput,
+  Modal,
+  BackHandler,
+  StatusBar,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import {
+  Stack,
+  useRouter,
+  useLocalSearchParams,
+  useFocusEffect,
+} from "expo-router";
+import * as MediaLibrary from "expo-media-library";
+import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  uploadUriToCloudinary,
+  listCloudinaryImages,
+  trackCloudinaryUpload,
+  deleteFromCloudinary,
+  getCloudinaryMeta,
+  setCloudinaryMeta,
+} from "../services/api";
+import { ParamsStore } from "../context/params-store";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const COLS = 3;
 const THUMB = (width - (COLS + 1) * 2) / COLS;
 
-interface CloudFile { url: string; public_id: string; isVideo?: boolean }
-interface SubFolder  { id: string; label: string }
+interface CloudFile {
+  url: string;
+  public_id: string;
+  isVideo?: boolean;
+}
+interface SubFolder {
+  id: string;
+  label: string;
+}
 
-const ALBUM_META: Record<string, { label: string; emoji: string; color: string; mediaType: MediaLibrary.MediaTypeValue[] }> = {
-  pictures:    { label: 'Pictures',    emoji: '🖼️',  color: '#4A90D9', mediaType: [MediaLibrary.MediaType.photo] },
-  camera:      { label: 'Camera',      emoji: '📷',  color: '#E8821A', mediaType: [MediaLibrary.MediaType.photo] },
-  movies:      { label: 'Movies',      emoji: '🎬',  color: '#C0392B', mediaType: [MediaLibrary.MediaType.video] },
-  screenshots: { label: 'Screenshots', emoji: '📱',  color: '#27AE60', mediaType: [MediaLibrary.MediaType.photo] },
-  downloads:   { label: 'Downloads',   emoji: '⬇️',  color: '#8E6BBE', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
-  documents:   { label: 'Documents',   emoji: '📄',  color: '#3498DB', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
-  music:       { label: 'Music',       emoji: '🎵',  color: '#9B59B6', mediaType: [MediaLibrary.MediaType.audio] },
-  icons:       { label: 'Icons',       emoji: '🎨',  color: '#FF6B35', mediaType: [MediaLibrary.MediaType.photo] },
-  projects:    { label: 'Projects',    emoji: '💼',  color: '#8E44AD', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
+const ALBUM_META: Record<
+  string,
+  {
+    label: string;
+    emoji: string;
+    color: string;
+    mediaType: MediaLibrary.MediaTypeValue[];
+  }
+> = {
+  pictures: {
+    label: "Pictures",
+    emoji: "🖼️",
+    color: "#4A90D9",
+    mediaType: [MediaLibrary.MediaType.photo],
+  },
+  camera: {
+    label: "Camera",
+    emoji: "📷",
+    color: "#E8821A",
+    mediaType: [MediaLibrary.MediaType.photo],
+  },
+  movies: {
+    label: "Movies",
+    emoji: "🎬",
+    color: "#C0392B",
+    mediaType: [MediaLibrary.MediaType.video],
+  },
+  screenshots: {
+    label: "Screenshots",
+    emoji: "📱",
+    color: "#27AE60",
+    mediaType: [MediaLibrary.MediaType.photo],
+  },
+  downloads: {
+    label: "Downloads",
+    emoji: "⬇️",
+    color: "#8E6BBE",
+    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+  },
+  documents: {
+    label: "Documents",
+    emoji: "📄",
+    color: "#3498DB",
+    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+  },
+  music: {
+    label: "Music",
+    emoji: "🎵",
+    color: "#9B59B6",
+    mediaType: [MediaLibrary.MediaType.audio],
+  },
+  icons: {
+    label: "Icons",
+    emoji: "🎨",
+    color: "#FF6B35",
+    mediaType: [MediaLibrary.MediaType.photo],
+  },
+  projects: {
+    label: "Projects",
+    emoji: "💼",
+    color: "#8E44AD",
+    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+  },
 };
 
-function foldersKey(album: string)           { return `storage_folders_${album}`; }
+function foldersKey(album: string) {
+  return `storage_folders_${album}`;
+}
 function filesKey(album: string, sub?: string) {
   return sub ? `storage_files_${album}_${sub}` : `storage_files_${album}`;
 }
@@ -39,56 +129,78 @@ function filesKey(album: string, sub?: string) {
 export default function GalleryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { album } = useLocalSearchParams<{ album: string }>();
-  const albumKey = (album ?? 'pictures') as string;
+  const { album, mode } = useLocalSearchParams<{
+    album?: string;
+    mode?: string;
+  }>();
+  const albumKey = (album ?? "pictures") as string;
   const meta = ALBUM_META[albumKey] ?? ALBUM_META.pictures;
+  const isChatSelectMode = mode === "chat";
 
   // ── Cloud view state ─────────────────────────────────────────────
-  const [depth, setDepth]               = useState<0 | 1>(0);
+  const [depth, setDepth] = useState<0 | 1>(0);
   const [currentFolder, setCurrentFolder] = useState<SubFolder | null>(null);
-  const [subFolders, setSubFolders]     = useState<SubFolder[]>([]);
-  const [files, setFiles]               = useState<CloudFile[]>([]);
-  const [loading, setLoading]           = useState(false);
-  const [fullView, setFullView]         = useState<CloudFile | null>(null);
-  const [cloudSelIds, setCloudSelIds]   = useState<Set<string>>(new Set());
+  const [subFolders, setSubFolders] = useState<SubFolder[]>([]);
+  const [files, setFiles] = useState<CloudFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fullView, setFullView] = useState<CloudFile | null>(null);
+  const [cloudSelIds, setCloudSelIds] = useState<Set<string>>(new Set());
   const [cloudSelMode, setCloudSelMode] = useState(false);
   const [folderDialog, setFolderDialog] = useState(false);
-  const [folderName, setFolderName]     = useState('');
+  const [folderName, setFolderName] = useState("");
 
   // ── Phone folder browser state ───────────────────────────────────
-  const [showAlbums, setShowAlbums]         = useState(false);
-  const [phoneAlbums, setPhoneAlbums]       = useState<MediaLibrary.Album[]>([]);
-  const [loadingAlbums, setLoadingAlbums]   = useState(false);
-  const [showAssets, setShowAssets]         = useState(false);
-  const [phoneAssets, setPhoneAssets]       = useState<MediaLibrary.Asset[]>([]);
-  const [loadingAssets, setLoadingAssets]   = useState(false);
-  const [selectedAlbumLib, setSelectedAlbumLib] = useState<MediaLibrary.Album | null>(null);
-  const [pickerSel, setPickerSel]           = useState<Set<string>>(new Set());
-  const [uploading, setUploading]           = useState(false);
+  const [showAlbums, setShowAlbums] = useState(false);
+  const [phoneAlbums, setPhoneAlbums] = useState<MediaLibrary.Album[]>([]);
+  const [loadingAlbums, setLoadingAlbums] = useState(false);
+  const [showAssets, setShowAssets] = useState(false);
+  const [phoneAssets, setPhoneAssets] = useState<MediaLibrary.Asset[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [selectedAlbumLib, setSelectedAlbumLib] =
+    useState<MediaLibrary.Album | null>(null);
+  const [pickerSel, setPickerSel] = useState<Set<string>>(new Set());
+  const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadTotal, setUploadTotal]       = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
 
   // ── MediaLibrary permission ──────────────────────────────────────
   const [mlPermission, requestMlPermission] = MediaLibrary.usePermissions();
 
   const depthRef = React.useRef(depth);
-  useEffect(() => { depthRef.current = depth; }, [depth]);
+  useEffect(() => {
+    depthRef.current = depth;
+  }, [depth]);
 
-  useFocusEffect(useCallback(() => {
-    const onBack = () => {
-      if (showAssets) { setShowAssets(false); return true; }
-      if (showAlbums) { setShowAlbums(false); return true; }
-      if (depthRef.current === 1) { goUp(); return true; }
-      router.back(); return false;
-    };
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
-    return () => sub.remove();
-  }, [router, showAlbums, showAssets]));
+  useFocusEffect(
+    useCallback(() => {
+      const onBack = () => {
+        if (showAssets) {
+          setShowAssets(false);
+          return true;
+        }
+        if (showAlbums) {
+          setShowAlbums(false);
+          if (isChatSelectMode) router.back();
+          return true;
+        }
+        if (depthRef.current === 1) {
+          goUp();
+          return true;
+        }
+        router.back();
+        return false;
+      };
+      const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+      return () => sub.remove();
+    }, [router, showAlbums, showAssets, isChatSelectMode]),
+  );
 
   useEffect(() => {
     const loadFolders = async () => {
       // Step 1: AsyncStorage — instant load (works offline)
-      const localRaw = await AsyncStorage.getItem(foldersKey(albumKey)).catch(() => null);
+      const localRaw = await AsyncStorage.getItem(foldersKey(albumKey)).catch(
+        () => null,
+      );
       const local: SubFolder[] = localRaw ? JSON.parse(localRaw) : [];
       if (local.length) setSubFolders(local);
       // Step 2: Cloudinary meta — merge & restore after reinstall
@@ -97,12 +209,17 @@ export default function GalleryScreen() {
         if (Array.isArray(cloud) && cloud.length > 0) {
           const merged = [...local];
           for (const cf of cloud as SubFolder[]) {
-            if (!merged.some(f => f.id === cf.id)) merged.push(cf);
+            if (!merged.some((f) => f.id === cf.id)) merged.push(cf);
           }
           setSubFolders(merged);
-          await AsyncStorage.setItem(foldersKey(albumKey), JSON.stringify(merged)).catch(() => {});
+          await AsyncStorage.setItem(
+            foldersKey(albumKey),
+            JSON.stringify(merged),
+          ).catch(() => {});
         }
-      } catch { /* cloud offline — local still shown */ }
+      } catch {
+        /* cloud offline — local still shown */
+      }
     };
     loadFolders();
   }, [albumKey]);
@@ -111,30 +228,44 @@ export default function GalleryScreen() {
     if (depth === 0) loadCloudFiles(undefined);
   }, [depth, albumKey]);
 
+  useEffect(() => {
+    if (!isChatSelectMode) return;
+    const timer = setTimeout(() => {
+      openFolderBrowser();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isChatSelectMode]);
+
   // ── Load uploaded cloud files ────────────────────────────────────
-  const loadCloudFiles = useCallback(async (sub?: SubFolder) => {
-    setLoading(true);
-    setFiles([]);
-    try {
-      const key = filesKey(albumKey, sub?.id);
-      const cached = await AsyncStorage.getItem(key);
-      const local: CloudFile[] = cached ? JSON.parse(cached) : [];
-      if (local.length > 0) setFiles(local);
+  const loadCloudFiles = useCallback(
+    async (sub?: SubFolder) => {
+      setLoading(true);
+      setFiles([]);
       try {
-        const folder = sub
-          ? `my-girls/storage/${albumKey}/${sub.id}`
-          : `my-girls/storage/${albumKey}`;
-        const cloud = await listCloudinaryImages(folder);
-        if (cloud.length > 0) {
-          const cloudIds = new Set(cloud.map(p => p.public_id));
-          const merged = [...cloud, ...local.filter(p => !cloudIds.has(p.public_id))];
-          setFiles(merged);
-          await AsyncStorage.setItem(key, JSON.stringify(merged));
-        }
+        const key = filesKey(albumKey, sub?.id);
+        const cached = await AsyncStorage.getItem(key);
+        const local: CloudFile[] = cached ? JSON.parse(cached) : [];
+        if (local.length > 0) setFiles(local);
+        try {
+          const folder = sub
+            ? `my-girls/storage/${albumKey}/${sub.id}`
+            : `my-girls/storage/${albumKey}`;
+          const cloud = await listCloudinaryImages(folder);
+          if (cloud.length > 0) {
+            const cloudIds = new Set(cloud.map((p) => p.public_id));
+            const merged = [
+              ...cloud,
+              ...local.filter((p) => !cloudIds.has(p.public_id)),
+            ];
+            setFiles(merged);
+            await AsyncStorage.setItem(key, JSON.stringify(merged));
+          }
+        } catch {}
       } catch {}
-    } catch {}
-    setLoading(false);
-  }, [albumKey]);
+      setLoading(false);
+    },
+    [albumKey],
+  );
 
   const goIntoFolder = (folder: SubFolder) => {
     setCurrentFolder(folder);
@@ -153,10 +284,10 @@ export default function GalleryScreen() {
   const pickIconWithCrop = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
+      Alert.alert("Permission வேணும்", "Gallery access allow பண்ணுங்க");
       return;
     }
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 300));
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -173,28 +304,43 @@ export default function GalleryScreen() {
       const folder = currentFolder
         ? `my-girls/storage/${albumKey}/${currentFolder.id}`
         : `my-girls/storage/${albumKey}`;
-      const uploaded = await uploadUriToCloudinary(asset.uri, 'image/jpeg', folder);
-      const cloudFile: CloudFile = { url: uploaded.url, public_id: uploaded.public_id };
-      trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
+      const uploaded = await uploadUriToCloudinary(
+        asset.uri,
+        "image/jpeg",
+        folder,
+      );
+      const cloudFile: CloudFile = {
+        url: uploaded.url,
+        public_id: uploaded.public_id,
+      };
+      trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(
+        () => {},
+      );
 
       const key = filesKey(albumKey, currentFolder?.id);
       const existing = await AsyncStorage.getItem(key).catch(() => null);
       const prev: CloudFile[] = existing ? JSON.parse(existing) : [];
-      const updated = [cloudFile, ...prev.filter(f => f.public_id !== cloudFile.public_id)];
+      const updated = [
+        cloudFile,
+        ...prev.filter((f) => f.public_id !== cloudFile.public_id),
+      ];
       await AsyncStorage.setItem(key, JSON.stringify(updated));
       setFiles(updated);
       setUploadProgress(1);
 
       Alert.alert(
-        '✅ Icon Upload ஆச்சு!',
-        '1:1 crop பண்ணி Icons folder-ல் save ஆச்சு.\n\nSettings-ல் இந்த icon-ஐ App Icon-ஆ set பண்ணி Build trigger பண்ணலாம்.',
+        "✅ Icon Upload ஆச்சு!",
+        "1:1 crop பண்ணி Icons folder-ல் save ஆச்சு.\n\nSettings-ல் இந்த icon-ஐ App Icon-ஆ set பண்ணி Build trigger பண்ணலாம்.",
         [
-          { text: 'OK', style: 'cancel' },
-          { text: '⚙️ Settings-க்கு போ', onPress: () => router.push('/settings') },
+          { text: "OK", style: "cancel" },
+          {
+            text: "⚙️ Settings-க்கு போ",
+            onPress: () => router.push("/settings"),
+          },
         ],
       );
     } catch (e: any) {
-      Alert.alert('Upload பிழை', e?.message || 'மீண்டும் try பண்ணுங்க');
+      Alert.alert("Upload பிழை", e?.message || "மீண்டும் try பண்ணுங்க");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -223,9 +369,9 @@ export default function GalleryScreen() {
 
     if (!granted) {
       Alert.alert(
-        'Permission வேணும்',
-        'Settings > Apps > My Girls > Permissions > Files & Media > Allow all\n\nAllow பண்ணிட்டு App close செய்து மீண்டும் திறங்க.',
-        [{ text: 'OK' }],
+        "Permission வேணும்",
+        "Settings > Apps > My Girls > Permissions > Files & Media > Allow all\n\nAllow பண்ணிட்டு App close செய்து மீண்டும் திறங்க.",
+        [{ text: "OK" }],
       );
       return;
     }
@@ -236,22 +382,24 @@ export default function GalleryScreen() {
     let retried = false;
     const loadAlbums = async () => {
       try {
-        const all = await MediaLibrary.getAlbumsAsync({ includeSmartAlbums: true });
+        const all = await MediaLibrary.getAlbumsAsync({
+          includeSmartAlbums: true,
+        });
         all.sort((a, b) => (b.assetCount ?? 0) - (a.assetCount ?? 0));
         setPhoneAlbums(all);
       } catch (e: any) {
-        const msg: string = e?.message ?? '';
-        if (!retried && msg.toLowerCase().includes('permission')) {
+        const msg: string = e?.message ?? "";
+        if (!retried && msg.toLowerCase().includes("permission")) {
           // Permission just granted but Android hasn't propagated yet — retry once
           retried = true;
-          await new Promise(r => setTimeout(r, 800));
+          await new Promise((r) => setTimeout(r, 800));
           await MediaLibrary.requestPermissionsAsync();
           return loadAlbums();
         }
         Alert.alert(
-          'Permission பிழை',
-          'Settings > Apps > My Girls > Permissions > Files & Media > Allow all\nApp close செய்து மீண்டும் திறங்க.',
-          [{ text: 'OK' }],
+          "Permission பிழை",
+          "Settings > Apps > My Girls > Permissions > Files & Media > Allow all\nApp close செய்து மீண்டும் திறங்க.",
+          [{ text: "OK" }],
         );
         setShowAlbums(false);
       }
@@ -267,15 +415,26 @@ export default function GalleryScreen() {
     setLoadingAssets(true);
     setShowAssets(true);
     try {
-      const page = await MediaLibrary.getAssetsAsync({
-        album: lib,
-        mediaType: meta.mediaType,
-        first: 300,
-        sortBy: MediaLibrary.SortBy.creationTime,
-      });
-      setPhoneAssets(page.assets);
+      const allAssets: MediaLibrary.Asset[] = [];
+      let after: string | undefined;
+      let hasNextPage = true;
+      while (hasNextPage) {
+        const page = await MediaLibrary.getAssetsAsync({
+          album: lib,
+          mediaType: isChatSelectMode
+            ? [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video]
+            : meta.mediaType,
+          first: 300,
+          after,
+          sortBy: MediaLibrary.SortBy.creationTime,
+        });
+        allAssets.push(...page.assets);
+        hasNextPage = page.hasNextPage;
+        after = page.endCursor;
+      }
+      setPhoneAssets(allAssets);
     } catch (e: any) {
-      Alert.alert('பிழை', 'Files load ஆகல: ' + (e?.message ?? ''));
+      Alert.alert("பிழை", "Files load ஆகல: " + (e?.message ?? ""));
       setShowAssets(false);
     }
     setLoadingAssets(false);
@@ -283,33 +442,80 @@ export default function GalleryScreen() {
 
   // ── Toggle file selection in picker ─────────────────────────────
   const togglePickerSel = (id: string) => {
-    setPickerSel(prev => {
+    setPickerSel((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   // ── Confirm selection → Cut / Copy ──────────────────────────────
   const confirmSelection = () => {
-    if (pickerSel.size === 0) { Alert.alert('Files தேர்வு பண்ணுங்க'); return; }
+    if (pickerSel.size === 0) {
+      Alert.alert("Files தேர்வு பண்ணுங்க");
+      return;
+    }
+
+    if (isChatSelectMode) {
+      const selected = phoneAssets.find((asset) => pickerSel.has(asset.id));
+      if (!selected) return;
+      const isVideo = selected.mediaType === MediaLibrary.MediaType.video;
+      const extension = selected.filename?.split(".").pop()?.toLowerCase();
+      const mimeType = isVideo
+        ? extension
+          ? `video/${extension === "mov" ? "quicktime" : extension}`
+          : "video/mp4"
+        : extension
+          ? `image/${extension === "jpg" ? "jpeg" : extension}`
+          : "image/jpeg";
+
+      ParamsStore.setPendingGalleryMedia({
+        uri: selected.uri,
+        isVideo,
+        mimeType,
+        fileName:
+          selected.filename ||
+          (isVideo ? "phone_video.mp4" : "phone_photo.jpg"),
+        durationSec:
+          isVideo && selected.duration ? selected.duration : undefined,
+      });
+      setShowAssets(false);
+      setShowAlbums(false);
+      router.back();
+      return;
+    }
+
     const count = pickerSel.size;
     Alert.alert(
-      `${count} file${count > 1 ? 's' : ''} select ஆச்சு`,
-      'Cloud-ல் எப்படி save பண்ணணும்?',
+      `${count} file${count > 1 ? "s" : ""} select ஆச்சு`,
+      "Cloud-ல் எப்படி save பண்ணணும்?",
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: '📋 Copy  (Phone-ல் இருக்கும்)',
-          onPress: () => { setShowAssets(false); setShowAlbums(false); doMediaUpload('copy'); } },
-        { text: '✂️ Cut  (Phone-ல் delete ஆகும்)', style: 'destructive',
-          onPress: () => { setShowAssets(false); setShowAlbums(false); doMediaUpload('cut'); } },
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "📋 Copy  (Phone-ல் இருக்கும்)",
+          onPress: () => {
+            setShowAssets(false);
+            setShowAlbums(false);
+            doMediaUpload("copy");
+          },
+        },
+        {
+          text: "✂️ Cut  (Phone-ல் delete ஆகும்)",
+          style: "destructive",
+          onPress: () => {
+            setShowAssets(false);
+            setShowAlbums(false);
+            doMediaUpload("cut");
+          },
+        },
       ],
     );
   };
 
   // ── Upload selected MediaLibrary assets ─────────────────────────
-  const doMediaUpload = async (mode: 'copy' | 'cut') => {
-    const selected = phoneAssets.filter(a => pickerSel.has(a.id));
+  const doMediaUpload = async (mode: "copy" | "cut") => {
+    const selected = phoneAssets.filter((a) => pickerSel.has(a.id));
     if (!selected.length) return;
 
     const total = selected.length;
@@ -325,8 +531,10 @@ export default function GalleryScreen() {
     const failures: { name: string; reason: string }[] = [];
 
     // Lazy-import expo-file-system/legacy for content:// → file:// cache copy
-    const Legacy = await import('expo-file-system/legacy').catch(() => null as any);
-    const cacheDir = Legacy?.cacheDirectory || '';
+    const Legacy = await import("expo-file-system/legacy").catch(
+      () => null as any,
+    );
+    const cacheDir = Legacy?.cacheDirectory || "";
 
     for (let i = 0; i < selected.length; i++) {
       const asset = selected[i];
@@ -343,34 +551,52 @@ export default function GalleryScreen() {
           localUri = asset.uri;
         }
         const srcUri = localUri;
-        if (!srcUri) throw new Error('URI கிடைக்கல');
-        const mime   = asset.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+        if (!srcUri) throw new Error("URI கிடைக்கல");
+        const mime = asset.mediaType === "video" ? "video/mp4" : "image/jpeg";
 
         // HMOS fix: copy content:// → file:// in app cache so upload works reliably
         let uploadUri = srcUri;
-        if (Legacy && cacheDir && (srcUri.startsWith('content://') || srcUri.startsWith('ph://'))) {
-          const ext = asset.mediaType === 'video' ? 'mp4' : 'jpg';
+        if (
+          Legacy &&
+          cacheDir &&
+          (srcUri.startsWith("content://") || srcUri.startsWith("ph://"))
+        ) {
+          const ext = asset.mediaType === "video" ? "mp4" : "jpg";
           cachedTmp = `${cacheDir}upload_${Date.now()}_${i}.${ext}`;
           try {
             await Legacy.copyAsync({ from: srcUri, to: cachedTmp });
             uploadUri = cachedTmp;
           } catch (copyErr: any) {
             // copy failed — fall back to original URI (upload may still try)
-            console.warn('Cache copy failed, using original URI:', copyErr?.message);
+            console.warn(
+              "Cache copy failed, using original URI:",
+              copyErr?.message,
+            );
             cachedTmp = null;
           }
         }
 
         const result = await uploadUriToCloudinary(uploadUri, mime, folder);
-        uploaded.push({ cloudFile: { url: result.url, public_id: result.public_id, isVideo: asset.mediaType === 'video' }, asset });
-        trackCloudinaryUpload(folder, result.public_id, result.url).catch(() => {});
+        uploaded.push({
+          cloudFile: {
+            url: result.url,
+            public_id: result.public_id,
+            isVideo: asset.mediaType === "video",
+          },
+          asset,
+        });
+        trackCloudinaryUpload(folder, result.public_id, result.url).catch(
+          () => {},
+        );
       } catch (e: any) {
-        const reason = (e?.message || String(e) || 'unknown').slice(0, 120);
+        const reason = (e?.message || String(e) || "unknown").slice(0, 120);
         failures.push({ name: fname, reason });
         console.warn(`Upload failed for asset ${i} (${fname}):`, reason);
       } finally {
         if (cachedTmp && Legacy) {
-          try { await Legacy.deleteAsync(cachedTmp, { idempotent: true }); } catch {}
+          try {
+            await Legacy.deleteAsync(cachedTmp, { idempotent: true });
+          } catch {}
         }
       }
       setUploadProgress(i + 1);
@@ -381,8 +607,10 @@ export default function GalleryScreen() {
       const key = filesKey(albumKey, currentFolder?.id);
       const existing = await AsyncStorage.getItem(key).catch(() => null);
       const prev: CloudFile[] = existing ? JSON.parse(existing) : [];
-      const existingIds = new Set(prev.map(f => f.public_id));
-      const newOnes = uploaded.map(u => u.cloudFile).filter(f => !existingIds.has(f.public_id));
+      const existingIds = new Set(prev.map((f) => f.public_id));
+      const newOnes = uploaded
+        .map((u) => u.cloudFile)
+        .filter((f) => !existingIds.has(f.public_id));
       const updated = [...newOnes, ...prev];
       await AsyncStorage.setItem(key, JSON.stringify(updated));
       setFiles(updated);
@@ -390,12 +618,14 @@ export default function GalleryScreen() {
 
     // Cut: delete from phone
     let cutDeleteFailed = false;
-    if (mode === 'cut' && uploaded.length > 0) {
+    if (mode === "cut" && uploaded.length > 0) {
       try {
         // deleteAssetsAsync resolves to a boolean — on Android 11+, if the user
         // dismisses the system delete-confirmation dialog, it resolves to
         // `false` instead of throwing. We must check this, not just await it.
-        const deleted = await MediaLibrary.deleteAssetsAsync(uploaded.map(u => u.asset));
+        const deleted = await MediaLibrary.deleteAssetsAsync(
+          uploaded.map((u) => u.asset),
+        );
         if (!deleted) {
           cutDeleteFailed = true;
         }
@@ -405,7 +635,7 @@ export default function GalleryScreen() {
       }
       if (cutDeleteFailed) {
         Alert.alert(
-          '⚠️ Delete பண்ண முடியல',
+          "⚠️ Delete பண்ண முடியல",
           'Upload ஆச்சு ✅ ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணுங்க, அல்லது Settings → My Girls → Permissions → Files → Delete முடிக்கணும்.',
         );
       }
@@ -417,24 +647,30 @@ export default function GalleryScreen() {
     setPickerSel(new Set());
 
     const reasonsText = failures.length
-      ? '\n\nFail reasons:\n' + failures.slice(0, 3).map(f => `• ${f.name}: ${f.reason}`).join('\n')
-      : '';
+      ? "\n\nFail reasons:\n" +
+        failures
+          .slice(0, 3)
+          .map((f) => `• ${f.name}: ${f.reason}`)
+          .join("\n")
+      : "";
     if (uploaded.length === 0 && total > 0) {
-      Alert.alert('❌ Upload பிழை', `0/${total} files saved.` + reasonsText);
-    } else if (!(mode === 'cut')) {
+      Alert.alert("❌ Upload பிழை", `0/${total} files saved.` + reasonsText);
+    } else if (!(mode === "cut")) {
       Alert.alert(
-        failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
+        failures.length ? "⚠️ Partial Upload" : "✅ Upload ஆச்சு!",
         `${uploaded.length}/${total} files cloud-ல் save ஆச்சு.` + reasonsText,
       );
     } else if (uploaded.length > 0 && !cutDeleteFailed) {
       Alert.alert(
-        failures.length ? '⚠️ Partial Cut' : '✅ Cut & Upload ஆச்சு!',
-        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` + reasonsText,
+        failures.length ? "⚠️ Partial Cut" : "✅ Cut & Upload ஆச்சு!",
+        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` +
+          reasonsText,
       );
     } else if (uploaded.length > 0 && cutDeleteFailed) {
       Alert.alert(
-        '⚠️ Upload ஆச்சு, ஆனா Delete ஆகல',
-        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு. Phone-ல் இன்னும் இருக்கும்.` + reasonsText,
+        "⚠️ Upload ஆச்சு, ஆனா Delete ஆகல",
+        `${uploaded.length}/${total} files cloud-ல் save ஆச்சு. Phone-ல் இன்னும் இருக்கும்.` +
+          reasonsText,
       );
     }
   };
@@ -442,15 +678,18 @@ export default function GalleryScreen() {
   // ── New cloud sub-folder ─────────────────────────────────────────
   const confirmNewFolder = async () => {
     const name = folderName.trim();
-    if (!name) { Alert.alert('பிழை', 'Folder பெயர் உள்ளிடுங்க'); return; }
-    const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+    if (!name) {
+      Alert.alert("பிழை", "Folder பெயர் உள்ளிடுங்க");
+      return;
+    }
+    const id = name.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
     const updated = [...subFolders, { id, label: name }];
     setSubFolders(updated);
     await AsyncStorage.setItem(foldersKey(albumKey), JSON.stringify(updated));
     setCloudinaryMeta(`gallery_folders_${albumKey}`, updated).catch(() => {}); // cloud backup
     setFolderDialog(false);
-    setFolderName('');
-    Alert.alert('✅', `"${name}" folder உருவாக்கப்பட்டது!`);
+    setFolderName("");
+    Alert.alert("✅", `"${name}" folder உருவாக்கப்பட்டது!`);
   };
 
   // ── Delete selected cloud files ──────────────────────────────────
@@ -458,11 +697,15 @@ export default function GalleryScreen() {
     const ids = [...cloudSelIds];
     setCloudSelMode(false);
     setCloudSelIds(new Set());
-    for (const id of ids) { try { await deleteFromCloudinary(id); } catch {} }
+    for (const id of ids) {
+      try {
+        await deleteFromCloudinary(id);
+      } catch {}
+    }
     const key = filesKey(albumKey, currentFolder?.id);
     const idSet = new Set(ids);
-    setFiles(prev => {
-      const updated = prev.filter(f => !idSet.has(f.public_id));
+    setFiles((prev) => {
+      const updated = prev.filter((f) => !idSet.has(f.public_id));
       AsyncStorage.setItem(key, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
@@ -471,33 +714,60 @@ export default function GalleryScreen() {
   // ─────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────
-  const headerTitle = depth === 1 && currentFolder
-    ? `${meta.emoji} ${currentFolder.label}`
-    : `${meta.emoji} ${meta.label}`;
+  const headerTitle =
+    depth === 1 && currentFolder
+      ? `${meta.emoji} ${currentFolder.label}`
+      : isChatSelectMode
+        ? "📂 Select Photo / Video"
+        : `${meta.emoji} ${meta.label}`;
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+    <SafeAreaView style={s.safe} edges={["bottom"]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity onPress={depth === 1 ? goUp : () => router.back()} style={s.backBtn}>
-          <Text style={s.backTxt}>{depth === 1 ? '‹ Back' : '‹'}</Text>
+      <View
+        style={[
+          s.header,
+          { backgroundColor: meta.color, paddingTop: insets.top + 14 },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={depth === 1 ? goUp : () => router.back()}
+          style={s.backBtn}
+        >
+          <Text style={s.backTxt}>{depth === 1 ? "‹ Back" : "‹"}</Text>
         </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        {cloudSelMode
-          ? <TouchableOpacity onPress={() => { setCloudSelMode(false); setCloudSelIds(new Set()); }} style={s.backBtn}>
-              <Text style={s.backTxt}>✕</Text>
-            </TouchableOpacity>
-          : <View style={{ width: 60 }} />}
+        <Text style={s.headerTitle} numberOfLines={1}>
+          {headerTitle}
+        </Text>
+        {cloudSelMode ? (
+          <TouchableOpacity
+            onPress={() => {
+              setCloudSelMode(false);
+              setCloudSelIds(new Set());
+            }}
+            style={s.backBtn}
+          >
+            <Text style={s.backTxt}>✕</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </View>
 
       {/* Upload progress */}
       {uploading && (
         <View style={s.uploadBar}>
           <ActivityIndicator color="#fff" size="small" />
-          <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
+          <Text style={s.uploadBarTxt}>
+            Upload பண்றேன்... {uploadProgress}/{uploadTotal}
+          </Text>
         </View>
       )}
 
@@ -511,31 +781,54 @@ export default function GalleryScreen() {
         </View>
       )}
 
-      <ScrollView style={{ flex: 1, backgroundColor: '#111' }} contentContainerStyle={{ paddingBottom: 24 }}>
-
+      <ScrollView
+        style={{ flex: 1, backgroundColor: "#111" }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
         {/* Action buttons */}
         <View style={s.actionRow}>
-          <TouchableOpacity
-            style={[s.uploadBtn, albumKey === 'icons' && { backgroundColor: '#FF6B35' }]}
-            onPress={albumKey === 'icons' ? pickIconWithCrop : openFolderBrowser}
-            disabled={uploading}
-          >
-            <Text style={s.uploadBtnTxt}>
-              {albumKey === 'icons' ? '🎨 Icon Upload (1:1)' : '⬆ Upload'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.newFolderBtn} onPress={() => { setFolderName(''); setFolderDialog(true); }}>
-            <Text style={s.newFolderTxt}>📁 New Folder</Text>
-          </TouchableOpacity>
+          {!isChatSelectMode && (
+            <>
+              <TouchableOpacity
+                style={[
+                  s.uploadBtn,
+                  albumKey === "icons" && { backgroundColor: "#FF6B35" },
+                ]}
+                onPress={
+                  albumKey === "icons" ? pickIconWithCrop : openFolderBrowser
+                }
+                disabled={uploading}
+              >
+                <Text style={s.uploadBtnTxt}>
+                  {albumKey === "icons" ? "🎨 Icon Upload (1:1)" : "⬆ Upload"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.newFolderBtn}
+                onPress={() => {
+                  setFolderName("");
+                  setFolderDialog(true);
+                }}
+              >
+                <Text style={s.newFolderTxt}>📁 New Folder</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Sub-folders */}
         {depth === 0 && subFolders.length > 0 && (
           <View style={s.foldersRow}>
-            {subFolders.map(folder => (
-              <TouchableOpacity key={folder.id} style={s.folderChip} onPress={() => goIntoFolder(folder)}>
+            {subFolders.map((folder) => (
+              <TouchableOpacity
+                key={folder.id}
+                style={s.folderChip}
+                onPress={() => goIntoFolder(folder)}
+              >
                 <Text style={s.folderChipEmoji}>📁</Text>
-                <Text style={s.folderChipLabel} numberOfLines={1}>{folder.label}</Text>
+                <Text style={s.folderChipLabel} numberOfLines={1}>
+                  {folder.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -551,24 +844,53 @@ export default function GalleryScreen() {
           <View style={s.center}>
             <Text style={s.emptyEmoji}>{meta.emoji}</Text>
             <Text style={s.emptyTxt}>
-              {depth === 1 ? `${currentFolder?.label} empty` : `${meta.label} empty`}
-              {'\n'}⬆ Upload பண்ணுங்க
+              {depth === 1
+                ? `${currentFolder?.label} empty`
+                : `${meta.label} empty`}
+              {"\n"}⬆ Upload பண்ணுங்க
             </Text>
           </View>
         ) : (
           <View style={s.grid}>
-            {files.map(file => {
+            {files.map((file) => {
               const isSel = cloudSelIds.has(file.public_id);
               return (
-                <TouchableOpacity key={file.public_id}
+                <TouchableOpacity
+                  key={file.public_id}
                   style={[s.thumb, isSel && s.thumbSel]}
-                  onPress={() => cloudSelMode ? setCloudSelIds(prev => { const n = new Set(prev); n.has(file.public_id) ? n.delete(file.public_id) : n.add(file.public_id); return n; }) : setFullView(file)}
-                  onLongPress={() => { setCloudSelMode(true); setCloudSelIds(new Set([file.public_id])); }}
-                  activeOpacity={0.85}>
-                  {file.isVideo
-                    ? <View style={[s.thumbImg, s.videoThumb]}><Text style={s.videoPlay}>▶</Text></View>
-                    : <Image source={{ uri: file.url }} style={s.thumbImg} resizeMode="cover" />}
-                  {isSel && <View style={s.checkOverlay}><Text style={s.checkTxt}>✓</Text></View>}
+                  onPress={() =>
+                    cloudSelMode
+                      ? setCloudSelIds((prev) => {
+                          const n = new Set(prev);
+                          n.has(file.public_id)
+                            ? n.delete(file.public_id)
+                            : n.add(file.public_id);
+                          return n;
+                        })
+                      : setFullView(file)
+                  }
+                  onLongPress={() => {
+                    setCloudSelMode(true);
+                    setCloudSelIds(new Set([file.public_id]));
+                  }}
+                  activeOpacity={0.85}
+                >
+                  {file.isVideo ? (
+                    <View style={[s.thumbImg, s.videoThumb]}>
+                      <Text style={s.videoPlay}>▶</Text>
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: file.url }}
+                      style={s.thumbImg}
+                      resizeMode="cover"
+                    />
+                  )}
+                  {isSel && (
+                    <View style={s.checkOverlay}>
+                      <Text style={s.checkTxt}>✓</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -577,14 +899,41 @@ export default function GalleryScreen() {
       </ScrollView>
 
       {/* ── MODAL 1: Phone Albums browser ───────────────────────── */}
-      <Modal visible={showAlbums} animationType="slide" onRequestClose={() => setShowAlbums(false)}>
-        <SafeAreaView style={[s.safe, { backgroundColor: '#1a1a1a' }]} edges={['bottom']}>
-          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
-            <TouchableOpacity onPress={() => setShowAlbums(false)} style={s.backBtn}>
+      <Modal
+        visible={showAlbums}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowAlbums(false);
+          if (isChatSelectMode) router.back();
+        }}
+      >
+        <SafeAreaView
+          style={[s.safe, { backgroundColor: "#1a1a1a" }]}
+          edges={["bottom"]}
+        >
+          <StatusBar
+            translucent
+            backgroundColor="transparent"
+            barStyle="light-content"
+          />
+          <View
+            style={[
+              s.header,
+              { backgroundColor: meta.color, paddingTop: insets.top + 14 },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                setShowAlbums(false);
+                if (isChatSelectMode) router.back();
+              }}
+              style={s.backBtn}
+            >
               <Text style={s.backTxt}>✕</Text>
             </TouchableOpacity>
-            <Text style={s.headerTitle}>📂 Phone Folders</Text>
+            <Text style={s.headerTitle}>
+              {isChatSelectMode ? "📂 Choose a folder" : "📂 Phone Folders"}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
           {loadingAlbums ? (
@@ -595,113 +944,200 @@ export default function GalleryScreen() {
           ) : (
             <FlatList
               data={phoneAlbums}
-              keyExtractor={a => a.id}
+              keyExtractor={(a) => a.id}
               contentContainerStyle={{ paddingVertical: 8 }}
               renderItem={({ item }) => (
-                <TouchableOpacity style={s.albumRow} onPress={() => openAlbumAssets(item)}>
+                <TouchableOpacity
+                  style={s.albumRow}
+                  onPress={() => openAlbumAssets(item)}
+                >
                   <Text style={s.albumIcon}>📁</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={s.albumName}>{item.title}</Text>
-                    <Text style={s.albumCount}>{item.assetCount ?? 0} files</Text>
+                    <Text style={s.albumCount}>
+                      {item.assetCount ?? 0} files
+                    </Text>
                   </View>
                   <Text style={s.albumArrow}>›</Text>
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={s.sep} />}
-            ListEmptyComponent={
-              <View style={s.center}>
-                <Text style={s.emptyEmoji}>📭</Text>
-                <Text style={[s.emptyTxt, { paddingHorizontal: 24 }]}>
-                  {'Folders கிடைக்கல.\n\nSettings → Apps → My Girls →\nPermissions → Files & Media → Allow all\n\nபிறகு App close செய்து மீண்டும் திறங்க.'}
-                </Text>
-                <TouchableOpacity
-                  style={[s.doneBtn, { backgroundColor: meta.color, marginTop: 24, minWidth: 140, paddingVertical: 12 }]}
-                  onPress={() => { setShowAlbums(false); setTimeout(() => openFolderBrowser(), 400); }}
-                >
-                  <Text style={s.doneBtnTxt}>🔄 Retry</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.doneBtn, { backgroundColor: '#444', marginTop: 12, minWidth: 140, paddingVertical: 12 }]}
-                  onPress={async () => {
-                    setShowAlbums(false);
-                    setTimeout(async () => {
-                      try {
-                        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                        if (!perm.granted) {
-                          Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
-                          return;
-                        }
-                        const res = await ImagePicker.launchImageLibraryAsync({
-                          mediaTypes: ImagePicker.MediaTypeOptions.All,
-                          allowsMultipleSelection: true,
-                          quality: 0.9,
-                        });
-                        if (!res.canceled && res.assets?.length) {
-                          setUploading(true);
-                          setUploadProgress(0);
-                          setUploadTotal(res.assets.length);
-                          const folder = currentFolder
-                            ? `my-girls/storage/${albumKey}/${currentFolder.id}`
-                            : `my-girls/storage/${albumKey}`;
-                          const uploaded: CloudFile[] = [];
-                          for (let i = 0; i < res.assets.length; i++) {
-                            try {
-                              const a = res.assets[i];
-                              const mime = a.type?.startsWith('video') ? 'video/mp4' : 'image/jpeg';
-                              const result = await uploadUriToCloudinary(a.uri, mime, folder);
-                              uploaded.push({ url: result.url, public_id: result.public_id });
-                            } catch {}
-                            setUploadProgress(i + 1);
+              ListEmptyComponent={
+                <View style={s.center}>
+                  <Text style={s.emptyEmoji}>📭</Text>
+                  <Text style={[s.emptyTxt, { paddingHorizontal: 24 }]}>
+                    {
+                      "Folders கிடைக்கல.\n\nSettings → Apps → My Girls →\nPermissions → Files & Media → Allow all\n\nபிறகு App close செய்து மீண்டும் திறங்க."
+                    }
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      s.doneBtn,
+                      {
+                        backgroundColor: meta.color,
+                        marginTop: 24,
+                        minWidth: 140,
+                        paddingVertical: 12,
+                      },
+                    ]}
+                    onPress={() => {
+                      setShowAlbums(false);
+                      setTimeout(() => openFolderBrowser(), 400);
+                    }}
+                  >
+                    <Text style={s.doneBtnTxt}>🔄 Retry</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      s.doneBtn,
+                      {
+                        backgroundColor: "#444",
+                        marginTop: 12,
+                        minWidth: 140,
+                        paddingVertical: 12,
+                      },
+                    ]}
+                    onPress={async () => {
+                      setShowAlbums(false);
+                      setTimeout(async () => {
+                        try {
+                          const perm =
+                            await ImagePicker.requestMediaLibraryPermissionsAsync();
+                          if (!perm.granted) {
+                            Alert.alert(
+                              "Permission வேணும்",
+                              "Gallery access allow பண்ணுங்க",
+                            );
+                            return;
                           }
-                          if (uploaded.length > 0) {
-                            const key = filesKey(albumKey, currentFolder?.id);
-                            const existing = await AsyncStorage.getItem(key).catch(() => null);
-                            const prev: CloudFile[] = existing ? JSON.parse(existing) : [];
-                            const updated = [...uploaded, ...prev.filter(f => !uploaded.some(u => u.public_id === f.public_id))];
-                            await AsyncStorage.setItem(key, JSON.stringify(updated));
-                            setFiles(updated);
-                            Alert.alert('✅ Upload ஆச்சு!', `${uploaded.length} file${uploaded.length > 1 ? 's' : ''} Cloud-ல் save ஆனது.`);
+                          const res = await ImagePicker.launchImageLibraryAsync(
+                            {
+                              mediaTypes: ImagePicker.MediaTypeOptions.All,
+                              allowsMultipleSelection: true,
+                              quality: 0.9,
+                            },
+                          );
+                          if (!res.canceled && res.assets?.length) {
+                            setUploading(true);
+                            setUploadProgress(0);
+                            setUploadTotal(res.assets.length);
+                            const folder = currentFolder
+                              ? `my-girls/storage/${albumKey}/${currentFolder.id}`
+                              : `my-girls/storage/${albumKey}`;
+                            const uploaded: CloudFile[] = [];
+                            for (let i = 0; i < res.assets.length; i++) {
+                              try {
+                                const a = res.assets[i];
+                                const mime = a.type?.startsWith("video")
+                                  ? "video/mp4"
+                                  : "image/jpeg";
+                                const result = await uploadUriToCloudinary(
+                                  a.uri,
+                                  mime,
+                                  folder,
+                                );
+                                uploaded.push({
+                                  url: result.url,
+                                  public_id: result.public_id,
+                                });
+                              } catch {}
+                              setUploadProgress(i + 1);
+                            }
+                            if (uploaded.length > 0) {
+                              const key = filesKey(albumKey, currentFolder?.id);
+                              const existing = await AsyncStorage.getItem(
+                                key,
+                              ).catch(() => null);
+                              const prev: CloudFile[] = existing
+                                ? JSON.parse(existing)
+                                : [];
+                              const updated = [
+                                ...uploaded,
+                                ...prev.filter(
+                                  (f) =>
+                                    !uploaded.some(
+                                      (u) => u.public_id === f.public_id,
+                                    ),
+                                ),
+                              ];
+                              await AsyncStorage.setItem(
+                                key,
+                                JSON.stringify(updated),
+                              );
+                              setFiles(updated);
+                              Alert.alert(
+                                "✅ Upload ஆச்சு!",
+                                `${uploaded.length} file${uploaded.length > 1 ? "s" : ""} Cloud-ல் save ஆனது.`,
+                              );
+                            }
+                            setUploading(false);
                           }
+                        } catch (e: any) {
                           setUploading(false);
+                          Alert.alert(
+                            "பிழை",
+                            (e as any)?.message || "Gallery திறக்கல",
+                          );
                         }
-                      } catch (e: any) {
-                        setUploading(false);
-                        Alert.alert('பிழை', (e as any)?.message || 'Gallery திறக்கல');
-                      }
-                    }, 300);
-                  }}
-                >
-                  <Text style={s.doneBtnTxt}>🖼️ Gallery திற</Text>
-                </TouchableOpacity>
-              </View>
-            }
-          />
+                      }, 300);
+                    }}
+                  >
+                    <Text style={s.doneBtnTxt}>🖼️ Gallery திற</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
           )}
         </SafeAreaView>
       </Modal>
 
       {/* ── MODAL 2: Files in selected album ────────────────────── */}
-      <Modal visible={showAssets} animationType="slide" onRequestClose={() => setShowAssets(false)}>
-        <SafeAreaView style={[s.safe, { backgroundColor: '#111' }]} edges={['top','bottom']}>
+      <Modal
+        visible={showAssets}
+        animationType="slide"
+        onRequestClose={() => setShowAssets(false)}
+      >
+        <SafeAreaView
+          style={[s.safe, { backgroundColor: "#111" }]}
+          edges={["top", "bottom"]}
+        >
           <View style={[s.header, { backgroundColor: meta.color }]}>
-            <TouchableOpacity onPress={() => setShowAssets(false)} style={s.backBtn}>
+            <TouchableOpacity
+              onPress={() => setShowAssets(false)}
+              style={s.backBtn}
+            >
               <Text style={s.backTxt}>‹ Back</Text>
             </TouchableOpacity>
             <Text style={s.headerTitle} numberOfLines={1}>
-              {selectedAlbumLib?.title ?? 'Files'}
+              {selectedAlbumLib?.title ?? "Files"}
             </Text>
             {pickerSel.size > 0 ? (
-              <TouchableOpacity onPress={confirmSelection} style={[s.doneBtn, { backgroundColor: meta.color }]}>
-                <Text style={s.doneBtnTxt}>Done ({pickerSel.size})</Text>
+              <TouchableOpacity
+                onPress={confirmSelection}
+                style={[s.doneBtn, { backgroundColor: meta.color }]}
+              >
+                <Text style={s.doneBtnTxt}>
+                  {isChatSelectMode ? "Use this" : `Done (${pickerSel.size})`}
+                </Text>
               </TouchableOpacity>
-            ) : <View style={{ width: 80 }} />}
+            ) : (
+              <View style={{ width: 80 }} />
+            )}
           </View>
 
           {pickerSel.size > 0 && (
             <View style={s.pickerSelBar}>
-              <Text style={s.pickerSelTxt}>{pickerSel.size} file{pickerSel.size > 1 ? 's' : ''} select ஆச்சு</Text>
-              <TouchableOpacity style={[s.selDelBtn, { backgroundColor: meta.color }]} onPress={confirmSelection}>
-                <Text style={s.selDelTxt}>⬆ Upload</Text>
+              <Text style={s.pickerSelTxt}>
+                {pickerSel.size} file{pickerSel.size > 1 ? "s" : ""} select
+                ஆச்சு
+              </Text>
+              <TouchableOpacity
+                style={[s.selDelBtn, { backgroundColor: meta.color }]}
+                onPress={confirmSelection}
+              >
+                <Text style={s.selDelTxt}>
+                  {isChatSelectMode ? "Use this" : "⬆ Upload"}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -719,7 +1155,7 @@ export default function GalleryScreen() {
           ) : (
             <FlatList
               data={phoneAssets}
-              keyExtractor={a => a.id}
+              keyExtractor={(a) => a.id}
               numColumns={COLS}
               contentContainerStyle={{ gap: 2, padding: 2 }}
               columnWrapperStyle={{ gap: 2 }}
@@ -728,13 +1164,30 @@ export default function GalleryScreen() {
                 return (
                   <TouchableOpacity
                     style={[s.thumb, isSel && s.thumbSel]}
-                    onPress={() => togglePickerSel(item.id)}
-                    activeOpacity={0.8}>
-                    <Image source={{ uri: item.uri }} style={s.thumbImg} resizeMode="cover" />
-                    {item.mediaType === 'video' && (
-                      <View style={s.videoTag}><Text style={s.videoTagTxt}>▶</Text></View>
+                    onPress={() => {
+                      if (isChatSelectMode) {
+                        setPickerSel(new Set([item.id]));
+                      } else {
+                        togglePickerSel(item.id);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: item.uri }}
+                      style={s.thumbImg}
+                      resizeMode="cover"
+                    />
+                    {item.mediaType === "video" && (
+                      <View style={s.videoTag}>
+                        <Text style={s.videoTagTxt}>▶</Text>
+                      </View>
                     )}
-                    {isSel && <View style={s.checkOverlay}><Text style={s.checkTxt}>✓</Text></View>}
+                    {isSel && (
+                      <View style={s.checkOverlay}>
+                        <Text style={s.checkTxt}>✓</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               }}
@@ -744,31 +1197,65 @@ export default function GalleryScreen() {
       </Modal>
 
       {/* Full view modal */}
-      <Modal visible={!!fullView} transparent animationType="fade" onRequestClose={() => setFullView(null)}>
+      <Modal
+        visible={!!fullView}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullView(null)}
+      >
         {fullView && (
           <View style={s.previewBg}>
-            <TouchableOpacity style={s.previewClose} onPress={() => setFullView(null)}>
+            <TouchableOpacity
+              style={s.previewClose}
+              onPress={() => setFullView(null)}
+            >
               <Text style={s.previewCloseTxt}>✕</Text>
             </TouchableOpacity>
-            {fullView.isVideo
-              ? <View style={s.videoPreview}><Text style={{ fontSize: 64 }}>▶</Text></View>
-              : <Image source={{ uri: fullView.url }} style={s.previewImg} resizeMode="contain" />}
+            {fullView.isVideo ? (
+              <View style={s.videoPreview}>
+                <Text style={{ fontSize: 64 }}>▶</Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: fullView.url }}
+                style={s.previewImg}
+                resizeMode="contain"
+              />
+            )}
           </View>
         )}
       </Modal>
 
       {/* New cloud sub-folder dialog */}
-      <Modal visible={folderDialog} transparent animationType="fade" onRequestClose={() => setFolderDialog(false)}>
+      <Modal
+        visible={folderDialog}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFolderDialog(false)}
+      >
         <View style={s.dialogOverlay}>
           <View style={s.dialog}>
             <Text style={s.dialogTitle}>📁 New Folder</Text>
-            <TextInput style={s.dialogInput} placeholder="Folder பெயர்..." placeholderTextColor="#aaa"
-              value={folderName} onChangeText={setFolderName} autoFocus onSubmitEditing={confirmNewFolder} />
+            <TextInput
+              style={s.dialogInput}
+              placeholder="Folder பெயர்..."
+              placeholderTextColor="#aaa"
+              value={folderName}
+              onChangeText={setFolderName}
+              autoFocus
+              onSubmitEditing={confirmNewFolder}
+            />
             <View style={s.dialogBtns}>
-              <TouchableOpacity style={s.dialogCancel} onPress={() => setFolderDialog(false)}>
+              <TouchableOpacity
+                style={s.dialogCancel}
+                onPress={() => setFolderDialog(false)}
+              >
                 <Text style={s.dialogCancelTxt}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.dialogOk, { backgroundColor: meta.color }]} onPress={confirmNewFolder}>
+              <TouchableOpacity
+                style={[s.dialogOk, { backgroundColor: meta.color }]}
+                onPress={confirmNewFolder}
+              >
                 <Text style={s.dialogOkTxt}>உருவாக்கு</Text>
               </TouchableOpacity>
             </View>
@@ -780,64 +1267,217 @@ export default function GalleryScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:           { flex: 1, backgroundColor: '#111' },
-  header:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12 },
-  backBtn:        { minWidth: 60 },
-  backTxt:        { color: '#fff', fontSize: 17, fontWeight: '600' },
-  headerTitle:    { flex: 1, color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
-  doneBtn:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, minWidth: 80, alignItems: 'center' },
-  doneBtnTxt:     { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  uploadBar:      { flexDirection: 'row', backgroundColor: '#1565C0', padding: 10, gap: 10, alignItems: 'center' },
-  uploadBarTxt:   { color: '#fff', fontSize: 14 },
-  selBar:         { flexDirection: 'row', backgroundColor: '#333', padding: 10, alignItems: 'center', gap: 12 },
-  selCount:       { color: '#fff', fontSize: 14, flex: 1 },
-  selDelBtn:      { backgroundColor: '#c62828', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  selDelTxt:      { color: '#fff', fontSize: 13, fontWeight: '600' },
-  pickerSelBar:   { flexDirection: 'row', backgroundColor: '#222', padding: 10, alignItems: 'center', gap: 12 },
-  pickerSelTxt:   { color: '#fff', fontSize: 14, flex: 1 },
-  actionRow:      { flexDirection: 'row', gap: 12, padding: 14 },
-  uploadBtn:      { flex: 1, backgroundColor: '#E8821A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  uploadBtnTxt:   { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  newFolderBtn:   { flex: 1, backgroundColor: '#444', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#FF6B35', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  iconCropBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  newFolderTxt:   { color: '#ccc', fontSize: 16, fontWeight: '600' },
-  foldersRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
-  folderChip:     { backgroundColor: '#2a2a2a', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  folderChipEmoji:{ fontSize: 18 },
-  folderChipLabel:{ color: '#ddd', fontSize: 13, fontWeight: '500' },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
-  thumb:          { width: THUMB, height: THUMB, overflow: 'hidden' },
-  thumbSel:       { opacity: 0.55 },
-  thumbImg:       { width: THUMB, height: THUMB },
-  videoThumb:     { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' },
-  videoPlay:      { fontSize: 32, color: '#fff' },
-  videoTag:       { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: 2 },
-  videoTagTxt:    { color: '#fff', fontSize: 10 },
-  checkOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  checkTxt:       { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  center:         { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  loadingTxt:     { color: '#aaa', marginTop: 14, fontSize: 14 },
-  emptyEmoji:     { fontSize: 56, marginBottom: 12 },
-  emptyTxt:       { color: '#888', fontSize: 15, textAlign: 'center', lineHeight: 24 },
-  albumRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#1e1e1e' },
-  albumIcon:      { fontSize: 28, marginRight: 12 },
-  albumName:      { color: '#fff', fontSize: 16, fontWeight: '600' },
-  albumCount:     { color: '#888', fontSize: 12, marginTop: 2 },
-  albumArrow:     { color: '#888', fontSize: 24 },
-  sep:            { height: 1, backgroundColor: '#2a2a2a' },
-  previewBg:      { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  previewClose:   { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
-  previewCloseTxt:{ color: '#fff', fontSize: 24 },
-  previewImg:     { width: '100%', height: '80%' },
-  videoPreview:   { alignItems: 'center', justifyContent: 'center' },
-  dialogOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  dialog:         { backgroundColor: '#222', borderRadius: 16, padding: 24, width: '100%' },
-  dialogTitle:    { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  dialogInput:    { backgroundColor: '#333', color: '#fff', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
-  dialogBtns:     { flexDirection: 'row', gap: 12 },
-  dialogCancel:   { flex: 1, backgroundColor: '#444', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  dialogCancelTxt:{ color: '#ccc', fontSize: 15 },
-  dialogOk:       { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  dialogOkTxt:    { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  safe: { flex: 1, backgroundColor: "#111" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  backBtn: { minWidth: 60 },
+  backTxt: { color: "#fff", fontSize: 17, fontWeight: "600" },
+  headerTitle: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  doneBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  doneBtnTxt: { color: "#fff", fontSize: 14, fontWeight: "bold" },
+  uploadBar: {
+    flexDirection: "row",
+    backgroundColor: "#1565C0",
+    padding: 10,
+    gap: 10,
+    alignItems: "center",
+  },
+  uploadBarTxt: { color: "#fff", fontSize: 14 },
+  selBar: {
+    flexDirection: "row",
+    backgroundColor: "#333",
+    padding: 10,
+    alignItems: "center",
+    gap: 12,
+  },
+  selCount: { color: "#fff", fontSize: 14, flex: 1 },
+  selDelBtn: {
+    backgroundColor: "#c62828",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  selDelTxt: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  pickerSelBar: {
+    flexDirection: "row",
+    backgroundColor: "#222",
+    padding: 10,
+    alignItems: "center",
+    gap: 12,
+  },
+  pickerSelTxt: { color: "#fff", fontSize: 14, flex: 1 },
+  actionRow: { flexDirection: "row", gap: 12, padding: 14 },
+  uploadBtn: {
+    flex: 1,
+    backgroundColor: "#E8821A",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  uploadBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  newFolderBtn: {
+    flex: 1,
+    backgroundColor: "#444",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  iconCropBtn: {
+    marginHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: "#FF6B35",
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  iconCropBtnTxt: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  newFolderTxt: { color: "#ccc", fontSize: 16, fontWeight: "600" },
+  foldersRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  folderChip: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  folderChipEmoji: { fontSize: 18 },
+  folderChipLabel: { color: "#ddd", fontSize: 13, fontWeight: "500" },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 2,
+    paddingHorizontal: 2,
+  },
+  thumb: { width: THUMB, height: THUMB, overflow: "hidden" },
+  thumbSel: { opacity: 0.55 },
+  thumbImg: { width: THUMB, height: THUMB },
+  videoThumb: {
+    backgroundColor: "#1a1a1a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlay: { fontSize: 32, color: "#fff" },
+  videoTag: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 4,
+    padding: 2,
+  },
+  videoTagTxt: { color: "#fff", fontSize: 10 },
+  checkOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkTxt: { color: "#fff", fontSize: 28, fontWeight: "bold" },
+  center: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
+  loadingTxt: { color: "#aaa", marginTop: 14, fontSize: 14 },
+  emptyEmoji: { fontSize: 56, marginBottom: 12 },
+  emptyTxt: {
+    color: "#888",
+    fontSize: 15,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  albumRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#1e1e1e",
+  },
+  albumIcon: { fontSize: 28, marginRight: 12 },
+  albumName: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  albumCount: { color: "#888", fontSize: 12, marginTop: 2 },
+  albumArrow: { color: "#888", fontSize: 24 },
+  sep: { height: 1, backgroundColor: "#2a2a2a" },
+  previewBg: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  previewClose: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  previewCloseTxt: { color: "#fff", fontSize: 24 },
+  previewImg: { width: "100%", height: "80%" },
+  videoPreview: { alignItems: "center", justifyContent: "center" },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  dialog: {
+    backgroundColor: "#222",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+  },
+  dialogTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  dialogInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    marginBottom: 20,
+  },
+  dialogBtns: { flexDirection: "row", gap: 12 },
+  dialogCancel: {
+    flex: 1,
+    backgroundColor: "#444",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  dialogCancelTxt: { color: "#ccc", fontSize: 15 },
+  dialogOk: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  dialogOkTxt: { color: "#fff", fontSize: 15, fontWeight: "bold" },
 });
