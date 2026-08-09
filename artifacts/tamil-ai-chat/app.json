@@ -77,7 +77,8 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "./plugins/removeVisualUserSelected"
+      "./plugins/removeVisualUserSelected",
+      "./plugins/withPlayProtect"
     ],
     "experiments": {
       "typedRoutes": true

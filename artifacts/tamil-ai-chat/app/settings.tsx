@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Linking, ActivityIndicator, Alert, Image, TextInput, Modal, StatusBar,
+  NativeModules, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -510,6 +511,27 @@ export default function SettingsScreen() {
     }
   };
 
+  const openPlayProtect = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Android only', 'Google Play Protect settings Android phone-ல் மட்டும் கிடைக்கும்.');
+      return;
+    }
+    try {
+      const playProtect = NativeModules.PlayProtect as
+        | { openPlayProtect?: () => Promise<boolean> }
+        | undefined;
+      if (!playProtect?.openPlayProtect) {
+        throw new Error('Native module unavailable');
+      }
+      await playProtect.openPlayProtect();
+    } catch {
+      Alert.alert(
+        'Play Protect',
+        'Google Play Protect settings திறக்க முடியவில்லை. Phone Settings → Security → Google Play Protect வழியாக திறக்கவும்.',
+      );
+    }
+  };
+
   const getBuildStatusColor = () => {
     switch (buildStatus) {
       case 'triggering': return '#f59e0b';
@@ -669,6 +691,19 @@ export default function SettingsScreen() {
               <Text style={s.infoVal}>{val}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardIcon}>🛡️</Text>
+            <Text style={s.cardTitle}>Google Play Protect</Text>
+          </View>
+          <Text style={s.cardDesc}>
+            உங்கள் phone-ன் Google Play Protect பாதுகாப்பு settings-ஐ திறந்து app scan செய்யலாம்.
+          </Text>
+          <TouchableOpacity style={s.playProtectBtn} onPress={openPlayProtect}>
+            <Text style={s.playProtectBtnTxt}>🛡️ Play Protect திறக்கவும்</Text>
+          </TouchableOpacity>
         </View>
 
         {/* App Icon மாத்து + Auto Build Trigger */}
@@ -1013,6 +1048,11 @@ const s = StyleSheet.create({
     paddingVertical: 11, alignItems: 'center',
   },
   downloadLinkTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  playProtectBtn: {
+    backgroundColor: '#2f81f7', borderRadius: 10,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  playProtectBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#21262d',
