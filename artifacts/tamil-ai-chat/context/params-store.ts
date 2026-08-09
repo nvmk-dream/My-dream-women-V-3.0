@@ -16,52 +16,32 @@ let _chatParams: ChatParams | null = null;
 let _groupPersonaIds: string[] = [];
 let _editPersonaId: string | null = null;
 let _offlineChatPersonaId: string | null = null;
-let _pendingPhotoStyle: string = "";
+let _pendingPhotoStyle: string = '';
 let _autoStoryQuery: boolean = false;
 let _pendingGalleryMedia: PendingGalleryMedia | null = null;
 
 export const ParamsStore = {
-  setChatParams: (p: ChatParams) => {
-    _chatParams = p;
-  },
+  setChatParams: (p: ChatParams) => { _chatParams = p; },
   getChatParams: () => _chatParams,
 
-  setGroupPersonaIds: (ids: string[]) => {
-    _groupPersonaIds = ids;
-  },
+  setGroupPersonaIds: (ids: string[]) => { _groupPersonaIds = ids; },
   getGroupPersonaIds: () => _groupPersonaIds,
 
-  setEditPersonaId: (id: string) => {
-    _editPersonaId = id;
-  },
+  setEditPersonaId: (id: string) => { _editPersonaId = id; },
   getEditPersonaId: () => _editPersonaId,
 
-  setOfflineChatPersonaId: (id: string | null) => {
-    _offlineChatPersonaId = id;
-  },
+  setOfflineChatPersonaId: (id: string | null) => { _offlineChatPersonaId = id; },
   getOfflineChatPersonaId: () => _offlineChatPersonaId,
 
-  setPendingPhotoStyle: (style: string) => {
-    _pendingPhotoStyle = style;
-  },
+  setPendingPhotoStyle: (style: string) => { _pendingPhotoStyle = style; },
   getPendingPhotoStyle: () => _pendingPhotoStyle,
-  clearPendingPhotoStyle: () => {
-    _pendingPhotoStyle = "";
-  },
+  clearPendingPhotoStyle: () => { _pendingPhotoStyle = ''; },
 
-  setAutoStoryQuery: (v: boolean) => {
-    _autoStoryQuery = v;
-  },
+  setAutoStoryQuery: (v: boolean) => { _autoStoryQuery = v; },
   getAutoStoryQuery: () => _autoStoryQuery,
-  clearAutoStoryQuery: () => {
-    _autoStoryQuery = false;
-  },
+  clearAutoStoryQuery: () => { _autoStoryQuery = false; },
 
-  setPendingGalleryMedia: (media: PendingGalleryMedia) => {
-    _pendingGalleryMedia = media;
-  },
+  setPendingGalleryMedia: (media: PendingGalleryMedia) => { _pendingGalleryMedia = media; },
   getPendingGalleryMedia: () => _pendingGalleryMedia,
-  clearPendingGalleryMedia: () => {
-    _pendingGalleryMedia = null;
-  },
+  clearPendingGalleryMedia: () => { _pendingGalleryMedia = null; },
 };
