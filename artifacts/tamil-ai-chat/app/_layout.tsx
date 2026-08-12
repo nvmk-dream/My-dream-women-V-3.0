@@ -7,13 +7,12 @@ import {
 } from "@expo-google-fonts/inter";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Dimensions, ScrollView,
-  Platform, Linking, PermissionsAndroid, AppState,
+  StatusBar, Dimensions, ScrollView, Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -64,7 +63,7 @@ const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
 // Permission onboarding — one-time on first install
 const PERMISSIONS_ONBOARDED_KEY = 'permissions_onboarded_v2';
-type OnboardStep = 'intro' | 'requesting' | 'allfiles';
+type OnboardStep = 'intro' | 'requesting';
 
 const AUTO_GREETINGS = [
   'என்ன பண்ற? miss ஆகுது 😊',
@@ -93,7 +92,6 @@ export default function RootLayout() {
   // ── Permission onboarding (one-time, Meta AI style) ──────────
   // null = still checking AsyncStorage; undefined = done (no overlay)
   const [onboardStep, setOnboardStep] = useState<OnboardStep | null | undefined>(undefined);
-  const appStateRef = useRef(AppState.currentState);
 
   // Check on mount whether onboarding is needed
   useEffect(() => {
@@ -106,26 +104,6 @@ export default function RootLayout() {
       .catch(() => setOnboardStep(undefined));
   }, []);
 
-  // AppState listener — re-check All Files Access when returning from Settings
-  useEffect(() => {
-    if (onboardStep !== 'allfiles') return;
-    const sub = AppState.addEventListener('change', async nextState => {
-      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        try {
-          const granted = await PermissionsAndroid.check(
-            'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
-          );
-          if (granted) {
-            await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true');
-            setOnboardStep(undefined);
-          }
-        } catch {}
-      }
-      appStateRef.current = nextState;
-    });
-    return () => sub.remove();
-  }, [onboardStep]);
-
   // "Next" tapped on intro screen — request permissions sequentially
   const handleStartPermissions = useCallback(async () => {
     setOnboardStep('requesting');
@@ -136,32 +114,7 @@ export default function RootLayout() {
     // Step 2: Photos & Videos (system dialog)
     try { await requestPhotoVideoPermissionsAsync(); } catch {}
 
-    // Step 3: Check All Files Access (special permission — needs Settings)
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.check(
-          'android.permission.MANAGE_EXTERNAL_STORAGE' as any,
-        );
-        if (!granted) {
-          setOnboardStep('allfiles');
-          return;
-        }
-      } catch {}
-    }
-
     // All done
-    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true').catch(() => {});
-    setOnboardStep(undefined);
-  }, []);
-
-  // "Settings திற" for All Files Access
-  const handleOpenAllFilesSettings = useCallback(() => {
-    appStateRef.current = 'background'; // prime the AppState listener
-    Linking.openSettings();
-  }, []);
-
-  // "பிறகு செய்கிறேன்" — skip All Files Access
-  const handleSkipAllFiles = useCallback(async () => {
     await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true').catch(() => {});
     setOnboardStep(undefined);
   }, []);
@@ -295,16 +248,8 @@ export default function RootLayout() {
                     <Text style={ob.rowDesc}>Gallery-ல் upload & save பண்ண</Text>
                   </View>
                 </View>
-                <View style={ob.divider} />
-                <View style={ob.row}>
-                  <Text style={ob.rowIcon}>📁</Text>
-                  <View style={ob.rowText}>
-                    <Text style={ob.rowTitle}>All Files Access</Text>
-                    <Text style={ob.rowDesc}>Cut பண்ணும்போது phone-ல் delete ஆக</Text>
-                  </View>
-                </View>
                 <View style={ob.noteBox}>
-                  <Text style={ob.noteText}>⚙️ Settings-ல் எந்த நேரத்திலும் மாற்றலாம்</Text>
+                  <Text style={ob.noteText}>⚙️ Settings-ல் permissions-ஐ எந்த நேரத்திலும் மாற்றலாம்</Text>
                 </View>
               </View>
 
@@ -324,31 +269,6 @@ export default function RootLayout() {
                 <Text style={ob.requestingText}>Permissions கேட்கிறோம்...</Text>
                 <Text style={ob.requestingDesc}>System dialogs-ல் Allow பண்ணுங்க</Text>
               </View>
-            </View>
-          )}
-
-          {/* Step 3: All Files Access — must go to Settings (Android limitation) */}
-          {onboardStep === 'allfiles' && (
-            <View style={ob.overlay}>
-              <StatusBar backgroundColor="#000" barStyle="light-content" />
-              <Text style={ob.appName}>My Dream Women ☁️</Text>
-              <View style={ob.card}>
-                <Text style={[ob.allFilesIcon]}>📁</Text>
-                <Text style={ob.allFilesTitle}>"All Files Access" தேவை</Text>
-                <Text style={ob.allFilesDesc}>
-                  {'Photos-ஐ "Cut" செய்து phone gallery-ல் delete பண்ண இந்த permission தேவை.'}
-                </Text>
-                <View style={ob.stepsBox}>
-                  <Text style={ob.stepsTitle}>Settings-ல் என்ன செய்யணும்:</Text>
-                  <Text style={ob.stepsText}>{'My Girls → All files access → Allow ✓'}</Text>
-                </View>
-              </View>
-              <TouchableOpacity style={ob.settingsBtn} onPress={handleOpenAllFilesSettings} activeOpacity={0.85}>
-                <Text style={ob.settingsBtnTxt}>⚙️ Settings திற</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={ob.skipBtn} onPress={handleSkipAllFiles}>
-                <Text style={ob.skipTxt}>பிறகு செய்கிறேன்</Text>
-              </TouchableOpacity>
             </View>
           )}
 
@@ -442,20 +362,6 @@ const ob = StyleSheet.create({
   requestingIcon: { fontSize: 40, textAlign: 'center', marginBottom: 12 },
   requestingText: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   requestingDesc: { color: '#6b7280', fontSize: 13, textAlign: 'center' },
-  // All Files step
-  allFilesTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
-  allFilesDesc: { color: '#9ca3af', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 16 },
-  stepsBox: { backgroundColor: '#1f2937', borderRadius: 12, padding: 14, width: '100%' },
-  stepsTitle: { color: '#6b7280', fontSize: 12, marginBottom: 6 },
-  stepsText: { color: '#25D366', fontSize: 13, fontWeight: '600' },
-  settingsBtn: {
-    backgroundColor: '#E67E22', borderRadius: 16, paddingVertical: 16,
-    width: '100%', alignItems: 'center', marginBottom: 12,
-  },
-  settingsBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  skipBtn: { paddingVertical: 12, width: '100%', alignItems: 'center' },
-  skipTxt: { color: '#4b5563', fontSize: 14 },
-  allFilesIcon: { fontSize: 48, marginBottom: 12, textAlign: 'center' as const },
 });
 
 const pin = StyleSheet.create({

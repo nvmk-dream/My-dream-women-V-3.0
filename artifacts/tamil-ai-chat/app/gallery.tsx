@@ -445,13 +445,13 @@ export default function GalleryScreen() {
           cutDeleteFailed = true;
         }
       } catch {
-        // Some devices need MANAGE_MEDIA permission — silent fail, show note
+        // MediaLibrary deletion can fail if the system confirmation is dismissed.
         cutDeleteFailed = true;
       }
       if (cutDeleteFailed) {
         Alert.alert(
           '⚠️ Delete பண்ண முடியல',
-          'Upload ஆச்சு ✅ ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணுங்க, அல்லது Settings → My Girls → Permissions → Files → Delete முடிக்கணும்.',
+          'Upload ஆச்சு ✅ ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.',
         );
       }
     }
