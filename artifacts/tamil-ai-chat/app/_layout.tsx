@@ -18,7 +18,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import * as Notifications from "expo-notifications";
-import * as MediaLibrary from "expo-media-library";
+import { requestPhotoVideoPermissionsAsync } from "@/services/media-permissions";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -134,7 +134,7 @@ export default function RootLayout() {
     try { await Notifications.requestPermissionsAsync(); } catch {}
 
     // Step 2: Photos & Videos (system dialog)
-    try { await MediaLibrary.requestPermissionsAsync(); } catch {}
+    try { await requestPhotoVideoPermissionsAsync(); } catch {}
 
     // Step 3: Check All Files Access (special permission — needs Settings)
     if (Platform.OS === 'android') {

@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
 import { ParamsStore } from '../context/params-store';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 const COLS = 3;
@@ -163,7 +164,7 @@ export default function GalleryScreen() {
 
   // ── Icons folder: pick with 1:1 crop ─────────────────────────────
   const pickIconWithCrop = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
       return;
@@ -220,7 +221,7 @@ export default function GalleryScreen() {
     let granted = false;
     try {
       // No argument = read+write; needed for getAlbumsAsync on Android 13+
-      const result = await MediaLibrary.requestPermissionsAsync();
+      const result = await requestPhotoVideoPermissionsAsync();
       granted = result.granted;
     } catch {
       granted = false;
@@ -257,7 +258,7 @@ export default function GalleryScreen() {
           // Permission just granted but Android hasn't propagated yet — retry once
           retried = true;
           await new Promise(r => setTimeout(r, 800));
-          await MediaLibrary.requestPermissionsAsync();
+          await requestPhotoVideoPermissionsAsync();
           return loadAlbums();
         }
         Alert.alert(
@@ -672,7 +673,7 @@ export default function GalleryScreen() {
                     setShowAlbums(false);
                     setTimeout(async () => {
                       try {
-                        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        const perm = await requestPhotoVideoPermissionsAsync();
                         if (!perm.granted) {
                           Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க');
                           return;

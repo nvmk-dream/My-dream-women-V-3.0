@@ -109,6 +109,37 @@ jobs:
           if [ ! -d android ]; then echo "android/ not created"; exit 1; fi
           echo "android/ created"
 
+      - name: Verify generated media permissions
+        run: |
+          MANIFEST="artifacts/tamil-ai-chat/android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "Generated AndroidManifest.xml not found"
+            exit 1
+          fi
+
+          REQUIRED_PERMISSIONS=(
+            "android.permission.READ_MEDIA_IMAGES"
+            "android.permission.READ_MEDIA_VIDEO"
+            "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+          )
+          for PERMISSION in "${REQUIRED_PERMISSIONS[@]}"; do
+            if ! grep -q "$PERMISSION" "$MANIFEST"; then
+              echo "Missing required permission: $PERMISSION"
+              exit 1
+            fi
+            echo "Verified manifest permission: $PERMISSION"
+          done
+
+          if [ -e "artifacts/tamil-ai-chat/plugins/removeVisualUserSelected.js" ] ||
+             grep -R -q "removeVisualUserSelected" "artifacts/tamil-ai-chat/app.json" "artifacts/tamil-ai-chat/plugins" 2>/dev/null; then
+            echo "The custom removeVisualUserSelected plugin is still active"
+            exit 1
+          fi
+          echo "Verified custom visual-user-selected removal plugin is disabled"
+
+          echo "Final generated media permission entries:"
+          grep -E "READ_MEDIA_(IMAGES|VIDEO|VISUAL_USER_SELECTED)" "$MANIFEST"
+
       - name: Inject custom icons via ImageMagick
         run: |
           ICON="artifacts/tamil-ai-chat/assets/images/icon.png"

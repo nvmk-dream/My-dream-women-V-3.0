@@ -14,6 +14,7 @@ import {
   HF_IMAGE_MODEL,
   HF_NSFW_MODELS,
 } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 
@@ -130,7 +131,7 @@ export default function PromptImageScreen() {
 
   // Pick image from gallery
   const pickImage = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும்.'); return; }
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'] as any, quality: 0.85, base64: true,

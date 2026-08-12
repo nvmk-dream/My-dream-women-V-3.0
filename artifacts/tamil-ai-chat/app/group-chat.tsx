@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendMessage, uploadToCloudinary, getCloudinaryMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const STYLE_IDS = [
   'normal','nude','seminude','breast','seductive',
@@ -112,7 +113,7 @@ export default function GroupChatScreen() {
   // ── pick selfie (gallery only) ────────────────────────────────
   const pickSelfie = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const perm = await requestPhotoVideoPermissionsAsync();
       if (!perm.granted) return;
       const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.85, allowsEditing: true, aspect: [1, 1] });
       if (result.canceled || !result.assets[0]) return;
@@ -157,7 +158,7 @@ export default function GroupChatScreen() {
   // ── pick target from gallery ──────────────────────────────────
   const pickTargetFromGallery = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const perm = await requestPhotoVideoPermissionsAsync();
       if (!perm.granted) { setSwapError('Gallery permission இல்ல.'); return; }
       const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.85 });
       if (result.canceled || !result.assets[0]) return;

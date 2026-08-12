@@ -25,6 +25,7 @@ import {
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
 import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
@@ -338,7 +339,7 @@ AsyncStorage-ல் save ஆச்சு!`
 
   // Load settings + check auto-messages in one shot (no interval state dep → no loop)
   const pickUserPhotoFromPhone = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -743,7 +744,7 @@ AsyncStorage-ல் save ஆச்சு!`
 
   // ── Photo to Script (Gemini key direct → All 13 Gemini keys auto-retry) ──
   const handlePhotoToScript = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
     if (res.canceled || !res.assets[0]) return;

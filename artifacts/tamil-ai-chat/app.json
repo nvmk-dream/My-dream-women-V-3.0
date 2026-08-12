@@ -44,8 +44,7 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.MANAGE_MEDIA",
-        "android.permission.MANAGE_EXTERNAL_STORAGE"
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -77,7 +76,6 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "./plugins/removeVisualUserSelected",
       "./plugins/withPlayProtect"
     ],
     "experiments": {

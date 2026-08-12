@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 
@@ -374,7 +375,7 @@ export default function FaceSwapScreen() {
   const [showVidmage, setShowVidmage] = useState(false);
 
   const pickImage = async (slot: 'target' | 'face') => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும்.'); return; }
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'] as any, quality: 0.85, base64: true,
@@ -496,8 +497,8 @@ export default function FaceSwapScreen() {
   const saveResult = async () => {
     if (!resultUrl) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Permission', 'Gallery permission வேணும்.'); return; }
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) { Alert.alert('Permission', 'Gallery permission வேணும்.'); return; }
       let localUri = resultUrl;
       if (resultUrl.startsWith('http')) {
         const tmp = FileSystem.cacheDirectory + `faceswap_${Date.now()}.jpg`;

@@ -22,6 +22,7 @@ import {
   setCloudinaryMeta,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const CUSTOM_CHARS_KEY = 'cloud_custom_chars';
 const CUSTOM_STYLES_KEY = 'cloud_custom_styles';
@@ -360,8 +361,8 @@ export default function AIGirlsCloudScreen() {
 
     try {
       // Explicitly request permission first — avoids silent failure on Honor HMOS
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert('Permission வேணும்', 'Settings → My Girls → Permissions → Photos → Allow all');
         return;
       }
@@ -612,8 +613,8 @@ export default function AIGirlsCloudScreen() {
     if (savingPhoto) return;
     setSavingPhoto(true);
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert('Permission இல்லை', 'Settings → My Girls → Permissions → Files & Media → Allow all');
         setSavingPhoto(false);
         return;

@@ -9,6 +9,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ALL_PERSONAS } from '../constants/personas';
 import { listCloudinaryVideos, deleteFromCloudinary, uploadUriToCloudinary, trackCloudinaryUpload } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { } = Dimensions.get('window');
 
@@ -103,7 +104,7 @@ export default function VideosScreen() {
   const uploadVideo = async () => {
     if (!selectedPersona) return;
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const perm = await requestPhotoVideoPermissionsAsync();
       if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும்'); return; }
 
       const res = await ImagePicker.launchImageLibraryAsync({

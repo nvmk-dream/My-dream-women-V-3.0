@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -37,8 +38,8 @@ export default function MediaImageViewer({ uri, onClose, onPrompt }: Props) {
   const handleSave = async () => {
     if (!uri) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert('Permission வேணும்', 'Settings → My Girls → Permissions → Files & Media → Allow all');
         return;
       }

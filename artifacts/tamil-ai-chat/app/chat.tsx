@@ -11,6 +11,7 @@ import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 function cloudVideoThumbnail(videoUrl: string): string {
   try {
@@ -1123,7 +1124,7 @@ ${todayStory.trim()}
   };
 
   const pickAvatarPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -1158,8 +1159,8 @@ ${todayStory.trim()}
   const saveAiImageToGallery = async (imageUrl: string) => {
     try {
       // Request MediaLibrary permission
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert('Permission வேணும் 📷', 'Settings → My Girls → Permissions → Files & Media → Allow all');
         return;
       }
@@ -1949,7 +1950,7 @@ ${todayStory.trim()}
 
   // ── Pick image from gallery → get AI prompt ───────────────────
   const pickImageForPrompt = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும் — settings-ல் allow பண்ணுங்க.'); return; }
     let picked: ImagePicker.ImagePickerResult;
     try {
