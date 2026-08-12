@@ -13,11 +13,11 @@ const playProtectModule = `package com.smk1.tamilaichat
 import android.content.ComponentName
 import android.content.Intent
 import android.provider.Settings
+import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.facebook.react.bridge.ReactPackage
 import com.facebook.react.uimanager.ViewManager
 
 class PlayProtectModule(private val reactContext: ReactApplicationContext) :
@@ -27,7 +27,7 @@ class PlayProtectModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun openPlayProtect(promise: Promise) {
-    val activity = currentActivity
+    val activity = reactContext.currentActivity
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "The app screen is not available")
       return
