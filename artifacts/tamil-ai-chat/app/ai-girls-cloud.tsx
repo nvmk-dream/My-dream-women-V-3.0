@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
-import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { ALL_PERSONAS } from '../constants/personas';
 import {
   listCloudinaryImages,
@@ -64,10 +64,19 @@ type PickerAssetMetadata = {
   modificationTime: number | null;
 };
 
-type PickerAssetWithMetadata = ImagePicker.ImagePickerAsset & {
+type PickerAssetWithMetadata = {
+  uri: string;
+  assetId?: string | null;
+  fileName?: string | null;
   fileSize?: number | null;
+  width: number;
+  height: number;
+  type: string;
+  mimeType?: string | null;
+  duration?: number | null;
   creationTime?: number | null;
   modificationTime?: number | null;
+  exif?: Record<string, unknown>;
   cutMetadata?: PickerAssetMetadata;
 };
 
@@ -377,7 +386,7 @@ export default function AIGirlsCloudScreen() {
   // ── Upload via System Picker (Cut / Copy) ────────────────────────────────
 
   const doUpload = async (
-    pickedAssets: ImagePicker.ImagePickerAsset[],
+    pickedAssets: PickerAssetWithMetadata[],
     charId: string,
     styleId: string,
     styleLabel: string,
@@ -527,28 +536,17 @@ export default function AIGirlsCloudScreen() {
   const openImagePicker = async (charId: string, charName: string, styleId: string, styleLabel: string) => {
     if (Platform.OS === 'web') { Alert.alert('Web', 'Upload mobile-ல் மட்டும் வேலை செய்யும்'); return; }
 
+    let result: DocumentPicker.DocumentPickerResult;
     try {
-      // Explicitly request permission first — avoids silent failure on Honor HMOS
-      const permission = await requestPhotoVideoPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permission வேணும்', 'Settings → My Girls → Permissions → Photos → Allow all');
-        return;
-      }
-    } catch { /* permission API not available on this device — proceed anyway */ }
-
-    let result: ImagePicker.ImagePickerResult;
-    try {
-      // ActivityResultLauncher registration settle panna wait pannrom
-      await new Promise(r => setTimeout(r, 350));
-      result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'] as any,
-        allowsMultipleSelection: true,
-        quality: 0.9,
-        // Keep capture metadata available for the assetId-null resolver.
-        exif: true,
+      // Android DocumentsUI: Recent → Phone → Folder → selected image/video.
+      // copyToCacheDirectory keeps the returned content URI readable by Cloudinary upload.
+      result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'video/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
       });
     } catch (e: any) {
-      Alert.alert('பிழை', 'Photo picker திறக்கல: ' + (e?.message ?? 'unknown'));
+      Alert.alert('பிழை', 'File picker திறக்கல: ' + (e?.message ?? 'unknown'));
       return;
     }
 
@@ -557,8 +555,7 @@ export default function AIGirlsCloudScreen() {
     const count = result.assets.length;
     const picked: PickerAssetWithMetadata[] = await Promise.all(
       result.assets.map(async asset => {
-        const raw = asset as any;
-        let fileSize = finiteNumber(raw.fileSize);
+        let fileSize = finiteNumber(asset.size);
         if (fileSize == null) {
           try {
             const fileInfo = await FileSystem.getInfoAsync(asset.uri);
@@ -567,7 +564,21 @@ export default function AIGirlsCloudScreen() {
             fileSize = null;
           }
         }
-        const enriched = { ...asset, fileSize } as PickerAssetWithMetadata;
+        const isVideo = asset.mimeType?.startsWith('video/') === true
+          || /\.(mp4|mov|m4v|avi|mkv|webm)$/i.test(asset.name ?? '');
+        const enriched: PickerAssetWithMetadata = {
+          uri: asset.uri,
+          assetId: null,
+          fileName: asset.name ?? null,
+          fileSize,
+          width: 0,
+          height: 0,
+          type: isVideo ? 'video' : 'image',
+          mimeType: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+          duration: null,
+          creationTime: null,
+          modificationTime: null,
+        };
         enriched.cutMetadata = getPickerMetadata(enriched);
         console.log('[CUT] picker-asset', JSON.stringify(enriched.cutMetadata));
         return enriched;
@@ -583,7 +594,7 @@ export default function AIGirlsCloudScreen() {
     );
 
     Alert.alert(
-      `${count} photo${count > 1 ? 's' : ''} select ஆச்சு`,
+      `${count} file${count > 1 ? 's' : ''} select ஆச்சு`,
       'Cloud-ல் எப்படி save பண்ணணும்?',
       [
         { text: 'Cancel', style: 'cancel' },
