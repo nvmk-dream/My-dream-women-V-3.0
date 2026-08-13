@@ -50,8 +50,29 @@ const PHOTO_STYLES = [
 
 interface CloudPhoto { url: string; public_id: string }
 
+type PickerAssetMetadata = {
+  uri: string;
+  assetId: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  width: number;
+  height: number;
+  mediaType: string;
+  type: string;
+  duration: number | null;
+  creationTime: number | null;
+  modificationTime: number | null;
+};
+
+type PickerAssetWithMetadata = ImagePicker.ImagePickerAsset & {
+  fileSize?: number | null;
+  creationTime?: number | null;
+  modificationTime?: number | null;
+  cutMetadata?: PickerAssetMetadata;
+};
+
 type PickerAssetForDeletion = {
-  pickerAsset: ImagePicker.ImagePickerAsset;
+  pickerAsset: PickerAssetWithMetadata;
   folder: string;
   uploaded: { url: string; public_id: string };
 };
@@ -61,19 +82,84 @@ type DeletionVerification = {
   detail: string;
 };
 
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseExifDate(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getPickerMetadata(asset: PickerAssetWithMetadata): PickerAssetMetadata {
+  const raw = asset as any;
+  const exif = raw.exif ?? {};
+  return {
+    uri: asset.uri,
+    assetId: asset.assetId ?? null,
+    fileName: asset.fileName ?? null,
+    fileSize: finiteNumber(raw.fileSize),
+    width: asset.width,
+    height: asset.height,
+    mediaType: asset.type,
+    type: asset.type,
+    duration: finiteNumber(asset.duration),
+    creationTime:
+      finiteNumber(raw.creationTime) ??
+      parseExifDate(exif.DateTimeOriginal) ??
+      parseExifDate(exif.DateTimeDigitized) ??
+      parseExifDate(exif.DateTime),
+    modificationTime: finiteNumber(raw.modificationTime),
+  };
+}
+
+async function getMediaLibraryFileSize(candidate: any): Promise<number | null> {
+  const directSize = finiteNumber(candidate.fileSize);
+  if (directSize != null) return directSize;
+
+  try {
+    const info = await MediaLibrary.getAssetInfoAsync(String(candidate.id)) as any;
+    const infoSize = finiteNumber(info?.fileSize) ?? finiteNumber(info?.size);
+    if (infoSize != null) return infoSize;
+
+    const localUri = info?.localUri ?? candidate.uri;
+    if (localUri) {
+      const fileInfo = await FileSystem.getInfoAsync(localUri);
+      return finiteNumber((fileInfo as any)?.size);
+    }
+  } catch {
+    // Some Android photo-picker assets cannot expose file information.
+  }
+  return null;
+}
+
 /**
- * Android's system photo picker may return an asset without assetId.
- * Resolve only an unambiguous MediaLibrary asset using exact metadata.
- * If no exact match exists, the caller must retain the original.
+ * Android's system photo picker can return a temporary URI and no assetId.
+ * Resolve only one unambiguous MediaLibrary asset using multiple independent
+ * metadata signals. A filename by itself is never sufficient.
  */
 async function resolvePickerAssetId(
-  pickerAsset: ImagePicker.ImagePickerAsset,
+  pickerAsset: PickerAssetWithMetadata,
 ): Promise<string | null> {
-  if (pickerAsset.assetId) return pickerAsset.assetId;
-  if (!pickerAsset.fileName) return null;
+  const metadata = pickerAsset.cutMetadata ?? getPickerMetadata(pickerAsset);
+  if (metadata.assetId) {
+    console.log(`[CUT] assetId | source=picker | assetId=${metadata.assetId}`);
+    return metadata.assetId;
+  }
 
-  const mediaType = pickerAsset.type === 'video' ? 'video' : 'photo';
-  const matches: any[] = [];
+  const mediaType = metadata.type === 'video' ? 'video' : 'photo';
+  const dimensionMatches: any[] = [];
   let after: string | undefined;
 
   for (let page = 0; page < 100; page += 1) {
@@ -85,26 +171,76 @@ async function resolvePickerAssetId(
     } as any);
 
     for (const candidate of result.assets as any[]) {
-      const sameName = candidate.filename === pickerAsset.fileName;
       const sameDimensions =
-        candidate.width === pickerAsset.width &&
-        candidate.height === pickerAsset.height;
-      const sameDuration =
-        mediaType !== 'video' ||
-        pickerAsset.duration == null ||
-        candidate.duration == null ||
-        Math.abs(candidate.duration - pickerAsset.duration) <= 1;
-
-      if (sameName && sameDimensions && sameDuration) {
-        matches.push(candidate);
-      }
+        (candidate.width === metadata.width && candidate.height === metadata.height) ||
+        (candidate.width === metadata.height && candidate.height === metadata.width);
+      if (sameDimensions) dimensionMatches.push(candidate);
     }
 
     if (!result.hasNextPage || !result.endCursor || result.endCursor === after) break;
     after = result.endCursor ?? undefined;
   }
 
-  return matches.length === 1 ? String(matches[0].id) : null;
+  const evaluated = await Promise.all(
+    dimensionMatches.map(async candidate => {
+      const candidateFileSize = await getMediaLibraryFileSize(candidate);
+      const sameName =
+        Boolean(metadata.fileName) &&
+        String(candidate.filename).toLowerCase() === String(metadata.fileName).toLowerCase();
+      const sameFileSize =
+        metadata.fileSize != null &&
+        candidateFileSize != null &&
+        metadata.fileSize === candidateFileSize;
+      const sameDuration =
+        mediaType === 'video' &&
+        metadata.duration != null &&
+        candidate.duration != null &&
+        Math.abs(candidate.duration - metadata.duration) <= 1;
+      const candidateTimes = [candidate.creationTime, candidate.modificationTime]
+        .map(finiteNumber)
+        .filter((value): value is number => value != null);
+      const pickerTimes = [metadata.creationTime, metadata.modificationTime]
+        .filter((value): value is number => value != null);
+      const sameTime = pickerTimes.some(pickerTime =>
+        candidateTimes.some(candidateTime => Math.abs(candidateTime - pickerTime) <= 24 * 60 * 60 * 1000),
+      );
+      const signals = [sameName, sameFileSize, sameDuration, sameTime]
+        .filter(Boolean).length;
+      const score =
+        (sameFileSize ? 100 : 0) +
+        (sameName ? 60 : 0) +
+        (sameDuration ? 50 : 0) +
+        (sameTime ? 25 : 0);
+      return {
+        candidate,
+        candidateFileSize,
+        sameName,
+        sameFileSize,
+        sameDuration,
+        sameTime,
+        signals,
+        score,
+      };
+    }),
+  );
+
+  const verified = evaluated.filter(match =>
+    // Dimensions are already required above. Two independent signals are
+    // reliable, while one signal is accepted only when it is the sole
+    // dimension match. This prevents filename-only deletion.
+    match.signals >= 2 || (evaluated.length === 1 && match.signals >= 1),
+  );
+  const bestScore = verified.length ? Math.max(...verified.map(match => match.score)) : -1;
+  const best = verified.filter(match => match.score === bestScore);
+
+  console.log(
+    `[CUT] media-library-resolution | fileName=${metadata.fileName ?? 'none'} | ` +
+    `fileSize=${metadata.fileSize ?? 'none'} | dimensions=${metadata.width}x${metadata.height} | ` +
+    `mediaType=${metadata.type} | dimensionMatches=${dimensionMatches.length} | ` +
+    `verified=${verified.length} | bestScore=${bestScore}`,
+  );
+
+  return best.length === 1 ? String(best[0].candidate.id) : null;
 }
 
 async function verifyMediaLibraryDeletion(assetId: string): Promise<DeletionVerification> {
@@ -260,6 +396,8 @@ export default function AIGirlsCloudScreen() {
     for (let i = 0; i < pickedAssets.length; i++) {
       const asset = pickedAssets[i];
       const fname = asset.fileName || `file_${i + 1}`;
+      const pickerMetadata = asset.cutMetadata ?? getPickerMetadata(asset);
+      console.log('[CUT] picker-asset', JSON.stringify(pickerMetadata));
       try {
         const folder = `my-girls/${charId}/${styleId}`;
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
@@ -269,8 +407,8 @@ export default function AIGirlsCloudScreen() {
         trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
         uploadedAssets.push({ pickerAsset: asset, folder, uploaded });
         console.log(
-          `[CUT] Cloudinary upload success | uri=${asset.uri} | assetId=${asset.assetId ?? 'none'} | ` +
-          `mediaType=${asset.type} | public_id=${uploaded.public_id} | url=${uploaded.url}`,
+          `[CUT] upload-success | uri=${pickerMetadata.uri} | assetId=${pickerMetadata.assetId ?? 'none'} | ` +
+          `mediaType=${pickerMetadata.mediaType} | public_id=${uploaded.public_id} | url=${uploaded.url}`,
         );
         done++;
       } catch (e: any) {
@@ -299,11 +437,10 @@ export default function AIGirlsCloudScreen() {
     const cutDeleteFailures: string[] = [];
     if (action === 'cut' && uploadedAssets.length > 0) {
       for (const { pickerAsset } of uploadedAssets) {
-        const logAssetId = pickerAsset.assetId ?? 'none';
-        console.log(
-          `[CUT] delete candidate | uri=${pickerAsset.uri} | assetId=${logAssetId} | ` +
-          `mediaType=${pickerAsset.type}`,
-        );
+        const metadata = pickerAsset.cutMetadata ?? getPickerMetadata(pickerAsset);
+        const logAssetId = metadata.assetId ?? 'none';
+        console.log('[CUT] picker-asset', JSON.stringify(metadata));
+        console.log(`[CUT] assetId | picker=${logAssetId}`);
 
         let resolvedAssetId: string | null = pickerAsset.assetId ?? null;
         try {
@@ -311,20 +448,24 @@ export default function AIGirlsCloudScreen() {
             resolvedAssetId = await resolvePickerAssetId(pickerAsset);
           }
           console.log(
-            `[CUT] resolved assetId=${resolvedAssetId ?? 'none'} | ` +
-            `uri=${pickerAsset.uri} | mediaType=${pickerAsset.type}`,
+            `[CUT] resolved-asset | assetId=${resolvedAssetId ?? 'none'} | ` +
+            `uri=${metadata.uri} | mediaType=${metadata.mediaType}`,
           );
 
           if (!resolvedAssetId) {
-            const msg = `${pickerAsset.fileName || pickerAsset.uri}: exact MediaLibrary asset match not found`;
+            const msg = `${metadata.fileName || metadata.uri}: verified MediaLibrary asset match not found`;
             cutDeleteFailures.push(msg);
-            console.log(`[CUT] deletion skipped — ${msg}`);
+            console.warn(`[CUT] asset-resolution-failed | ${msg}`);
             continue;
           }
 
+          console.log(
+            `[CUT] delete-start | assetId=${resolvedAssetId} | ` +
+            `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
+          );
           const deleteResult = await MediaLibrary.deleteAssetsAsync([resolvedAssetId]);
           console.log(
-            `[CUT] deleteAssetsAsync result | assetId=${resolvedAssetId} | result=${deleteResult}`,
+            `[CUT] delete-result | assetId=${resolvedAssetId} | result=${deleteResult}`,
           );
 
           const verification = await verifyMediaLibraryDeletion(resolvedAssetId);
@@ -336,16 +477,16 @@ export default function AIGirlsCloudScreen() {
           if (verification.deleted) {
             cutDeletedCount += 1;
           } else {
-            const msg = `${pickerAsset.fileName || pickerAsset.uri}: deletion not confirmed`;
+            const msg = `${metadata.fileName || metadata.uri}: deletion not confirmed (${verification.detail})`;
             cutDeleteFailures.push(msg);
-            console.log(`[CUT] deletion failed | ${msg}`);
+            console.warn(`[CUT] delete-failed | ${msg}`);
           }
         } catch (error) {
-          const msg = `${pickerAsset.fileName || pickerAsset.uri}: ${String(error).slice(0, 200)}`;
+          const msg = `${metadata.fileName || metadata.uri}: ${String(error).slice(0, 200)}`;
           cutDeleteFailures.push(msg);
-          console.log(
-            `[CUT] deletion error | assetId=${resolvedAssetId ?? 'none'} | ` +
-            `uri=${pickerAsset.uri} | mediaType=${pickerAsset.type} | error=${String(error)}`,
+          console.warn(
+            `[CUT] delete-failed | assetId=${resolvedAssetId ?? 'none'} | ` +
+            `uri=${metadata.uri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
           );
         }
       }
@@ -403,34 +544,43 @@ export default function AIGirlsCloudScreen() {
         mediaTypes: ['images', 'videos'] as any,
         allowsMultipleSelection: true,
         quality: 0.9,
-        exif: false,
+        // Keep capture metadata available for the assetId-null resolver.
+        exif: true,
       });
     } catch (e: any) {
       Alert.alert('பிழை', 'Photo picker திறக்கல: ' + (e?.message ?? 'unknown'));
       return;
     }
 
+    if (result.canceled || result.assets.length === 0) return;
+
+    const count = result.assets.length;
+    const picked: PickerAssetWithMetadata[] = await Promise.all(
+      result.assets.map(async asset => {
+        const raw = asset as any;
+        let fileSize = finiteNumber(raw.fileSize);
+        if (fileSize == null) {
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+            fileSize = finiteNumber((fileInfo as any)?.size);
+          } catch {
+            fileSize = null;
+          }
+        }
+        const enriched = { ...asset, fileSize } as PickerAssetWithMetadata;
+        enriched.cutMetadata = getPickerMetadata(enriched);
+        console.log('[CUT] picker-asset', JSON.stringify(enriched.cutMetadata));
+        return enriched;
+      }),
+    );
+
     console.log(
       '[CUT] picker result',
       JSON.stringify({
         canceled: result.canceled,
-        assets: result.assets.map(asset => ({
-          uri: asset.uri,
-          assetId: asset.assetId ?? null,
-          mediaType: asset.type,
-          fileName: asset.fileName ?? null,
-          mimeType: asset.mimeType ?? null,
-          width: asset.width,
-          height: asset.height,
-          duration: asset.duration ?? null,
-        })),
+        assets: picked.map(asset => asset.cutMetadata ?? getPickerMetadata(asset)),
       }),
     );
-
-    if (result.canceled || result.assets.length === 0) return;
-
-    const count = result.assets.length;
-    const picked = result.assets;
 
     Alert.alert(
       `${count} photo${count > 1 ? 's' : ''} select ஆச்சு`,
