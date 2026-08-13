@@ -20,12 +20,22 @@ function withSafDocumentDelete(config) {
   return withMainApplication(config, (config) => {
     const { contents, language } = config.modResults;
     if (contents.includes(IMPORT_LINE)) return config;
-    if (language !== 'kotlin') {
-      throw new Error('SafDocument plugin requires a Kotlin MainApplication');
+    if (language === 'kotlin') {
+      config.modResults.contents = contents
+        .replace(/^(package [^\n]+\n)/m, '$1\n' + IMPORT_LINE + '\n')
+        .replace(
+          'PackageList(this).packages.apply {',
+          'PackageList(this).packages.apply {\n      add(' + PACKAGE_NAME + '())',
+        );
+    } else {
+      // Expo may generate MainApplication.java for this project.
+      config.modResults.contents = contents
+        .replace(/^(package [^\n]+;\n)/m, '$1\n' + IMPORT_LINE + ';\n')
+        .replace(
+          'List<ReactPackage> packages = new PackageList(this).getPackages();',
+          'List<ReactPackage> packages = new PackageList(this).getPackages();\n    packages.add(new ' + PACKAGE_NAME + '());',
+        );
     }
-    config.modResults.contents = contents
-      .replace(/^(package [^\n]+\n)/m, '$1\n' + IMPORT_LINE + '\n')
-      .replace('PackageList(this).packages.apply {', 'PackageList(this).packages.apply {\n      add(' + PACKAGE_NAME + '())');
     return config;
   });
 }
