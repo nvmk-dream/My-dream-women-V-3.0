@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
-  Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
+  Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler, NativeModules,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -91,6 +91,26 @@ type DeletionVerification = {
   detail: string;
 };
 
+type SafDocumentDeleteResult = {
+  deleted: boolean;
+  rows: number;
+  detail: string;
+};
+
+const SafDocument = NativeModules.SafDocument as {
+  deleteDocument: (uri: string) => Promise<SafDocumentDeleteResult>;
+} | undefined;
+
+async function deleteOriginalDocument(uri: string): Promise<SafDocumentDeleteResult> {
+  if (!uri.startsWith('content://')) {
+    return { deleted: false, rows: 0, detail: 'SAF deletion requires the original content:// URI' };
+  }
+  if (!SafDocument?.deleteDocument) {
+    return { deleted: false, rows: 0, detail: 'SafDocument native module is unavailable in this APK' };
+  }
+  return SafDocument.deleteDocument(uri);
+}
+
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -131,125 +151,6 @@ function getPickerMetadata(asset: PickerAssetWithMetadata): PickerAssetMetadata 
       parseExifDate(exif.DateTime),
     modificationTime: finiteNumber(raw.modificationTime),
   };
-}
-
-async function getMediaLibraryFileSize(candidate: any): Promise<number | null> {
-  const directSize = finiteNumber(candidate.fileSize);
-  if (directSize != null) return directSize;
-
-  try {
-    const info = await MediaLibrary.getAssetInfoAsync(String(candidate.id)) as any;
-    const infoSize = finiteNumber(info?.fileSize) ?? finiteNumber(info?.size);
-    if (infoSize != null) return infoSize;
-
-    const localUri = info?.localUri ?? candidate.uri;
-    if (localUri) {
-      const fileInfo = await FileSystem.getInfoAsync(localUri);
-      return finiteNumber((fileInfo as any)?.size);
-    }
-  } catch {
-    // Some Android photo-picker assets cannot expose file information.
-  }
-  return null;
-}
-
-/**
- * Android's system photo picker can return a temporary URI and no assetId.
- * Resolve only one unambiguous MediaLibrary asset using multiple independent
- * metadata signals. A filename by itself is never sufficient.
- */
-async function resolvePickerAssetId(
-  pickerAsset: PickerAssetWithMetadata,
-): Promise<string | null> {
-  const metadata = pickerAsset.cutMetadata ?? getPickerMetadata(pickerAsset);
-  if (metadata.assetId) {
-    console.log(`[CUT] assetId | source=picker | assetId=${metadata.assetId}`);
-    return metadata.assetId;
-  }
-
-  const mediaType = metadata.type === 'video' ? 'video' : 'photo';
-  const dimensionMatches: any[] = [];
-  let after: string | undefined;
-
-  for (let page = 0; page < 100; page += 1) {
-    const result = await MediaLibrary.getAssetsAsync({
-      first: 100,
-      after,
-      mediaType: [mediaType],
-      sortBy: ['creationTime'],
-    } as any);
-
-    for (const candidate of result.assets as any[]) {
-      const sameDimensions =
-        (candidate.width === metadata.width && candidate.height === metadata.height) ||
-        (candidate.width === metadata.height && candidate.height === metadata.width);
-      if (sameDimensions) dimensionMatches.push(candidate);
-    }
-
-    if (!result.hasNextPage || !result.endCursor || result.endCursor === after) break;
-    after = result.endCursor ?? undefined;
-  }
-
-  const evaluated = await Promise.all(
-    dimensionMatches.map(async candidate => {
-      const candidateFileSize = await getMediaLibraryFileSize(candidate);
-      const sameName =
-        Boolean(metadata.fileName) &&
-        String(candidate.filename).toLowerCase() === String(metadata.fileName).toLowerCase();
-      const sameFileSize =
-        metadata.fileSize != null &&
-        candidateFileSize != null &&
-        metadata.fileSize === candidateFileSize;
-      const sameDuration =
-        mediaType === 'video' &&
-        metadata.duration != null &&
-        candidate.duration != null &&
-        Math.abs(candidate.duration - metadata.duration) <= 1;
-      const candidateTimes = [candidate.creationTime, candidate.modificationTime]
-        .map(finiteNumber)
-        .filter((value): value is number => value != null);
-      const pickerTimes = [metadata.creationTime, metadata.modificationTime]
-        .filter((value): value is number => value != null);
-      const sameTime = pickerTimes.some(pickerTime =>
-        candidateTimes.some(candidateTime => Math.abs(candidateTime - pickerTime) <= 24 * 60 * 60 * 1000),
-      );
-      const signals = [sameName, sameFileSize, sameDuration, sameTime]
-        .filter(Boolean).length;
-      const score =
-        (sameFileSize ? 100 : 0) +
-        (sameName ? 60 : 0) +
-        (sameDuration ? 50 : 0) +
-        (sameTime ? 25 : 0);
-      return {
-        candidate,
-        candidateFileSize,
-        sameName,
-        sameFileSize,
-        sameDuration,
-        sameTime,
-        signals,
-        score,
-      };
-    }),
-  );
-
-  const verified = evaluated.filter(match =>
-    // Dimensions are already required above. Two independent signals are
-    // reliable, while one signal is accepted only when it is the sole
-    // dimension match. This prevents filename-only deletion.
-    match.signals >= 2 || (evaluated.length === 1 && match.signals >= 1),
-  );
-  const bestScore = verified.length ? Math.max(...verified.map(match => match.score)) : -1;
-  const best = verified.filter(match => match.score === bestScore);
-
-  console.log(
-    `[CUT] media-library-resolution | fileName=${metadata.fileName ?? 'none'} | ` +
-    `fileSize=${metadata.fileSize ?? 'none'} | dimensions=${metadata.width}x${metadata.height} | ` +
-    `mediaType=${metadata.type} | dimensionMatches=${dimensionMatches.length} | ` +
-    `verified=${verified.length} | bestScore=${bestScore}`,
-  );
-
-  return best.length === 1 ? String(best[0].candidate.id) : null;
 }
 
 async function verifyMediaLibraryDeletion(assetId: string): Promise<DeletionVerification> {
@@ -441,7 +342,7 @@ export default function AIGirlsCloudScreen() {
     }
 
     // CUT: delete only originals whose Cloudinary upload succeeded.
-    // Gallery media must be deleted through expo-media-library, never FileSystem.
+    // Delete originals through MediaLibrary asset IDs or Android SAF document URIs; never delete the cache copy.
     let cutDeletedCount = 0;
     const cutDeleteFailures: string[] = [];
     if (action === 'cut' && uploadedAssets.length > 0) {
@@ -452,50 +353,71 @@ export default function AIGirlsCloudScreen() {
         console.log(`[CUT] assetId | picker=${logAssetId}`);
 
         let resolvedAssetId: string | null = pickerAsset.assetId ?? null;
+        const originalUri = metadata.uri;
         try {
-          if (!resolvedAssetId) {
-            resolvedAssetId = await resolvePickerAssetId(pickerAsset);
+          // PATH B: DocumentsUI returns the original content:// URI without a MediaLibrary assetId.
+          // Never scan by filename or guess a MediaLibrary ID for this path.
+          if (!resolvedAssetId && originalUri.startsWith('content://')) {
+            console.log(
+              `[CUT] SAF delete-start | uri=${originalUri} | fileName=${metadata.fileName ?? 'none'} | ` +
+              `mediaType=${metadata.mediaType}`,
+            );
+            const safResult = await deleteOriginalDocument(originalUri);
+            console.log(
+              `[CUT] SAF delete-result | uri=${originalUri} | rows=${safResult.rows} | ` +
+              `deleted=${safResult.deleted} | detail=${safResult.detail}`,
+            );
+            if (safResult.deleted) {
+              cutDeletedCount += 1;
+            } else {
+              const msg = `${metadata.fileName || originalUri}: original document delete not confirmed (${safResult.detail})`;
+              cutDeleteFailures.push(msg);
+              console.warn(`[CUT] SAF delete-failed | ${msg}`);
+            }
+            continue;
           }
+
+          // PATH A: a genuine MediaLibrary assetId can use the existing MediaLibrary path.
           console.log(
             `[CUT] resolved-asset | assetId=${resolvedAssetId ?? 'none'} | ` +
-            `uri=${metadata.uri} | mediaType=${metadata.mediaType}`,
+            `uri=${originalUri} | mediaType=${metadata.mediaType}`,
           );
 
           if (!resolvedAssetId) {
-            const msg = `${metadata.fileName || metadata.uri}: verified MediaLibrary asset match not found`;
+            const msg = `${metadata.fileName || originalUri}: valid MediaLibrary assetId not available`;
             cutDeleteFailures.push(msg);
             console.warn(`[CUT] asset-resolution-failed | ${msg}`);
             continue;
           }
 
           console.log(
-            `[CUT] delete-start | assetId=${resolvedAssetId} | ` +
+            `[CUT] MediaLibrary delete-start | assetId=${resolvedAssetId} | ` +
             `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
           );
           const deleteResult = await MediaLibrary.deleteAssetsAsync([resolvedAssetId]);
           console.log(
-            `[CUT] delete-result | assetId=${resolvedAssetId} | result=${deleteResult}`,
+            `[CUT] MediaLibrary delete-result | assetId=${resolvedAssetId} | result=${deleteResult}`,
           );
 
           const verification = await verifyMediaLibraryDeletion(resolvedAssetId);
           console.log(
-            `[CUT] post-delete verification | assetId=${resolvedAssetId} | ` +
+            `[CUT] MediaLibrary post-delete verification | assetId=${resolvedAssetId} | ` +
             `deleted=${verification.deleted} | detail=${verification.detail}`,
           );
 
           if (verification.deleted) {
             cutDeletedCount += 1;
           } else {
-            const msg = `${metadata.fileName || metadata.uri}: deletion not confirmed (${verification.detail})`;
+            const msg = `${metadata.fileName || originalUri}: deletion not confirmed (${verification.detail})`;
             cutDeleteFailures.push(msg);
             console.warn(`[CUT] delete-failed | ${msg}`);
           }
         } catch (error) {
-          const msg = `${metadata.fileName || metadata.uri}: ${String(error).slice(0, 200)}`;
+          const msg = `${metadata.fileName || originalUri}: ${String(error).slice(0, 200)}`;
           cutDeleteFailures.push(msg);
           console.warn(
             `[CUT] delete-failed | assetId=${resolvedAssetId ?? 'none'} | ` +
-            `uri=${metadata.uri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
+            `uri=${originalUri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
           );
         }
       }
@@ -527,7 +449,7 @@ export default function AIGirlsCloudScreen() {
       // CUT — upload succeeded but phone delete failed
       Alert.alert(
         '⚠️ Upload ஆச்சு, Delete ஆகல',
-        `${done}/${total} photos cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nPhotos & Videos permission-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
+        `${done}/${total} photos cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; document delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nDocument provider delete permission அல்லது source file access-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
           (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
       );
     }
@@ -539,11 +461,12 @@ export default function AIGirlsCloudScreen() {
     let result: DocumentPicker.DocumentPickerResult;
     try {
       // Android DocumentsUI: Recent → Phone → Folder → selected image/video.
-      // copyToCacheDirectory keeps the returned content URI readable by Cloudinary upload.
+      // Preserve the original SAF content:// URI for Cut deletion; uploadAsync reads it directly.
+      // Do not use the cache copy as the deletion target.
       result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'video/*'],
         multiple: true,
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: false,
       });
     } catch (e: any) {
       Alert.alert('பிழை', 'File picker திறக்கல: ' + (e?.message ?? 'unknown'));

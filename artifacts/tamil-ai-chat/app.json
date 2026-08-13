@@ -76,7 +76,8 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "./plugins/withPlayProtect"
+      "./plugins/withPlayProtect",
+      "./plugins/withSafDocumentDelete"
     ],
     "experiments": {
       "typedRoutes": true
