@@ -446,74 +446,6 @@ export default function ChatScreen() {
   const [stagingCaption, setStagingCaption] = useState('');
   const [stagingUploading, setStagingUploading] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    const pending = ParamsStore.getPendingGalleryMedia();
-    if (!pending) return;
-    ParamsStore.clearPendingGalleryMedia();
-
-    let active = true;
-    const prepareGalleryMedia = async () => {
-      setFileLoading(true);
-      const tempUri = `${FileSystem.cacheDirectory}chat_gallery_${Date.now()}${pending.isVideo ? '.mp4' : '.jpg'}`;
-      try {
-        await FileSystem.copyAsync({ from: pending.uri, to: tempUri });
-        const info = await FileSystem.getInfoAsync(tempUri);
-        const sizeMB = info.exists && 'size' in info ? (info.size || 0) / (1024 * 1024) : 0;
-        const sizeLimit = pending.isVideo ? 100 : 25;
-        if (sizeMB > sizeLimit) {
-          throw new Error(`${pending.isVideo ? 'வீடியோ' : 'படம்'} ${sizeMB.toFixed(1)}MB உள்ளது — ${sizeLimit}MB-க்கு கீழ் இருக்கணும்.`);
-        }
-        if (pending.isVideo && pending.durationSec && pending.durationSec > 60) {
-          setTrimStartSec(0);
-          setTrimEndSec(Math.min(60, pending.durationSec));
-          setTrimCurrentSec(0);
-          setTrimPending({
-            uri: pending.uri,
-            durationSec: pending.durationSec,
-            mimeType: pending.mimeType,
-            fileName: pending.fileName,
-          });
-          return;
-        }
-        let b64 = '';
-        if (pending.isVideo) {
-          b64 = await FileSystem.readAsStringAsync(tempUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } else {
-          const compressed = await ImageManipulator.manipulateAsync(
-            tempUri,
-            [{ resize: { width: 1280 } }],
-            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
-          );
-          b64 = await FileSystem.readAsStringAsync(compressed.uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          await FileSystem.deleteAsync(compressed.uri, { idempotent: true }).catch(() => {});
-        }
-        if (!active) return;
-        if (!b64 || b64.length < 10) throw new Error('Selected media is empty');
-        setStagingCaption('');
-        setStagingMedia({
-          uri: pending.uri,
-          isVideo: pending.isVideo,
-          b64,
-          mimeType: pending.mimeType,
-          fileName: pending.fileName,
-        });
-      } catch (e: any) {
-        if (active) {
-          Alert.alert('❌ File Read பண்ண முடியல', e?.message || 'Selected media could not be read');
-        }
-      } finally {
-        await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
-        if (active) setFileLoading(false);
-      }
-    };
-    prepareGalleryMedia();
-    return () => { active = false; };
-  }, []));
-
   // ── Video Trim state ──────────────────────────────────────────────────────
   const [trimPending, setTrimPending] = useState<{
     uri: string; durationSec: number; mimeType: string; fileName: string;
@@ -523,6 +455,54 @@ export default function ChatScreen() {
   const [trimCurrentSec, setTrimCurrentSec] = useState(0);
   const [isTrimming, setIsTrimming] = useState(false);
   const trimVideoRef = useRef<any>(null);
+  // Prepare a selected image/video for the existing staging + Cloudinary flow
+  const prepareSelectedMedia = useCallback(async (pending: {
+    uri: string; isVideo: boolean; mimeType: string; fileName: string; durationSec?: number;
+  }) => {
+    setFileLoading(true);
+    const tempUri = FileSystem.cacheDirectory + 'chat_gallery_' + Date.now() + (pending.isVideo ? '.mp4' : '.jpg');
+    try {
+      await FileSystem.copyAsync({ from: pending.uri, to: tempUri });
+      const info = await FileSystem.getInfoAsync(tempUri);
+      const sizeMB = info.exists && 'size' in info ? (info.size || 0) / (1024 * 1024) : 0;
+      const sizeLimit = pending.isVideo ? 100 : 25;
+      if (sizeMB > sizeLimit) throw new Error((pending.isVideo ? 'வீடியோ' : 'படம்') + ' ' + sizeMB.toFixed(1) + 'MB உள்ளது — ' + sizeLimit + 'MB-க்கு கீழ் இருக்கணும்.');
+      if (pending.isVideo && pending.durationSec && pending.durationSec > 60) {
+        setTrimStartSec(0);
+        setTrimEndSec(Math.min(60, pending.durationSec));
+        setTrimCurrentSec(0);
+        setTrimPending({ uri: pending.uri, durationSec: pending.durationSec, mimeType: pending.mimeType, fileName: pending.fileName });
+        return;
+      }
+      let b64 = '';
+      if (pending.isVideo) {
+        b64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
+      } else {
+        const compressed = await ImageManipulator.manipulateAsync(
+          tempUri,
+          [{ resize: { width: 1280 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        b64 = await FileSystem.readAsStringAsync(compressed.uri, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.deleteAsync(compressed.uri, { idempotent: true }).catch(() => {});
+      }
+      if (!b64 || b64.length < 10) throw new Error('Selected media is empty');
+      setStagingCaption('');
+      setStagingMedia({ uri: pending.uri, isVideo: pending.isVideo, b64, mimeType: pending.mimeType, fileName: pending.fileName });
+    } catch (e: any) {
+      Alert.alert('❌ File Read பண்ண முடியல', e?.message || 'Selected media could not be read');
+    } finally {
+      await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+      setFileLoading(false);
+    }
+  }, []);
+  // Existing gallery route still works; it shares the same preparation path.
+  useFocusEffect(useCallback(() => {
+    const pending = ParamsStore.getPendingGalleryMedia();
+    if (!pending) return;
+    ParamsStore.clearPendingGalleryMedia();
+    prepareSelectedMedia(pending);
+  }, [prepareSelectedMedia]));
   const [showGenModal, setShowGenModal] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState('normal');
@@ -1181,6 +1161,29 @@ ${todayStory.trim()}
     }
   };
 
+  // WhatsApp-style file selection: Android DocumentsUI (Recent → Phone → Folder → File)
+  const pickChatMediaFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'video/*'],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const isVideo = asset.mimeType?.startsWith('video/') === true || /\.(mp4|mov|m4v|avi|mkv|webm)$/i.test(asset.name ?? '');
+      const fallbackMime = isVideo ? 'video/mp4' : 'image/jpeg';
+      await prepareSelectedMedia({
+        uri: asset.uri,
+        isVideo,
+        mimeType: asset.mimeType || fallbackMime,
+        fileName: asset.name || (isVideo ? 'phone_video.mp4' : 'phone_photo.jpg'),
+      });
+    } catch (e: any) {
+      Alert.alert('❌ File picker பிழை', e?.message || 'File select பண்ண முடியல.');
+    }
+  }, [prepareSelectedMedia]);
   const handleFileAttach = useCallback(async () => {
     if (!persona) return;
     try {
@@ -1191,7 +1194,7 @@ ${todayStory.trim()}
         [
           {
             text: '📷 Photo / Video',
-            onPress: () => router.push('/gallery?mode=chat' as any),
+            onPress: pickChatMediaFile,
           },
           {
             text: '📄 Document (PDF/TXT)',
@@ -1266,7 +1269,7 @@ ${todayStory.trim()}
     } catch (e) {
       Alert.alert('Error', 'File pick பண்ண முடியல');
     }
-  }, [persona]);
+  }, [persona, pickChatMediaFile]);
 
   // ── Send staged photo/video: upload to Cloudinary → analyzeFile ──────────────
   const sendStagedMedia = useCallback(async () => {
