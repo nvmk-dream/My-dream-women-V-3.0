@@ -869,16 +869,18 @@ ${todayStory.trim()}
   const toggleMood = async () => {
     const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp' | 'story'> | undefined;
     let next: 'presana' | 'normal' | 'whatsapp' | 'story';
-    if (allowedModes?.length) {
-      const cycle = allowedModes.includes('story') ? allowedModes : [...allowedModes, 'story'];
-      const idx = cycle.indexOf(moodMode);
-      next = cycle[(idx < 0 ? 0 : idx + 1) % cycle.length];
-    } else {
-      next = moodMode === 'presana' ? 'normal' : moodMode === 'normal' ? 'whatsapp' : moodMode === 'whatsapp' ? 'story' : 'presana';
-    }
+    // Keep the original four-mode order. Story is only part of the cycle
+    // when a story exists; otherwise it must not block Presana.
+    const configuredModes: Array<'presana' | 'normal' | 'whatsapp' | 'story'> =
+      allowedModes?.length
+        ? allowedModes
+        : ['whatsapp', 'normal', 'presana', 'story'];
+    const cycle = configuredModes.filter(mode => mode !== 'story' || Boolean(todayStory.trim()));
+    const idx = cycle.indexOf(moodMode);
+    next = cycle[(idx < 0 ? 0 : idx + 1) % cycle.length];
     if (next === 'story' && !todayStory.trim()) {
       Alert.alert('இன்றைய கதை இல்ல', 'Edit Character page-ல் "இன்றைய கதை" section-ல் ஒரு கதை add பண்ணுங்க, அப்புறம் Story mode use பண்ணலாம்.');
-      next = 'normal';
+      return;
     }
     setMoodMode(next);
     if (personaId) await AsyncStorage.setItem(`mood_mode_${personaId}`, next);
