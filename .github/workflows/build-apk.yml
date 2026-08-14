@@ -193,6 +193,7 @@ jobs:
       - name: Build APK
         working-directory: artifacts/tamil-ai-chat/android
         run: |
+          set -o pipefail
           chmod +x gradlew
           ./gradlew assembleDebug -PbundleInDebug=true --no-daemon 2>&1 | tee /tmp/gradle.log
           find . -name "*.apk" | grep -v node_modules | while read f; do

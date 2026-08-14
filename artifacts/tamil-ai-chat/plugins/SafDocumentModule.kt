@@ -3,7 +3,6 @@ package com.smk1.tamilaichat
 import android.os.Build
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.provider.MediaStore
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -86,6 +85,27 @@ class SafDocumentModule(private val reactContext: ReactApplicationContext) :
       isDocumentProvider = isDocumentProvider,
       supportsDelete = if (isDocumentProvider) documentSupportsDelete(uri) else null,
     )
+  }
+
+  private fun resolveMediaStoreUri(uri: Uri): Uri? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+
+    return try {
+      // Resolve this API reflectively so the module also compiles with Android
+      // SDKs whose android.jar does not expose getMediaUri yet.
+      val method = DocumentsContract::class.java.getMethod(
+        "getMediaUri",
+        android.content.Context::class.java,
+        Uri::class.java,
+      )
+      method.invoke(null, reactContext, uri) as? Uri
+    } catch (error: Exception) {
+      android.util.Log.w(
+        "SafDocument",
+        "media-uri-resolution-failed uri=$uri error=${error.message}",
+      )
+      null
+    }
   }
 
   private fun auditMap(uri: Uri, audit: UriAudit): com.facebook.react.bridge.WritableMap {
@@ -197,7 +217,7 @@ class SafDocumentModule(private val reactContext: ReactApplicationContext) :
         audit.provider == "MediaStore DocumentsProvider" &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
       ) {
-        MediaStore.getMediaUri(reactContext, uri)
+        resolveMediaStoreUri(uri)
       } else if (audit.provider == "MediaStore") {
         uri
       } else {
