@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as DocumentPicker from 'expo-document-picker';
 import { ALL_PERSONAS } from '../constants/personas';
+import { PHOTO_STYLES } from '../constants/photo-styles';
 import {
   listCloudinaryImages,
   trackCloudinaryUpload,
@@ -30,23 +31,6 @@ const { width } = Dimensions.get('window');
 const PHOTO_COL = 3;
 const PHOTO_SIZE = (width - 4 * (PHOTO_COL + 1)) / PHOTO_COL;
 
-const PHOTO_STYLES = [
-  { id: 'breast',    label: 'Breast Show'  },
-  { id: 'buttocks',  label: 'Buttocks'     },
-  { id: 'cleavage',  label: 'Cleavage'     },
-  { id: 'halfbreast',label: 'Half Breast'  },
-  { id: 'highslit',  label: 'High Slit'    },
-  { id: 'legs',      label: 'Legs Spread'  },
-  { id: 'lingerie',  label: 'Lingerie'     },
-  { id: 'lowneck',   label: 'Low Neckline' },
-  { id: 'normal',    label: 'Normal Photo' },
-  { id: 'nude',      label: 'Nude'         },
-  { id: 'seductive', label: 'Seductive'    },
-  { id: 'seminude',  label: 'Semi Nude'    },
-  { id: 'sleeping',  label: 'Sleeping'     },
-  { id: 'wet',       label: 'Wet Clothes'  },
-  { id: 'saree',     label: 'Saree Tuck'   },
-];
 
 interface CloudPhoto { url: string; public_id: string }
 
