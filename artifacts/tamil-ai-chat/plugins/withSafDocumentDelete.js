@@ -20,7 +20,8 @@ function withSafDocumentDelete(config) {
   return withMainApplication(config, (config) => {
     const { contents, language } = config.modResults;
     if (contents.includes(IMPORT_LINE)) return config;
-    if (language === 'kotlin') {
+    // Expo config plugins report Kotlin MainApplication files as language 'kt'.
+    if (language === 'kotlin' || language === 'kt') {
       config.modResults.contents = contents
         .replace(/^(package [^\n]+\n)/m, '$1\n' + IMPORT_LINE + '\n')
         .replace(
