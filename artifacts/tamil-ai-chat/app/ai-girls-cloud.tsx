@@ -95,18 +95,100 @@ type SafDocumentDeleteResult = {
   deleted: boolean;
   rows: number;
   detail: string;
+  originalUri: string;
+  uriAuthority: string;
+  uriType: string;
+  provider: string;
+  deleteMethod: string;
+  deleteResult: string;
+  postDeleteVerification: string;
+  supportsDelete?: boolean | null;
 };
 
 const SafDocument = NativeModules.SafDocument as {
+  inspectUri?: (uri: string) => Promise<{
+    originalUri: string;
+    uriAuthority: string;
+    uriType: string;
+    provider: string;
+    isDocumentProvider: boolean;
+    supportsDelete?: boolean | null;
+  }>;
   deleteDocument: (uri: string) => Promise<SafDocumentDeleteResult>;
 } | undefined;
 
+function uriAuthorityFallback(uri: string): string {
+  if (!uri.startsWith('content://')) return 'none';
+  const authority = uri.slice('content://'.length).split('/')[0];
+  return authority || 'unknown';
+}
+
+function providerFallback(uri: string): string {
+  const authority = uriAuthorityFallback(uri);
+  if (authority === 'media') return 'MediaStore';
+  if (authority === 'com.android.providers.media.documents') return 'MediaStore DocumentsProvider';
+  if (
+    authority === 'com.android.providers.downloads.documents' ||
+    authority === 'com.android.providers.downloads'
+  ) return 'Downloads/Documents provider';
+  if (uri.startsWith('content://')) return 'DocumentsProvider or Other provider';
+  return 'Other provider';
+}
+
+async function inspectOriginalUri(
+  uri: string,
+  metadata: PickerAssetMetadata,
+): Promise<{
+  originalUri: string;
+  uriAuthority: string;
+  uriType: string;
+  provider: string;
+  supportsDelete?: boolean | null;
+}> {
+  if (SafDocument?.inspectUri) {
+    try {
+      return await SafDocument.inspectUri(uri);
+    } catch (error) {
+      console.warn(`[CUT] URI audit failed | originalUri=${uri} | error=${String(error)}`);
+    }
+  }
+  return {
+    originalUri: uri,
+    uriAuthority: uriAuthorityFallback(uri),
+    uriType: metadata.mediaType || 'unknown',
+    provider: providerFallback(uri),
+    supportsDelete: null,
+  };
+}
+
 async function deleteOriginalDocument(uri: string): Promise<SafDocumentDeleteResult> {
   if (!uri.startsWith('content://')) {
-    return { deleted: false, rows: 0, detail: 'SAF deletion requires the original content:// URI' };
+    return {
+      deleted: false,
+      rows: 0,
+      detail: 'SAF deletion requires the original content:// URI',
+      originalUri: uri,
+      uriAuthority: uriAuthorityFallback(uri),
+      uriType: 'non-content URI',
+      provider: 'Other provider',
+      deleteMethod: 'none',
+      deleteResult: 'invalid URI',
+      postDeleteVerification: 'not attempted',
+    };
   }
   if (!SafDocument?.deleteDocument) {
-    return { deleted: false, rows: 0, detail: 'SafDocument native module is unavailable in this APK' };
+    return {
+      deleted: false,
+      rows: 0,
+      detail: 'SafDocument native module is unavailable in this APK',
+      originalUri: uri,
+      uriAuthority: uriAuthorityFallback(uri),
+      uriType: 'unknown',
+      provider: providerFallback(uri),
+      deleteMethod: 'none',
+      deleteResult: 'native module unavailable',
+      postDeleteVerification: 'not attempted',
+    };
   }
   return SafDocument.deleteDocument(uri);
 }
@@ -307,10 +389,13 @@ export default function AIGirlsCloudScreen() {
       const asset = pickedAssets[i];
       const fname = asset.fileName || `file_${i + 1}`;
       const pickerMetadata = asset.cutMetadata ?? getPickerMetadata(asset);
+      const uriAudit = await inspectOriginalUri(pickerMetadata.uri, pickerMetadata);
       console.log('[CUT] picker-asset', JSON.stringify(pickerMetadata));
-      console.log(`[CUT] original URI: ${pickerMetadata.uri}`);
+      console.log(`[CUT] originalUri: ${uriAudit.originalUri}`);
+      console.log(`[CUT] uriAuthority: ${uriAudit.uriAuthority}`);
+      console.log(`[CUT] uriType: ${uriAudit.uriType}`);
       console.log(`[CUT] assetId: ${pickerMetadata.assetId ?? 'none'}`);
-      console.log(`[CUT] mediaType: ${pickerMetadata.mediaType}`);
+      console.log(`[CUT] provider: ${uriAudit.provider}`);
       try {
         const folder = `my-girls/${charId}/${styleId}`;
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
@@ -319,6 +404,7 @@ export default function AIGirlsCloudScreen() {
         // Track server-side so photos survive app reinstall
         trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
         uploadedAssets.push({ pickerAsset: asset, folder, uploaded });
+        console.log(`[CUT] uploadSuccess: true | originalUri=${pickerMetadata.uri}`);
         console.log(
           `[CUT] Cloudinary upload success | original URI: ${pickerMetadata.uri} | ` +
           `assetId=${pickerMetadata.assetId ?? 'none'} | mediaType=${pickerMetadata.mediaType} | ` +
@@ -328,6 +414,7 @@ export default function AIGirlsCloudScreen() {
       } catch (e: any) {
         const reason = (e?.message || String(e) || 'unknown').slice(0, 120);
         failures.push({ name: fname, reason });
+        console.log(`[CUT] uploadSuccess: false | originalUri=${pickerMetadata.uri} | reason=${reason}`);
         console.warn(`Upload failed (${fname}):`, reason);
       }
       setUploadProgress(i + 1);
@@ -353,8 +440,14 @@ export default function AIGirlsCloudScreen() {
       for (const { pickerAsset } of uploadedAssets) {
         const metadata = pickerAsset.cutMetadata ?? getPickerMetadata(pickerAsset);
         const logAssetId = metadata.assetId ?? 'none';
+        const uriAudit = await inspectOriginalUri(metadata.uri, metadata);
         console.log('[CUT] picker-asset', JSON.stringify(metadata));
-        console.log(`[CUT] assetId | picker=${logAssetId}`);
+        console.log(`[CUT] originalUri: ${uriAudit.originalUri}`);
+        console.log(`[CUT] uriAuthority: ${uriAudit.uriAuthority}`);
+        console.log(`[CUT] uriType: ${uriAudit.uriType}`);
+        console.log(`[CUT] assetId: ${logAssetId}`);
+        console.log(`[CUT] provider: ${uriAudit.provider}`);
+        console.log('[CUT] uploadSuccess: true');
 
         let resolvedAssetId: string | null = pickerAsset.assetId ?? null;
         const originalUri = metadata.uri;
@@ -362,19 +455,22 @@ export default function AIGirlsCloudScreen() {
           // PATH B: DocumentsUI returns the original content:// URI without a MediaLibrary assetId.
           // Never scan by filename or guess a MediaLibrary ID for this path.
           if (!resolvedAssetId && originalUri.startsWith('content://')) {
-            console.log('[CUT] delete method: ContentResolver');
             console.log(
-              `[CUT] ContentResolver delete-start | original URI: ${originalUri} | ` +
-              `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
+              `[CUT] delete start | provider=${uriAudit.provider} | ` +
+              `authority=${uriAudit.uriAuthority} | type=${uriAudit.uriType}`,
             );
             const safResult = await deleteOriginalDocument(originalUri);
             console.log(
-              `[CUT] delete result: ContentResolver | original URI: ${originalUri} | ` +
-              `rows=${safResult.rows} | deleted=${safResult.deleted} | detail=${safResult.detail}`,
+              `[CUT] deleteMethod: ${safResult.deleteMethod} | ` +
+              `provider=${safResult.provider} | authority=${safResult.uriAuthority}`,
             );
             console.log(
-              `[CUT] post-delete verification: ContentResolver | original URI: ${originalUri} | ` +
+              `[CUT] deleteResult: ${safResult.deleteResult} | rows=${safResult.rows} | ` +
               `deleted=${safResult.deleted} | detail=${safResult.detail}`,
+            );
+            console.log(
+              `[CUT] postDeleteVerification: ${safResult.postDeleteVerification} | ` +
+              `deleted=${safResult.deleted} | originalUri=${originalUri}`,
             );
             if (safResult.deleted) {
               cutDeletedCount += 1;
@@ -394,25 +490,28 @@ export default function AIGirlsCloudScreen() {
 
           if (!resolvedAssetId) {
             const msg = `${metadata.fileName || originalUri}: valid MediaLibrary assetId not available`;
+            console.log('[CUT] deleteMethod: none');
+            console.log(`[CUT] deleteResult: ${msg}`);
+            console.log('[CUT] postDeleteVerification: not attempted');
             cutDeleteFailures.push(msg);
             console.warn(`[CUT] asset-resolution-failed | ${msg}`);
             continue;
           }
 
-          console.log('[CUT] delete method: MediaLibrary');
+          console.log('[CUT] deleteMethod: MediaLibrary.deleteAssetsAsync');
           console.log(
             `[CUT] MediaLibrary delete-start | assetId=${resolvedAssetId} | ` +
             `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
           );
           const deleteResult = await MediaLibrary.deleteAssetsAsync([resolvedAssetId]);
           console.log(
-            `[CUT] delete result: MediaLibrary | assetId=${resolvedAssetId} | ` +
+            `[CUT] deleteResult: MediaLibrary.deleteAssetsAsync | assetId=${resolvedAssetId} | ` +
             `result=${JSON.stringify(deleteResult)}`,
           );
 
           const verification = await verifyMediaLibraryDeletion(resolvedAssetId);
           console.log(
-            `[CUT] post-delete verification: MediaLibrary | assetId=${resolvedAssetId} | ` +
+            `[CUT] postDeleteVerification: MediaLibrary | assetId=${resolvedAssetId} | ` +
             `deleted=${verification.deleted} | detail=${verification.detail}`,
           );
 
@@ -426,9 +525,13 @@ export default function AIGirlsCloudScreen() {
         } catch (error) {
           const msg = `${metadata.fileName || originalUri}: ${String(error).slice(0, 200)}`;
           cutDeleteFailures.push(msg);
+          console.log('[CUT] deleteMethod: exception before verified deletion');
+          console.log(`[CUT] deleteResult: ${msg}`);
+          console.log('[CUT] postDeleteVerification: not verified');
           console.warn(
             `[CUT] delete failure reason: assetId=${resolvedAssetId ?? 'none'} | ` +
-            `original URI=${originalUri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
+            `originalUri=${originalUri} | provider=${uriAudit.provider} | ` +
+            `mediaType=${metadata.mediaType} | error=${String(error)}`,
           );
         }
       }
