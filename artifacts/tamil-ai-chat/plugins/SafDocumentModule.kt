@@ -3,6 +3,7 @@ package com.smk1.tamilaichat
 import android.os.Build
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -50,7 +51,7 @@ class SafDocumentModule(private val reactContext: ReactApplicationContext) :
         if (!it.moveToFirst()) return false
         val index = it.getColumnIndex(DocumentsContract.Document.COLUMN_FLAGS)
         if (index < 0 || it.isNull(index)) return null
-        (it.getLong(index) and DocumentsContract.Document.FLAG_SUPPORTS_DELETE) != 0L
+        (it.getLong(index) and DocumentsContract.Document.FLAG_SUPPORTS_DELETE.toLong()) != 0L
       }
     } catch (error: Exception) {
       android.util.Log.w("SafDocument", "document-flags-failed uri=$uri error=${error.message}")
@@ -196,7 +197,7 @@ class SafDocumentModule(private val reactContext: ReactApplicationContext) :
         audit.provider == "MediaStore DocumentsProvider" &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
       ) {
-        DocumentsContract.getMediaUri(reactContext, uri)
+        MediaStore.getMediaUri(reactContext, uri)
       } else if (audit.provider == "MediaStore") {
         uri
       } else {
