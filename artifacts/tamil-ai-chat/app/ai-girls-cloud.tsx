@@ -308,6 +308,9 @@ export default function AIGirlsCloudScreen() {
       const fname = asset.fileName || `file_${i + 1}`;
       const pickerMetadata = asset.cutMetadata ?? getPickerMetadata(asset);
       console.log('[CUT] picker-asset', JSON.stringify(pickerMetadata));
+      console.log(`[CUT] original URI: ${pickerMetadata.uri}`);
+      console.log(`[CUT] assetId: ${pickerMetadata.assetId ?? 'none'}`);
+      console.log(`[CUT] mediaType: ${pickerMetadata.mediaType}`);
       try {
         const folder = `my-girls/${charId}/${styleId}`;
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
@@ -317,8 +320,9 @@ export default function AIGirlsCloudScreen() {
         trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
         uploadedAssets.push({ pickerAsset: asset, folder, uploaded });
         console.log(
-          `[CUT] upload-success | uri=${pickerMetadata.uri} | assetId=${pickerMetadata.assetId ?? 'none'} | ` +
-          `mediaType=${pickerMetadata.mediaType} | public_id=${uploaded.public_id} | url=${uploaded.url}`,
+          `[CUT] Cloudinary upload success | original URI: ${pickerMetadata.uri} | ` +
+          `assetId=${pickerMetadata.assetId ?? 'none'} | mediaType=${pickerMetadata.mediaType} | ` +
+          `public_id=${uploaded.public_id} | url=${uploaded.url}`,
         );
         done++;
       } catch (e: any) {
@@ -358,13 +362,18 @@ export default function AIGirlsCloudScreen() {
           // PATH B: DocumentsUI returns the original content:// URI without a MediaLibrary assetId.
           // Never scan by filename or guess a MediaLibrary ID for this path.
           if (!resolvedAssetId && originalUri.startsWith('content://')) {
+            console.log('[CUT] delete method: ContentResolver');
             console.log(
-              `[CUT] SAF delete-start | uri=${originalUri} | fileName=${metadata.fileName ?? 'none'} | ` +
-              `mediaType=${metadata.mediaType}`,
+              `[CUT] ContentResolver delete-start | original URI: ${originalUri} | ` +
+              `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
             );
             const safResult = await deleteOriginalDocument(originalUri);
             console.log(
-              `[CUT] SAF delete-result | uri=${originalUri} | rows=${safResult.rows} | ` +
+              `[CUT] delete result: ContentResolver | original URI: ${originalUri} | ` +
+              `rows=${safResult.rows} | deleted=${safResult.deleted} | detail=${safResult.detail}`,
+            );
+            console.log(
+              `[CUT] post-delete verification: ContentResolver | original URI: ${originalUri} | ` +
               `deleted=${safResult.deleted} | detail=${safResult.detail}`,
             );
             if (safResult.deleted) {
@@ -372,7 +381,7 @@ export default function AIGirlsCloudScreen() {
             } else {
               const msg = `${metadata.fileName || originalUri}: original document delete not confirmed (${safResult.detail})`;
               cutDeleteFailures.push(msg);
-              console.warn(`[CUT] SAF delete-failed | ${msg}`);
+              console.warn(`[CUT] delete failure reason: ${msg}`);
             }
             continue;
           }
@@ -390,18 +399,20 @@ export default function AIGirlsCloudScreen() {
             continue;
           }
 
+          console.log('[CUT] delete method: MediaLibrary');
           console.log(
             `[CUT] MediaLibrary delete-start | assetId=${resolvedAssetId} | ` +
             `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
           );
           const deleteResult = await MediaLibrary.deleteAssetsAsync([resolvedAssetId]);
           console.log(
-            `[CUT] MediaLibrary delete-result | assetId=${resolvedAssetId} | result=${deleteResult}`,
+            `[CUT] delete result: MediaLibrary | assetId=${resolvedAssetId} | ` +
+            `result=${JSON.stringify(deleteResult)}`,
           );
 
           const verification = await verifyMediaLibraryDeletion(resolvedAssetId);
           console.log(
-            `[CUT] MediaLibrary post-delete verification | assetId=${resolvedAssetId} | ` +
+            `[CUT] post-delete verification: MediaLibrary | assetId=${resolvedAssetId} | ` +
             `deleted=${verification.deleted} | detail=${verification.detail}`,
           );
 
@@ -410,14 +421,14 @@ export default function AIGirlsCloudScreen() {
           } else {
             const msg = `${metadata.fileName || originalUri}: deletion not confirmed (${verification.detail})`;
             cutDeleteFailures.push(msg);
-            console.warn(`[CUT] delete-failed | ${msg}`);
+            console.warn(`[CUT] delete failure reason: ${msg}`);
           }
         } catch (error) {
           const msg = `${metadata.fileName || originalUri}: ${String(error).slice(0, 200)}`;
           cutDeleteFailures.push(msg);
           console.warn(
-            `[CUT] delete-failed | assetId=${resolvedAssetId ?? 'none'} | ` +
-            `uri=${originalUri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
+            `[CUT] delete failure reason: assetId=${resolvedAssetId ?? 'none'} | ` +
+            `original URI=${originalUri} | mediaType=${metadata.mediaType} | error=${String(error)}`,
           );
         }
       }
@@ -438,18 +449,26 @@ export default function AIGirlsCloudScreen() {
         `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.` +
           (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
       );
-    } else if (cutDeletedCount === uploadedAssets.length) {
-      // CUT success — upload + phone delete both done
+    } else if (cutDeletedCount === total && done === total) {
+      // CUT success only when every selected file uploaded and its original deletion was verified.
       Alert.alert(
-        failures.length ? '⚠️ Partial Cut' : '✅ Cut & Upload ஆச்சு!',
+        '✅ Upload ஆச்சு, Delete ஆச்சு!',
         `${done}/${total} photos cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` +
           (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
       );
+    } else if (cutDeletedCount > 0) {
+      // Partial CUT — never present the full success message for an incomplete batch.
+      Alert.alert(
+        '⚠️ Partial Cut',
+        `${done}/${total} files cloud-ல் save ஆச்சு; ${cutDeletedCount}/${total} original files மட்டும் delete verify ஆச்சு.` +
+          `\n\n${cutDeleteFailures.slice(0, 3).join('\n') || 'சில files upload அல்லது delete ஆகவில்லை.'}` +
+          (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
+      );
     } else {
-      // CUT — upload succeeded but phone delete failed
+      // CUT — upload succeeded but no original deletion was verified.
       Alert.alert(
         '⚠️ Upload ஆச்சு, Delete ஆகல',
-        `${done}/${total} photos cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; document delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nDocument provider delete permission அல்லது source file access-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
+        `${done}/${total} files cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; document delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nDocument provider delete permission அல்லது source file access-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
           (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
       );
     }
