@@ -71,6 +71,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
+import {
+  kallaatamErrorCategory,
+  kallaatamFriendlyError,
+  mergeKallaatamCharacters,
+  parseKallaatamExtraction,
+} from '../utils/kallaatam-extraction';
 
 const { width, height } = Dimensions.get('window');
 
@@ -283,8 +289,11 @@ export default function ChatScreen() {
   const [kTaskContinue, setKTaskContinue] = useState(true);
   const [kTaskOutline, setKTaskOutline] = useState(true);
   const [kAllAI, setKAllAI] = useState(true);
+  const [personaDataLoaded, setPersonaDataLoaded] = useState(false);
+  const autoStoryRequestRef = useRef<string | null>(null);
 
   const reloadPersona = useCallback(async () => {
+    setPersonaDataLoaded(false);
     // Step 1: Look up built-in personas first
     const base = ALL_PERSONAS.find(p => p.id === personaId);
 
@@ -330,7 +339,7 @@ export default function ChatScreen() {
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
         setTodayStory(data.todayStory ?? '');
-        // Load kallaatam character table
+        // Load kallaatam character table before allowing its automatic story request.
         if (finalPersona.id === 'kallaatam') {
           try {
             const kRaw = await AsyncStorage.getItem('kallaatam_engine');
@@ -355,8 +364,10 @@ export default function ChatScreen() {
         setAvatarUri(finalPersona.avatarPhotoUri);
         setTodayStory('');
       }
+      setPersonaDataLoaded(true);
     } catch {
       setPersona(finalPersona);
+      setPersonaDataLoaded(true);
     }
   }, [personaId]);
 
@@ -772,8 +783,11 @@ export default function ChatScreen() {
 
   // ── கல்லாட்டம்: auto story query — triggered when Story Save navigates here ──
   useEffect(() => {
-    if (!historyLoaded || persona?.id !== 'kallaatam') return;
+    if (!historyLoaded || !personaDataLoaded || persona?.id !== 'kallaatam') return;
     if (!ParamsStore.getAutoStoryQuery()) return;
+    if (autoStoryRequestRef.current) return;
+    const requestKey = `${personaId}:${todayStory.trim()}`;
+    autoStoryRequestRef.current = requestKey;
     ParamsStore.clearAutoStoryQuery();
 
     const queryText = 'கதையில் உள்ள கதாபாத்திரம் என்ன?';
@@ -785,60 +799,77 @@ export default function ChatScreen() {
       timestamp: ts,
     }]);
 
-    setTimeout(async () => {
+    void (async () => {
       setLoading(true);
       try {
-        const storyCtx = todayStory.trim()
+        // Re-read the persisted values so the request never uses an older render.
+        const [personaRaw, engineRaw] = await Promise.all([
+          AsyncStorage.getItem(`persona_edit_${personaId}`),
+          AsyncStorage.getItem('kallaatam_engine'),
+        ]);
+        const personaData = personaRaw ? JSON.parse(personaRaw) : {};
+        const engine = engineRaw ? JSON.parse(engineRaw) : {};
+        const readyStory = String(personaData.todayStory ?? todayStory).trim();
+        const readyChars = Array.isArray(engine.kChars) ? engine.kChars : kChars;
+        setTodayStory(readyStory);
+        if (Array.isArray(engine.kChars)) setKChars(engine.kChars);
+        if (typeof engine.kOutline === 'string') setKOutline(engine.kOutline);
+
+        const storyCtx = readyStory
           ? `
 
 கதை:
-${todayStory.trim()}
+${readyStory}
 
-கதையில் உள்ள ஒவ்வொரு கதாபாத்திரத்தையும் **பெயர்** — [User/AI] format-ல் list செய்.`
+இந்த கதைக்கான outline-ஐ சுருக்கமாக கொடுத்து, கதையில் உள்ள கதாபாத்திரங்களை name மற்றும் role உடன் கண்டுபிடி.`
           : '';
         const introHistory = [{ role: 'user' as const, content: queryText }];
-        const introPrompt = ((persona as any).prompt ?? '') + storyCtx;
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('auto_timeout')), 20000)
+        const existingCharacterContext = JSON.stringify(
+          readyChars
+            .filter((character: any) => String(character?.name ?? '').trim())
+            .map((character: any) => ({ name: character.name, role: character.role ?? '' })),
         );
-        const reply = await Promise.race([
-          sendMessage(introHistory, provider, introPrompt, 'story'),
-          timeoutPromise,
-        ]);
+        const introPrompt = `${(persona as any).prompt ?? ''}
+${storyCtx}
+
+Return JSON only in this exact shape:
+{"outline":"","characters":[{"name":"","role":""}]}
+Do not invent characters. Existing Kallaatam character context:
+${existingCharacterContext}`;
+        const reply = await sendMessage(introHistory, provider, introPrompt, 'story');
         setMessages(prev => [...prev, {
           id: `auto-sq-a-${Date.now()}`,
           role: 'assistant' as const,
           content: reply,
           timestamp: new Date(),
         }]);
-        // Extract **Name** patterns → save to kallaatam_engine kChars
-        const names = [...reply.matchAll(/\*\*([^*]+)\*\*/g)]
-          .map(m => m[1].trim())
-          .filter(n => n.length > 0);
-        if (names.length > 0) {
-          const raw = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
-          const engine = raw ? JSON.parse(raw) : {};
-          const chars: any[] = Array.isArray(engine.kChars) ? [...engine.kChars] : [];
-          names.forEach((nm, i) => {
-            if (i < chars.length) chars[i] = { ...chars[i], name: nm };
-            else chars.push({ name: nm, role: '', aiPlay: true });
-          });
-          await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: chars })).catch(() => {});
-        }
+        const extraction = parseKallaatamExtraction(reply);
+        const mergedChars = mergeKallaatamCharacters(readyChars, extraction.characters);
+        console.log('[STORY-AUTO]', {
+          responseLength: reply.length,
+          parsedJson: extraction.parsedJson,
+          characterCount: extraction.characters.length,
+        });
+        setKChars(mergedChars);
+        const currentEngineRaw = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
+        const currentEngine = currentEngineRaw ? JSON.parse(currentEngineRaw) : {};
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+          ...currentEngine,
+          kChars: mergedChars,
+        }));
       } catch (e: any) {
-        const isTimeout = e?.message === 'auto_timeout';
+        const category = kallaatamErrorCategory(e);
+        console.log('[STORY-AUTO]', { category, stage: 'automatic-extraction' });
         setMessages(prev => [...prev, {
           id: `auto-sq-err-${Date.now()}`,
           role: 'assistant' as const,
-          content: isTimeout
-            ? 'Server busy ஆக உள்ளது. கொஞ்சம் wait பண்ணி மீண்டும் message அனுப்புங்க 🔄'
-            : 'கதாபாத்திரம் load ஆகவில்லை. மீண்டும் try பண்ணுங்க.',
+          content: kallaatamFriendlyError('auto', category),
           timestamp: new Date(),
         }]);
       } finally { setLoading(false); }
-    }, 400);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoaded, persona?.id]);
+  }, [historyLoaded, persona?.id, personaDataLoaded]);
 
   const toggleDialect = async () => {
     const next = !dialectMode;

@@ -15,6 +15,12 @@ import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { RichEditor } from 'react-native-pell-rich-editor';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import {
+  kallaatamErrorCategory,
+  kallaatamFriendlyError,
+  mergeKallaatamCharacters,
+  parseKallaatamExtraction,
+} from '../utils/kallaatam-extraction';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -116,71 +122,18 @@ function Field({ label, hint, value, onChange, minH = 60, wordInputs, onSetWordI
   );
 }
 
-// Extract button — uses multimedia_gemini_1..5 keys only (separate from chat gemini_1..13 keys)
-const EXTRACT_API: string = (process.env['EXPO_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
-async function sendExtractMessage(content: string): Promise<string> {
-  const AS = (await import('@react-native-async-storage/async-storage')).default;
-  const [saved, enabledRaw] = await Promise.all([
-    AS.getItem('api_keys_store').catch(() => null),
-    AS.getItem('api_keys_enabled_v1').catch(() => null),
-  ]);
-  const parsed = saved ? JSON.parse(saved) as Record<string, string> : {};
-  const enabled = enabledRaw ? JSON.parse(enabledRaw) as Record<string, boolean> : {};
-  // Multimedia keys (story mode — preferred pool)
-  const multimediaKeys: string[] = [];
-  for (let i = 1; i <= 5; i++) {
-    const k = parsed[`multimedia_gemini_${i}`];
-    if (k?.trim() && enabled[`multimedia_gemini_${i}`] !== false) multimediaKeys.push(k.trim());
-  }
-  // Chat keys (fallback when multimedia quota exhausted)
-  const chatKeys: string[] = [];
-  for (let i = 1; i <= 13; i++) {
-    const k = parsed[`gemini_${i}`];
-    if (k?.trim() && enabled[`gemini_${i}`] !== false) chatKeys.push(k.trim());
-  }
-  const messages = [{ role: 'user', content }];
-  let lastErr: any;
-  // Pass 1: multimedia keys with mode:'story' (dedicated story/multimedia pool)
-  const pass1Keys = multimediaKeys.length > 0 ? multimediaKeys : [undefined as any];
-  for (const key of pass1Keys) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 100000);
-      const res = await fetch(`${EXTRACT_API}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, mode: 'story', ...(key ? { apiKey: key } : {}) }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (res.status === 429) { lastErr = new Error('quota'); continue; }
-      if (!res.ok) { const e = await res.json().catch(() => ({})) as any; throw new Error(e?.error || `HTTP ${res.status}`); }
-      const data = await res.json() as any;
-      if (data.error) throw new Error(data.error);
-      return data.content || '';
-    } catch (e: any) { lastErr = e; continue; }
-  }
-  // Pass 2: fallback — chat keys without mode (larger gemini chat pool on server)
-  const pass2Keys = chatKeys.length > 0 ? chatKeys : [undefined as any];
-  for (const key of pass2Keys) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 100000);
-      const res = await fetch(`${EXTRACT_API}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, ...(key ? { apiKey: key } : {}) }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (res.status === 429) { lastErr = new Error('quota'); continue; }
-      if (!res.ok) { const e = await res.json().catch(() => ({})) as any; throw new Error(e?.error || `HTTP ${res.status}`); }
-      const data = await res.json() as any;
-      if (data.error) throw new Error(data.error);
-      return data.content || '';
-    } catch (e: any) { lastErr = e; continue; }
-  }
-  throw lastErr ?? new Error('Extract failed');
+const KALLAATAM_EXTRACTION_SYSTEM_PROMPT = `You extract structured story data for the Kallaatam character engine.
+Return JSON only in this exact shape:
+{"outline":"short story outline","characters":[{"name":"character name","role":"role in story"}]}
+Include every meaningful character found in the story, with an empty role when unknown. Do not invent characters.`;
+
+async function requestKallaatamExtraction(content: string): Promise<string> {
+  return sendMessage(
+    [{ role: 'user', content }],
+    'gemini',
+    KALLAATAM_EXTRACTION_SYSTEM_PROMPT,
+    'story',
+  );
 }
 
 export default function EditCharacterScreen() {
@@ -400,33 +353,44 @@ export default function EditCharacterScreen() {
     const story = todayStory.trim();
     setKExtracting(true);
     try {
-      // Step 1: Names
-      const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-      const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
+      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory outline மற்றும் கதையில் உள்ள முக்கிய கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
+      const extraction = parseKallaatamExtraction(reply);
+      console.log('[EXTRACT]', {
+        responseLength: reply.length,
+        parsedJson: extraction.parsedJson,
+        characterCount: extraction.characters.length,
+      });
+      const names = extraction.characters.map(character => character.name).slice(0, 6);
       await new Promise<void>(resolve => {
         Alert.alert(
           '👥 கதாபாத்திரங்கள் பெயர்கள்',
           `கதையில் இந்த பெயர்கள் கிடைச்சது:\n\n${names.map((n: string, i: number) => `${i + 1}. ${n}`).join('\n')}\n\nCharacter name-ஆக fill செய்யவா?`,
           [
             { text: '✅ Yes, Fill பண்ணு', onPress: () => {
-              const arr = [...kChars];
-              names.forEach((nm: string, i: number) => { if (i < arr.length) arr[i] = { ...arr[i], name: nm }; });
+              const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
               setKChars(arr);
+              AsyncStorage.getItem('kallaatam_engine')
+                .then(raw => {
+                  const engine = raw ? JSON.parse(raw) : {};
+                  return AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: arr }));
+                })
+                .catch(error => {
+                  console.log('[EXTRACT]', { category: kallaatamErrorCategory(error), stage: 'persist-ai-fill' });
+                });
               resolve();
             }},
             { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
           ]
         );
       });
-      // (roles and outline not extracted — names only)
     } catch (e: any) {
-      const _msg = String(e?.message ?? e);
-      const _isQuota = _msg.includes('quota') || _msg.includes('429') || _msg.includes('நாளைக்கு') || _msg.includes('resource_exhausted') || _msg.includes('rate limit') || _msg.includes('busy');
+      const category = kallaatamErrorCategory(e);
+      console.log('[EXTRACT]', { category, stage: 'ai-fill' });
       Alert.alert(
-        _isQuota ? '⏳ API Quota தீர்ந்தது' : 'Error',
-        _isQuota
-          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
-          : (_msg.slice(0, 300) || 'AI extract பண்ண முடியல. Try again.')
+        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : 'Error',
+        category === 'quota'
+          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+          : kallaatamFriendlyError('extract', category),
       );
     } finally {
       setKExtracting(false);
@@ -435,7 +399,7 @@ export default function EditCharacterScreen() {
   };
 
   const handleStorySave = async () => {
-    if (!persona) return;
+    if (!persona || persona.id !== 'kallaatam') return;
     setStorySaving(true);
     try {
       const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
@@ -865,26 +829,35 @@ export default function EditCharacterScreen() {
                   onPress={async () => {
                     if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
                     setKExtracting(true);
-                    try {
+                      try {
                       const story = todayStory.trim();
-                      // Message 1: character names
-                      const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-                      const names = namesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-                      // Fill only character names (keep existing roles)
-                      setKChars(prev => {
-                        const arr = [...prev];
-                        names.forEach((nm, i) => { if (i < arr.length) arr[i] = { ...arr[i], name: nm }; });
-                        return arr;
+                      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory Outline மற்றும் கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
+                      const extraction = parseKallaatamExtraction(reply);
+                      console.log('[EXTRACT]', {
+                        responseLength: reply.length,
+                        parsedJson: extraction.parsedJson,
+                        characterCount: extraction.characters.length,
                       });
-                      Alert.alert('✅ பெயர்கள் fill ஆச்சு!', `${names.length} கதாபாத்திர பெயர்கள் fill ஆச்சு. Edit பண்ணலாம்.`);
+                      const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
+                      const nextOutline = extraction.outline || kOutline;
+                      setKChars(arr);
+                      setKOutline(nextOutline);
+                      const rawEngine = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
+                      const engine = rawEngine ? JSON.parse(rawEngine) : {};
+                      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+                        ...engine,
+                        kChars: arr,
+                        kOutline: nextOutline,
+                      }));
+                      Alert.alert('✅ Extract முடிந்தது!', `${extraction.characters.length} கதாபாத்திரங்கள் மற்றும் Story Outline update ஆச்சு.`);
                     } catch (e: any) {
-                      const msg = String(e?.message ?? e);
-                      const isQuota = msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு') || msg.includes('resource_exhausted') || msg.includes('rate limit');
+                      const category = kallaatamErrorCategory(e);
+                      console.log('[EXTRACT]', { category, stage: 'outline-extract' });
                       Alert.alert(
-                        isQuota ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
-                        isQuota
-                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
-                          : msg.slice(0, 300));
+                        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
+                        category === 'quota'
+                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+                          : kallaatamFriendlyError('extract', category));
                     } finally { setKExtracting(false); }
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
