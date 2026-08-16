@@ -385,12 +385,16 @@ export default function EditCharacterScreen() {
       });
     } catch (e: any) {
       const category = kallaatamErrorCategory(e);
-      console.log('[EXTRACT]', { category, stage: 'ai-fill' });
+        console.log('[EXTRACT]', {
+          category,
+          stage: 'ai-fill',
+          error: e?.message ?? String(e),
+        });
       Alert.alert(
         category === 'quota' ? '⏳ API Quota தீர்ந்தது' : 'Error',
         category === 'quota'
           ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
-          : kallaatamFriendlyError('extract', category),
+          : kallaatamFriendlyError('extract', category, e),
       );
     } finally {
       setKExtracting(false);
@@ -410,8 +414,17 @@ export default function EditCharacterScreen() {
       ParamsStore.setAutoStoryQuery(true);
       ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
       router.push('/chat');
-    } catch {
-      Alert.alert('Error', 'Story save failed. Try again.');
+    } catch (e: any) {
+      const category = kallaatamErrorCategory(e);
+      console.log('[STORY-SAVE]', {
+        category,
+        stage: 'persist-and-navigate',
+        error: e?.message ?? String(e),
+      });
+      Alert.alert(
+        'Story Save Error',
+        kallaatamFriendlyError('auto', category, e),
+      );
     } finally {
       setStorySaving(false);
     }
@@ -852,12 +865,16 @@ export default function EditCharacterScreen() {
                       Alert.alert('✅ Extract முடிந்தது!', `${extraction.characters.length} கதாபாத்திரங்கள் மற்றும் Story Outline update ஆச்சு.`);
                     } catch (e: any) {
                       const category = kallaatamErrorCategory(e);
-                      console.log('[EXTRACT]', { category, stage: 'outline-extract' });
+                      console.log('[EXTRACT]', {
+                        category,
+                        stage: 'outline-extract',
+                        error: e?.message ?? String(e),
+                      });
                       Alert.alert(
                         category === 'quota' ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
                         category === 'quota'
                           ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
-                          : kallaatamFriendlyError('extract', category));
+                          : kallaatamFriendlyError('extract', category, e));
                     } finally { setKExtracting(false); }
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}

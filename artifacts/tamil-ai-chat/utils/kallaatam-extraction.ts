@@ -194,12 +194,44 @@ export function kallaatamErrorCategory(error: unknown): string {
   return 'unknown';
 }
 
-export function kallaatamFriendlyError(scope: 'auto' | 'extract', category: string): string {
-  if (category === 'quota') return 'AI limit முடிந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.';
-  if (category === 'timeout') return 'AI பதில் வர நேரம் எடுத்துக்கொள்கிறது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.';
-  if (category === 'server' || category === 'network') return 'AI server-ஐ இப்போது அணுக முடியவில்லை. Connection-ஐ சரிபார்த்து மீண்டும் முயற்சி செய்யுங்கள்.';
-  if (category === 'parse') return 'AI பதிலைப் புரிந்துகொள்ள முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.';
-  return scope === 'auto'
-    ? 'Automatic character extraction முடிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.'
-    : 'Story extract முடிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.';
+export function kallaatamErrorDetail(error: unknown): string {
+  const raw = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : (() => {
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return String(error);
+          }
+        })();
+
+  const detail = String(raw ?? '')
+    .replace(/AIza[0-9A-Za-z_-]+/g, '[redacted-key]')
+    .replace(/(api[_ -]?key|authorization|token)\s*[:=]\s*\S+/gi, '$1=[redacted]')
+    .trim();
+
+  if (!detail || detail === '[object Object]' || detail === 'undefined' || detail === 'null') return '';
+  return detail.length > 240 ? `${detail.slice(0, 237)}...` : detail;
+}
+
+export function kallaatamFriendlyError(
+  scope: 'auto' | 'extract',
+  category: string,
+  error?: unknown,
+): string {
+  const base = category === 'quota'
+    ? 'AI limit முடிந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+    : category === 'timeout'
+      ? 'AI பதில் வர நேரம் எடுத்துக்கொள்கிறது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+      : category === 'server' || category === 'network'
+        ? 'AI server-ஐ இப்போது அணுக முடியவில்லை. Connection-ஐ சரிபார்த்து மீண்டும் முயற்சி செய்யுங்கள்.'
+        : category === 'parse'
+          ? 'AI பதிலைப் புரிந்துகொள்ள முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.'
+          : scope === 'auto'
+            ? 'Automatic character extraction முடிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.'
+            : 'Story extract முடிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.';
+  const detail = kallaatamErrorDetail(error);
+  return detail ? `${base}\n\nDetails: ${detail}` : base;
 }

@@ -859,11 +859,15 @@ ${existingCharacterContext}`;
         }));
       } catch (e: any) {
         const category = kallaatamErrorCategory(e);
-        console.log('[STORY-AUTO]', { category, stage: 'automatic-extraction' });
+        console.log('[STORY-AUTO]', {
+          category,
+          stage: 'automatic-extraction',
+          error: e?.message ?? String(e),
+        });
         setMessages(prev => [...prev, {
           id: `auto-sq-err-${Date.now()}`,
           role: 'assistant' as const,
-          content: kallaatamFriendlyError('auto', category),
+          content: kallaatamFriendlyError('auto', category, e),
           timestamp: new Date(),
         }]);
       } finally { setLoading(false); }
