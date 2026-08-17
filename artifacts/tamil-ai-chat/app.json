@@ -77,7 +77,8 @@
         }
       ],
       "./plugins/withPlayProtect",
-      "./plugins/withSafDocumentDelete"
+      "./plugins/withSafDocumentDelete",
+      "./plugins/withInstalledApk"
     ],
     "experiments": {
       "typedRoutes": true

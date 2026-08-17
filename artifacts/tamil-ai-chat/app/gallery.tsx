@@ -11,6 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { createBackupZip, getInstalledApkInfo } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
@@ -70,6 +71,8 @@ export default function GalleryScreen() {
   const [uploading, setUploading]           = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal]       = useState(0);
+  const [backingUp, setBackingUp]           = useState(false);
+  const [backupStep, setBackupStep]         = useState('');
 
   // ── MediaLibrary permission ──────────────────────────────────────
   const [mlPermission, requestMlPermission] = MediaLibrary.usePermissions();
@@ -352,6 +355,152 @@ export default function GalleryScreen() {
     );
   };
 
+  const backupPathPart = (value: string) =>
+    value.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'file';
+
+  const fileNameForBackup = (file: CloudFile, index: number) => {
+    const publicName = file.public_id?.split('/').pop() || `file_${index + 1}`;
+    const urlPath = file.url?.split('?')[0] || '';
+    const urlName = urlPath.split('/').pop() || '';
+    const urlExt = urlName.match(/\.[A-Za-z0-9]{2,5}$/)?.[0] || '';
+    const fallbackExt = file.isVideo ? '.mp4' : '.jpg';
+    return `${backupPathPart(publicName.replace(/\.[A-Za-z0-9]{2,5}$/, ''))}${urlExt || fallbackExt}`;
+  };
+
+  const collectProjectBackup = async () => {
+    const storageKeys = (await AsyncStorage.getAllKeys()).filter(key =>
+      key === foldersKey('projects') || key.startsWith('storage_files_projects'),
+    );
+    const localStorage: Record<string, unknown> = {};
+    for (const key of storageKeys) {
+      const raw = await AsyncStorage.getItem(key).catch(() => null);
+      if (!raw) continue;
+      try { localStorage[key] = JSON.parse(raw); } catch { localStorage[key] = raw; }
+    }
+
+    const folderList = Array.isArray(localStorage[foldersKey('projects')])
+      ? localStorage[foldersKey('projects')] as SubFolder[]
+      : subFolders;
+    const folders = [{ id: '', label: 'Root' }, ...folderList];
+    const mediaFiles: { url: string; path: string }[] = [];
+    const seen = new Set<string>();
+    const cloudFolders: Record<string, CloudFile[]> = {};
+
+    for (const folder of folders) {
+      const cloudFolder = folder.id
+        ? `my-girls/storage/projects/${folder.id}`
+        : 'my-girls/storage/projects';
+      const cloudFiles = await listCloudinaryImages(cloudFolder).catch(() => []);
+      const cachedKey = filesKey('projects', folder.id || undefined);
+      const cachedRaw = await AsyncStorage.getItem(cachedKey).catch(() => null);
+      let cachedFiles: CloudFile[] = [];
+      try { cachedFiles = cachedRaw ? JSON.parse(cachedRaw) : []; } catch {}
+      const merged = [
+        ...cloudFiles,
+        ...cachedFiles.filter(c => !cloudFiles.some(f => f.public_id === c.public_id)),
+      ];
+      cloudFolders[folder.id || 'root'] = merged;
+
+      merged.forEach((file, index) => {
+        const uniqueId = `${folder.id}:${file.public_id}`;
+        if (seen.has(uniqueId) || !file.url) return;
+        seen.add(uniqueId);
+        const folderPart = folder.id ? backupPathPart(folder.id) : 'Root';
+        mediaFiles.push({
+          url: file.url,
+          path: `Projects/${folderPart}/${fileNameForBackup(file, index)}`,
+        });
+      });
+    }
+
+    return {
+      projectData: {
+        storageKeys: localStorage,
+        cloudFolders,
+        source: 'existing Projects gallery storage',
+        exportedAt: new Date().toISOString(),
+      },
+      mediaFiles,
+    };
+  };
+
+  const runProjectBackup = async () => {
+    if (albumKey !== 'projects' || backingUp) return;
+    setBackingUp(true);
+    setBackupStep('Preparing backup...');
+    try {
+      const apkInfo = await getInstalledApkInfo();
+      setBackupStep('Collecting Projects data...');
+      const collected = await collectProjectBackup();
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      const outputName = `MyDreamWoman_FullBackup_${stamp}.zip`;
+      const backupInfo = {
+        appName: 'My Dream Women',
+        packageName: apkInfo.packageName,
+        version: apkInfo.versionName,
+        buildNumber: apkInfo.versionCode,
+        backupDate: new Date().toISOString(),
+        backupType: 'full',
+        apkFormat: 'single-apk',
+      };
+
+      setBackupStep('Creating ZIP...');
+      const zip = await createBackupZip({
+        outputName,
+        backupInfoJson: JSON.stringify(backupInfo, null, 2),
+        projectDataJson: JSON.stringify(collected.projectData, null, 2),
+        mediaFilesJson: JSON.stringify(collected.mediaFiles),
+      });
+
+      setBackupStep('Uploading backup to Cloudinary...');
+      const uploaded = await uploadUriToCloudinary(
+        zip.uri,
+        'application/zip',
+        'my-girls/storage/projects/Backup',
+      );
+      const record = {
+        ...backupInfo,
+        fileName: outputName,
+        url: uploaded.url,
+        public_id: uploaded.public_id,
+        sizeBytes: zip.sizeBytes,
+      };
+      const oldHistory = await getCloudinaryMeta('project_backups_v1').catch(() => null);
+      const history = Array.isArray(oldHistory) ? oldHistory : [];
+      setCloudinaryMeta('project_backups_v1', [...history, record].slice(-25)).catch(() => {});
+
+      Alert.alert(
+        '✅ Backup completed',
+        `${outputName}\n\nAPK + Projects data + ${collected.mediaFiles.length} media file(s) Cloudinary-ல் save ஆச்சு.`,
+      );
+    } catch (error: any) {
+      const reason = error?.message || String(error) || 'Unknown backup error';
+      Alert.alert(
+        'Backup failed',
+        reason,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry', onPress: () => { runProjectBackup(); } },
+        ],
+      );
+    } finally {
+      setBackingUp(false);
+      setBackupStep('');
+    }
+  };
+
+  const confirmProjectBackup = () => {
+    if (albumKey !== 'projects' || backingUp) return;
+    Alert.alert(
+      'Backup Projects?',
+      'இதில் சேரும்:\n✓ Current installed App APK\n✓ Projects folder structure\n✓ Project files/data\n✓ BackupInfo.json',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Backup', onPress: runProjectBackup },
+      ],
+    );
+  };
+
   // ── Upload selected MediaLibrary assets ─────────────────────────
   const doMediaUpload = async (mode: 'copy' | 'cut') => {
     const selected = phoneAssets.filter(a => pickerSel.has(a.id));
@@ -539,10 +688,12 @@ export default function GalleryScreen() {
       </View>
 
       {/* Upload progress */}
-      {uploading && (
+      {(uploading || backingUp) && (
         <View style={s.uploadBar}>
           <ActivityIndicator color="#fff" size="small" />
-          <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
+          <Text style={s.uploadBarTxt}>
+            {backingUp ? backupStep : `Upload பண்றேன்... ${uploadProgress}/${uploadTotal}`}
+          </Text>
         </View>
       )}
 
@@ -564,15 +715,20 @@ export default function GalleryScreen() {
             <TouchableOpacity
               style={[s.uploadBtn, albumKey === 'icons' && { backgroundColor: '#FF6B35' }]}
               onPress={albumKey === 'icons' ? pickIconWithCrop : openFolderBrowser}
-              disabled={uploading}
+              disabled={uploading || backingUp}
             >
               <Text style={s.uploadBtnTxt}>
                 {albumKey === 'icons' ? '🎨 Icon Upload (1:1)' : '⬆ Upload'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.newFolderBtn} onPress={() => { setFolderName(''); setFolderDialog(true); }}>
+            <TouchableOpacity style={s.newFolderBtn} disabled={uploading || backingUp} onPress={() => { setFolderName(''); setFolderDialog(true); }}>
               <Text style={s.newFolderTxt}>📁 New Folder</Text>
             </TouchableOpacity>
+            {albumKey === 'projects' && depth === 0 && (
+              <TouchableOpacity style={s.backupBtn} disabled={uploading || backingUp} onPress={confirmProjectBackup}>
+                <Text style={s.backupBtnTxt}>💾 Backup</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -848,10 +1004,12 @@ const s = StyleSheet.create({
   selDelTxt:      { color: '#fff', fontSize: 13, fontWeight: '600' },
   pickerSelBar:   { flexDirection: 'row', backgroundColor: '#222', padding: 10, alignItems: 'center', gap: 12 },
   pickerSelTxt:   { color: '#fff', fontSize: 14, flex: 1 },
-  actionRow:      { flexDirection: 'row', gap: 12, padding: 14 },
+  actionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
   uploadBtn:      { flex: 1, backgroundColor: '#E8821A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   uploadBtnTxt:   { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   newFolderBtn:   { flex: 1, backgroundColor: '#444', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  backupBtn:      { width: '100%', backgroundColor: '#5E35B1', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  backupBtnTxt:   { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#FF6B35', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   iconCropBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
   newFolderTxt:   { color: '#ccc', fontSize: 16, fontWeight: '600' },

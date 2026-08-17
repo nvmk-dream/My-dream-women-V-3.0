@@ -285,10 +285,13 @@ export async function uploadUriToCloudinary(
   folder: string = 'my-girls',
 ): Promise<{ url: string; public_id: string; width?: number; height?: number }> {
   const isVideo = mimeType.startsWith('video');
-  const endpoint = isVideo
+  const isRaw = mimeType === 'application/zip' || /\.zip(?:\?|$)/i.test(uri);
+  const endpoint = isRaw
+    ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/raw/upload`
+    : isVideo
     ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`
     : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
-  const ext = isVideo ? 'mp4' : 'jpg';
+  const ext = isRaw ? 'zip' : isVideo ? 'mp4' : 'jpg';
 
   // Primary: legacy uploadAsync — best for content:// URIs on Android
   try {
