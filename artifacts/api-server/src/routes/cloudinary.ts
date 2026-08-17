@@ -230,12 +230,15 @@ router.delete("/cloudinary/delete", async (req, res) => {
       result = await cl.uploader.destroy(public_id, { resource_type: "video", invalidate: true });
     }
 
-    // Also remove this entry from the folder's track store — otherwise the
-    // deleted photo/video reappears next time the folder is synced/reloaded,
-    // since /list serves from the track store first.
-    const idx = public_id.lastIndexOf("/");
-    if (idx > 0) {
-      const folder = public_id.slice(0, idx);
+    // Remove from ALL ancestor folder track stores — otherwise the deleted
+    // image reappears on the next sync because parent-folder tracks (e.g.
+    // my-girls root) still hold a reference even after the direct-parent
+    // track is cleaned. Walk up every level: my-girls/kavya/breast →
+    // my-girls/kavya → my-girls.
+    const parts = public_id.split('/');
+    parts.pop(); // strip filename, keep folder segments only
+    while (parts.length > 0) {
+      const folder = parts.join('/');
       try {
         const existing = await getTracked(folder, cl);
         const filtered = existing.filter(e => e.public_id !== public_id);
@@ -243,6 +246,7 @@ router.delete("/cloudinary/delete", async (req, res) => {
           await saveTracked(folder, filtered, cl);
         }
       } catch { /* best-effort */ }
+      parts.pop(); // move up one level
     }
 
     res.json({ success: true, result: result?.result });
@@ -293,7 +297,6 @@ router.get("/cloudinary/videos", async (req, res) => {
     res.status(500).json({ error: err?.message || "Video list failed" });
   }
 });
-
 
 // ── POST /api/cloudinary/track ────────────────────────────────────────────
 // Saves upload metadata to Cloudinary meta (survives Render redeploy + reinstall)
@@ -369,38 +372,191 @@ router.post("/cloudinary/create-folder", async (req, res) => {
   }
   const cl = cfg();
 
-  // Method 1: Admin API create_folder (fastest, no asset created)
+  // IMPORTANT: Cloudinary Admin API create_folder() creates an invisible system
+  // entry that does NOT appear in the Media Library console. The ONLY reliable way
+  // to make a folder visible in the Cloudinary console is to upload an actual file.
+  // We use a signed upload (api_key + api_secret) of a 1×1 transparent placeholder
+  // PNG so the folder appears immediately in the console after creation.
   try {
-    await (cl.api as any).create_folder(folderPath);
-    return res.json({ ok: true, folder: folderPath, method: 'admin' });
+    await cl.uploader.upload(
+      `data:image/png;base64,${PLACEHOLDER_B64}`,
+      {
+        public_id: `${folderPath}/placeholder`,
+        resource_type: 'image',
+        overwrite: true,
+        invalidate: true,
+      }
+    );
+    return res.json({ ok: true, folder: folderPath, method: 'signed_upload' });
   } catch (err: any) {
     const msg: string = err?.message || err?.error?.message || JSON.stringify(err).slice(0, 300);
-    // Already exists = success
-    if (msg.includes('already exists') || (err?.http_code ?? err?.error?.http_code) === 409) {
-      return res.json({ ok: true, folder: folderPath, existed: true });
+    req.log.error({ err: msg, folderPath }, 'Signed placeholder upload failed');
+    return res.status(500).json({ error: msg, folderPath });
+  }
+});
+
+// ── GET /api/cloudinary/characters ─────────────────────────────────────────
+// Lists all character IDs (direct sub-folder names under my-girls/)
+router.get("/cloudinary/characters", async (_req, res) => {
+  const cl = cfg();
+  try {
+    const result = await (cl.api as any).sub_folders('my-girls');
+    const ids: string[] = (result?.folders ?? []).map((f: any) => f.name as string);
+    return res.json({ ok: true, characters: ids });
+  } catch {
+    try {
+      const r = await cl.api.resources({
+        type: 'upload', resource_type: 'image',
+        prefix: 'my-girls/', max_results: 500,
+      });
+      const ids = [...new Set(
+        (r?.resources ?? [])
+          .map((x: any) => (x.public_id as string).split('/')[1])
+          .filter(Boolean),
+      )] as string[];
+      return res.json({ ok: true, characters: ids, method: 'prefix-scan' });
+    } catch (err2: any) {
+      return res.status(500).json({ error: String(err2?.message ?? err2) });
     }
-    req.log.warn({ err: msg, folderPath }, 'Admin create_folder failed, trying upload fallback');
+  }
+});
+
+// ── DELETE /api/cloudinary/delete-style-folder ─────────────────────────────
+// Deletes a photo style folder across ALL character folders:
+//   my-girls/{charId}/{styleId}/ → delete all assets + the empty folder itself
+router.delete("/cloudinary/delete-style-folder", async (req, res) => {
+  const { styleId } = req.body as { styleId?: string };
+  if (!styleId || typeof styleId !== 'string') {
+    return res.status(400).json({ error: 'styleId required' });
+  }
+  const cl = cfg();
+
+  // Collect all character IDs from Cloudinary sub-folders
+  let charIds: string[] = [];
+  try {
+    const result = await (cl.api as any).sub_folders('my-girls');
+    charIds = (result?.folders ?? []).map((f: any) => f.name as string);
+  } catch {
+    try {
+      const r = await cl.api.resources({
+        type: 'upload', resource_type: 'image',
+        prefix: 'my-girls/', max_results: 500,
+      });
+      charIds = [...new Set(
+        (r?.resources ?? [])
+          .map((x: any) => (x.public_id as string).split('/')[1])
+          .filter(Boolean),
+      )] as string[];
+    } catch { /* no chars found */ }
   }
 
-  // Method 2: Unsigned upload fallback — upload tiny placeholder to create folder
-  try {
-    // Note: public_id must NOT start with '.' — Cloudinary rejects it.
-    // Use '_keep' as a valid placeholder name.
-    await cl.uploader.unsigned_upload(
-      `data:image/png;base64,${PLACEHOLDER_B64}`,
-      PRESET_NAME,
-      { folder: folderPath, public_id: '_keep', resource_type: 'image' }
-    );
-    return res.json({ ok: true, folder: folderPath, method: 'upload' });
-  } catch (err2: any) {
-    const msg2: string = err2?.message || err2?.error?.message || JSON.stringify(err2).slice(0, 300);
-    // Already exists = success
-    if (msg2.includes('already exists') || (err2?.http_code ?? err2?.error?.http_code) === 409) {
-      return res.json({ ok: true, folder: folderPath, existed: true, method: 'upload' });
+  const results: { charId: string; deleted: number; folderDeleted: boolean; error?: string }[] = [];
+
+  for (const charId of charIds) {
+    const folder = `my-girls/${charId}/${styleId}`;
+    let deleted = 0;
+    let folderDeleted = false;
+    try {
+      // Collect assets: from track cache first, then Admin API prefix scan
+      let publicIds: string[] = [];
+      try {
+        const tracked = await getTracked(folder, cl);
+        publicIds = tracked.map(t => t.public_id);
+      } catch {}
+      if (publicIds.length === 0) {
+        try {
+          const r = await cl.api.resources({
+            type: 'upload', resource_type: 'image',
+            prefix: folder + '/', max_results: 500,
+          });
+          publicIds = (r?.resources ?? []).map((x: any) => x.public_id as string);
+        } catch {}
+      }
+      // Delete each asset (try image, fallback to video)
+      for (const pid of publicIds) {
+        try {
+          const r: any = await cl.uploader.destroy(pid, { resource_type: 'image', invalidate: true });
+          if (r?.result !== 'ok') {
+            await cl.uploader.destroy(pid, { resource_type: 'video', invalidate: true });
+          }
+          deleted++;
+        } catch {}
+      }
+      // Clear track cache for this folder
+      trackCache.delete(folder);
+      // Delete _keep placeholder if it exists
+      try {
+        await cl.uploader.destroy(`${folder}/_keep`, { resource_type: 'image', invalidate: true });
+      } catch {}
+      // Delete the now-empty folder via Admin API
+      try {
+        await (cl.api as any).delete_folder(folder);
+        folderDeleted = true;
+      } catch {}
+      results.push({ charId, deleted, folderDeleted });
+    } catch (err: any) {
+      results.push({ charId, deleted, folderDeleted, error: String(err?.message ?? err) });
     }
-    req.log.error({ err: msg2, folderPath }, 'Both folder creation methods failed');
-    return res.status(500).json({ error: msg2, folderPath });
   }
+
+  return res.json({ ok: true, styleId, charCount: charIds.length, results });
+});
+
+// ── DELETE /api/cloudinary/delete-folder ───────────────────────────────────
+// Permanently deletes a custom photo-style global folder from Cloudinary and
+// removes the style entry from the meta store.
+// Cloudinary path: my-girls/global_styles/{styleId}/
+router.delete("/cloudinary/delete-folder", async (req, res) => {
+  const { styleId } = req.body as { styleId?: string };
+  if (!styleId || typeof styleId !== 'string') {
+    return res.status(400).json({ error: 'styleId required' });
+  }
+  const cl = cfg();
+  const folderPath = `my-girls/global_styles/${styleId}`;
+
+  let assetsDeleted = 0;
+  let folderDeleted = false;
+
+  // Step a: Delete all assets inside the style folder using Admin API prefix delete
+  try {
+    const r = await (cl.api as any).delete_resources_by_prefix(`${folderPath}/`);
+    assetsDeleted = Object.keys(r?.deleted ?? {}).length;
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_resources_by_prefix failed');
+  }
+  // Clear any in-memory track cache for this folder
+  trackCache.delete(folderPath);
+
+  // Step b: Delete the now-empty Cloudinary folder itself
+  try {
+    await (cl.api as any).delete_folder(folderPath);
+    folderDeleted = true;
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_folder failed');
+  }
+
+  // Step c: Remove the style entry from the global_photo_styles meta store permanently
+  try {
+    const metaKey = 'global_photo_styles';
+    const info = await cl.api.resource(`my-girls/meta/${metaKey}`, { resource_type: 'raw' });
+    const resp = await fetch(info.secure_url + `?_t=${Date.now()}`);
+    const raw = await resp.json() as { hidden?: string[]; custom?: { id: string }[] };
+    const updated = {
+      hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
+      custom: Array.isArray(raw.custom) ? raw.custom.filter((s: any) => s.id !== styleId) : [],
+    };
+    const b64 = Buffer.from(JSON.stringify(updated)).toString('base64');
+    await cl.uploader.upload(`data:application/json;base64,${b64}`, {
+      public_id: `my-girls/meta/${metaKey}`,
+      resource_type: 'raw',
+      overwrite: true,
+      invalidate: true,
+    } as any);
+  } catch (err: any) {
+    req.log.warn({ err: String(err?.message ?? err), styleId }, 'meta update failed — style entry may remain');
+  }
+
+  return res.json({ ok: true, styleId, assetsDeleted, folderDeleted });
 });
 
 export default router;

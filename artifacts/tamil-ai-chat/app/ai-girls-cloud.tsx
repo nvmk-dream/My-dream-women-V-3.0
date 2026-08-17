@@ -2,14 +2,15 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
-  Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler,
+  Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler, NativeModules,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import * as FileSystem from 'expo-file-system';
+import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
-import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { ALL_PERSONAS } from '../constants/personas';
+import { PHOTO_STYLES } from '../constants/photo-styles';
 import {
   listCloudinaryImages,
   trackCloudinaryUpload,
@@ -21,6 +22,7 @@ import {
   setCloudinaryMeta,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const CUSTOM_CHARS_KEY = 'cloud_custom_chars';
 const CUSTOM_STYLES_KEY = 'cloud_custom_styles';
@@ -29,25 +31,207 @@ const { width } = Dimensions.get('window');
 const PHOTO_COL = 3;
 const PHOTO_SIZE = (width - 4 * (PHOTO_COL + 1)) / PHOTO_COL;
 
-const PHOTO_STYLES = [
-  { id: 'breast',    label: 'Breast Show'  },
-  { id: 'buttocks',  label: 'Buttocks'     },
-  { id: 'cleavage',  label: 'Cleavage'     },
-  { id: 'halfbreast',label: 'Half Breast'  },
-  { id: 'highslit',  label: 'High Slit'    },
-  { id: 'legs',      label: 'Legs Spread'  },
-  { id: 'lingerie',  label: 'Lingerie'     },
-  { id: 'lowneck',   label: 'Low Neckline' },
-  { id: 'normal',    label: 'Normal Photo' },
-  { id: 'nude',      label: 'Nude'         },
-  { id: 'seductive', label: 'Seductive'    },
-  { id: 'seminude',  label: 'Semi Nude'    },
-  { id: 'sleeping',  label: 'Sleeping'     },
-  { id: 'wet',       label: 'Wet Clothes'  },
-  { id: 'saree',     label: 'Saree Tuck'   },
-];
 
 interface CloudPhoto { url: string; public_id: string }
+
+type PickerAssetMetadata = {
+  uri: string;
+  assetId: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  width: number;
+  height: number;
+  mediaType: string;
+  type: string;
+  duration: number | null;
+  creationTime: number | null;
+  modificationTime: number | null;
+};
+
+type PickerAssetWithMetadata = {
+  uri: string;
+  assetId?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  width: number;
+  height: number;
+  type: string;
+  mimeType?: string | null;
+  duration?: number | null;
+  creationTime?: number | null;
+  modificationTime?: number | null;
+  exif?: Record<string, unknown>;
+  cutMetadata?: PickerAssetMetadata;
+};
+
+type PickerAssetForDeletion = {
+  pickerAsset: PickerAssetWithMetadata;
+  folder: string;
+  uploaded: { url: string; public_id: string };
+};
+
+type DeletionVerification = {
+  deleted: boolean;
+  detail: string;
+};
+
+type SafDocumentDeleteResult = {
+  deleted: boolean;
+  rows: number;
+  detail: string;
+  originalUri: string;
+  uriAuthority: string;
+  uriType: string;
+  provider: string;
+  deleteMethod: string;
+  deleteResult: string;
+  postDeleteVerification: string;
+  supportsDelete?: boolean | null;
+};
+
+const SafDocument = NativeModules.SafDocument as {
+  inspectUri?: (uri: string) => Promise<{
+    originalUri: string;
+    uriAuthority: string;
+    uriType: string;
+    provider: string;
+    isDocumentProvider: boolean;
+    supportsDelete?: boolean | null;
+  }>;
+  deleteDocument: (uri: string) => Promise<SafDocumentDeleteResult>;
+} | undefined;
+
+function uriAuthorityFallback(uri: string): string {
+  if (!uri.startsWith('content://')) return 'none';
+  const authority = uri.slice('content://'.length).split('/')[0];
+  return authority || 'unknown';
+}
+
+function providerFallback(uri: string): string {
+  const authority = uriAuthorityFallback(uri);
+  if (authority === 'media') return 'MediaStore';
+  if (authority === 'com.android.providers.media.documents') return 'MediaStore DocumentsProvider';
+  if (
+    authority === 'com.android.providers.downloads.documents' ||
+    authority === 'com.android.providers.downloads'
+  ) return 'Downloads/Documents provider';
+  if (uri.startsWith('content://')) return 'DocumentsProvider or Other provider';
+  return 'Other provider';
+}
+
+async function inspectOriginalUri(
+  uri: string,
+  metadata: PickerAssetMetadata,
+): Promise<{
+  originalUri: string;
+  uriAuthority: string;
+  uriType: string;
+  provider: string;
+  supportsDelete?: boolean | null;
+}> {
+  if (SafDocument?.inspectUri) {
+    try {
+      return await SafDocument.inspectUri(uri);
+    } catch (error) {
+      console.warn(`[CUT] URI audit failed | originalUri=${uri} | error=${String(error)}`);
+    }
+  }
+  return {
+    originalUri: uri,
+    uriAuthority: uriAuthorityFallback(uri),
+    uriType: metadata.mediaType || 'unknown',
+    provider: providerFallback(uri),
+    supportsDelete: null,
+  };
+}
+
+async function deleteOriginalDocument(uri: string): Promise<SafDocumentDeleteResult> {
+  if (!uri.startsWith('content://')) {
+    return {
+      deleted: false,
+      rows: 0,
+      detail: 'SAF deletion requires the original content:// URI',
+      originalUri: uri,
+      uriAuthority: uriAuthorityFallback(uri),
+      uriType: 'non-content URI',
+      provider: 'Other provider',
+      deleteMethod: 'none',
+      deleteResult: 'invalid URI',
+      postDeleteVerification: 'not attempted',
+    };
+  }
+  if (!SafDocument?.deleteDocument) {
+    return {
+      deleted: false,
+      rows: 0,
+      detail: 'SafDocument native module is unavailable in this APK',
+      originalUri: uri,
+      uriAuthority: uriAuthorityFallback(uri),
+      uriType: 'unknown',
+      provider: providerFallback(uri),
+      deleteMethod: 'none',
+      deleteResult: 'native module unavailable',
+      postDeleteVerification: 'not attempted',
+    };
+  }
+  return SafDocument.deleteDocument(uri);
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseExifDate(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function getPickerMetadata(asset: PickerAssetWithMetadata): PickerAssetMetadata {
+  const raw = asset as any;
+  const exif = raw.exif ?? {};
+  return {
+    uri: asset.uri,
+    assetId: asset.assetId ?? null,
+    fileName: asset.fileName ?? null,
+    fileSize: finiteNumber(raw.fileSize),
+    width: asset.width,
+    height: asset.height,
+    mediaType: asset.type,
+    type: asset.type,
+    duration: finiteNumber(asset.duration),
+    creationTime:
+      finiteNumber(raw.creationTime) ??
+      parseExifDate(exif.DateTimeOriginal) ??
+      parseExifDate(exif.DateTimeDigitized) ??
+      parseExifDate(exif.DateTime),
+    modificationTime: finiteNumber(raw.modificationTime),
+  };
+}
+
+async function verifyMediaLibraryDeletion(assetId: string): Promise<DeletionVerification> {
+  try {
+    const info = await MediaLibrary.getAssetInfoAsync(assetId);
+    if (info) {
+      return { deleted: false, detail: 'asset still returned by getAssetInfoAsync' };
+    }
+    return { deleted: true, detail: 'getAssetInfoAsync returned no asset' };
+  } catch (error) {
+    const detail = String(error);
+    const notFound = /not found|no asset|does not exist|could not find|couldn't find/i.test(detail);
+    return { deleted: notFound, detail: notFound ? `asset lookup not found: ${detail}` : detail };
+  }
+}
 
 type Depth = 0 | 1 | 2;
 
@@ -56,10 +240,25 @@ const FOLDER_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#009688','#FF572
 export default function AIGirlsCloudScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const ALREADY_PATCHED = true; const { charId } = useLocalSearchParams<{ charId?: string }>();
 
   const [depth, setDepth] = useState<Depth>(0);
   const [selectedChar, setSelectedChar] = useState<{ id: string; name: string; color: string; letter: string } | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<{ id: string; label: string } | null>(null);
+
+  // Auto-select character when charId param provided (chat ☁️ shortcut)
+  useEffect(() => {
+    if (!charId) return;
+    const persona = ALL_PERSONAS.find(p => p.id === charId);
+    if (!persona) return;
+    setSelectedChar({
+      id: persona.id,
+      name: persona.name,
+      color: persona.avatarColor,
+      letter: (persona as any).avatarLetter || persona.emoji,
+    });
+    setDepth(1);
+  }, [charId]);
 
   // Photos state (depth 2)
   const [photos, setPhotos] = useState<CloudPhoto[]>([]);
@@ -83,14 +282,15 @@ export default function AIGirlsCloudScreen() {
   // Custom delete confirm (Alert.alert blocked on Chrome web)
   const [deleteTarget, setDeleteTarget] = useState<CloudPhoto | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: string; name: string; type: 'char' | 'style' } | null>(null);
+  const [hiddenStyles, setHiddenStyles] = useState<Set<string>>(new Set()); // built-in styles hidden per char
 
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
 
-
   // Load custom folders — AsyncStorage first (instant), then merge from Cloudinary (survives reinstall)
-  useEffect(() => {
+  // useFocusEffect: re-runs when navigating back from Settings (picks up newly added styles)
+  useFocusEffect(useCallback(() => {
     const loadFolders = async () => {
       // Step 1: Load from AsyncStorage immediately (fast, works offline)
       const localCharsRaw = await AsyncStorage.getItem(CUSTOM_CHARS_KEY).catch(() => null);
@@ -115,7 +315,13 @@ export default function AIGirlsCloudScreen() {
           setCustomChars(merged);
           await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(merged)).catch(() => {});
         }
-        if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
+        // Load global photo styles from Settings screen (overrides local custom styles)
+        const globalStyles = await getGlobalPhotoStyles().catch(() => null);
+        if (globalStyles && globalStyles.custom.length > 0) {
+          setCustomStyles(globalStyles.custom);
+          await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(globalStyles.custom)).catch(() => {});
+        } else if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
+          // Fallback: old custom_styles Cloudinary meta key
           const merged = [...localStyles];
           for (const cs of cloudStyles) {
             if (!merged.some((s: any) => s.id === cs.id)) merged.push(cs);
@@ -126,7 +332,7 @@ export default function AIGirlsCloudScreen() {
       } catch { /* cloud fetch failed — local data still shown */ }
     };
     loadFolders();
-  }, []);
+  }, []));
 
   // Base personas
   const basePersonas = ALL_PERSONAS.filter(p => p.gender === 'female').map(p => ({
@@ -137,7 +343,7 @@ export default function AIGirlsCloudScreen() {
   }));
 
   const personas = [...basePersonas, ...customChars];
-  const photoStyles = [...PHOTO_STYLES, ...customStyles];
+  const photoStyles = [...PHOTO_STYLES, ...customStyles].filter(s => !hiddenStyles.has(s.id));
 
   const handleNewFolder = () => {
     setFolderName('');
@@ -147,7 +353,7 @@ export default function AIGirlsCloudScreen() {
   // ── Upload via System Picker (Cut / Copy) ────────────────────────────────
 
   const doUpload = async (
-    pickedAssets: ImagePicker.ImagePickerAsset[],
+    pickedAssets: PickerAssetWithMetadata[],
     charId: string,
     styleId: string,
     styleLabel: string,
@@ -160,11 +366,20 @@ export default function AIGirlsCloudScreen() {
 
     const newPhotos: CloudPhoto[] = [];
     const failures: { name: string; reason: string }[] = [];
+    const uploadedAssets: PickerAssetForDeletion[] = [];
     let done = 0;
 
     for (let i = 0; i < pickedAssets.length; i++) {
       const asset = pickedAssets[i];
       const fname = asset.fileName || `file_${i + 1}`;
+      const pickerMetadata = asset.cutMetadata ?? getPickerMetadata(asset);
+      const uriAudit = await inspectOriginalUri(pickerMetadata.uri, pickerMetadata);
+      console.log('[CUT] picker-asset', JSON.stringify(pickerMetadata));
+      console.log(`[CUT] originalUri: ${uriAudit.originalUri}`);
+      console.log(`[CUT] uriAuthority: ${uriAudit.uriAuthority}`);
+      console.log(`[CUT] uriType: ${uriAudit.uriType}`);
+      console.log(`[CUT] assetId: ${pickerMetadata.assetId ?? 'none'}`);
+      console.log(`[CUT] provider: ${uriAudit.provider}`);
       try {
         const folder = `my-girls/${charId}/${styleId}`;
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
@@ -172,10 +387,18 @@ export default function AIGirlsCloudScreen() {
         newPhotos.push({ url: uploaded.url, public_id: uploaded.public_id });
         // Track server-side so photos survive app reinstall
         trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
+        uploadedAssets.push({ pickerAsset: asset, folder, uploaded });
+        console.log(`[CUT] uploadSuccess: true | originalUri=${pickerMetadata.uri}`);
+        console.log(
+          `[CUT] Cloudinary upload success | original URI: ${pickerMetadata.uri} | ` +
+          `assetId=${pickerMetadata.assetId ?? 'none'} | mediaType=${pickerMetadata.mediaType} | ` +
+          `public_id=${uploaded.public_id} | url=${uploaded.url}`,
+        );
         done++;
       } catch (e: any) {
         const reason = (e?.message || String(e) || 'unknown').slice(0, 120);
         failures.push({ name: fname, reason });
+        console.log(`[CUT] uploadSuccess: false | originalUri=${pickerMetadata.uri} | reason=${reason}`);
         console.warn(`Upload failed (${fname}):`, reason);
       }
       setUploadProgress(i + 1);
@@ -193,41 +416,109 @@ export default function AIGirlsCloudScreen() {
       }
     }
 
-    // CUT: delete originals from device after successful upload
-    if (action === 'cut' && done > 0) {
-      try {
-        const writePerm = await MediaLibrary.requestPermissionsAsync(true);
-        if (writePerm.granted) {
-          // Method 1: Use assetId directly (most reliable on Android/HarmonyOS)
-          const assetIds = pickedAssets
-            .filter(a => a.assetId)
-            .map(a => a.assetId as string);
-          if (assetIds.length > 0) {
-            await MediaLibrary.deleteAssetsAsync(assetIds);
-          } else {
-            // Method 2: file:// URI → FileSystem.deleteAsync directly
-            for (const a of pickedAssets) {
-              if (a.uri.startsWith('file://')) {
-                await FileSystem.deleteAsync(a.uri, { idempotent: true }).catch(() => {});
-              }
+    // CUT: delete only originals whose Cloudinary upload succeeded.
+    // Delete originals through MediaLibrary asset IDs or Android SAF document URIs; never delete the cache copy.
+    let cutDeletedCount = 0;
+    const cutDeleteFailures: string[] = [];
+    if (action === 'cut' && uploadedAssets.length > 0) {
+      for (const { pickerAsset } of uploadedAssets) {
+        const metadata = pickerAsset.cutMetadata ?? getPickerMetadata(pickerAsset);
+        const logAssetId = metadata.assetId ?? 'none';
+        const uriAudit = await inspectOriginalUri(metadata.uri, metadata);
+        console.log('[CUT] picker-asset', JSON.stringify(metadata));
+        console.log(`[CUT] originalUri: ${uriAudit.originalUri}`);
+        console.log(`[CUT] uriAuthority: ${uriAudit.uriAuthority}`);
+        console.log(`[CUT] uriType: ${uriAudit.uriType}`);
+        console.log(`[CUT] assetId: ${logAssetId}`);
+        console.log(`[CUT] provider: ${uriAudit.provider}`);
+        console.log('[CUT] uploadSuccess: true');
+
+        let resolvedAssetId: string | null = pickerAsset.assetId ?? null;
+        const originalUri = metadata.uri;
+        try {
+          // PATH B: DocumentsUI returns the original content:// URI without a MediaLibrary assetId.
+          // Never scan by filename or guess a MediaLibrary ID for this path.
+          if (!resolvedAssetId && originalUri.startsWith('content://')) {
+            console.log(
+              `[CUT] delete start | provider=${uriAudit.provider} | ` +
+              `authority=${uriAudit.uriAuthority} | type=${uriAudit.uriType}`,
+            );
+            const safResult = await deleteOriginalDocument(originalUri);
+            console.log(
+              `[CUT] deleteMethod: ${safResult.deleteMethod} | ` +
+              `provider=${safResult.provider} | authority=${safResult.uriAuthority}`,
+            );
+            console.log(
+              `[CUT] deleteResult: ${safResult.deleteResult} | rows=${safResult.rows} | ` +
+              `deleted=${safResult.deleted} | detail=${safResult.detail}`,
+            );
+            console.log(
+              `[CUT] postDeleteVerification: ${safResult.postDeleteVerification} | ` +
+              `deleted=${safResult.deleted} | originalUri=${originalUri}`,
+            );
+            if (safResult.deleted) {
+              cutDeletedCount += 1;
+            } else {
+              const msg = `${metadata.fileName || originalUri}: original document delete not confirmed (${safResult.detail})`;
+              cutDeleteFailures.push(msg);
+              console.warn(`[CUT] delete failure reason: ${msg}`);
             }
-            // Method 3: Fallback — scan MediaLibrary by filename
-            const filenames = new Set(pickedAssets.map(a => a.uri.split('/').pop()).filter(Boolean));
-            if (filenames.size > 0) {
-              const toDelete: string[] = [];
-              let cursor: string | undefined;
-              do {
-                const res = await MediaLibrary.getAssetsAsync({ mediaType: 'photo', first: 500, after: cursor });
-                for (const ma of res.assets) {
-                  if (filenames.has(ma.filename)) toDelete.push(ma.id);
-                }
-                cursor = res.hasNextPage ? res.endCursor : undefined;
-              } while (cursor && toDelete.length < pickedAssets.length);
-              if (toDelete.length > 0) await MediaLibrary.deleteAssetsAsync(toDelete);
-            }
+            continue;
           }
+
+          // PATH A: a genuine MediaLibrary assetId can use the existing MediaLibrary path.
+          console.log(
+            `[CUT] resolved-asset | assetId=${resolvedAssetId ?? 'none'} | ` +
+            `uri=${originalUri} | mediaType=${metadata.mediaType}`,
+          );
+
+          if (!resolvedAssetId) {
+            const msg = `${metadata.fileName || originalUri}: valid MediaLibrary assetId not available`;
+            console.log('[CUT] deleteMethod: none');
+            console.log(`[CUT] deleteResult: ${msg}`);
+            console.log('[CUT] postDeleteVerification: not attempted');
+            cutDeleteFailures.push(msg);
+            console.warn(`[CUT] asset-resolution-failed | ${msg}`);
+            continue;
+          }
+
+          console.log('[CUT] deleteMethod: MediaLibrary.deleteAssetsAsync');
+          console.log(
+            `[CUT] MediaLibrary delete-start | assetId=${resolvedAssetId} | ` +
+            `fileName=${metadata.fileName ?? 'none'} | mediaType=${metadata.mediaType}`,
+          );
+          const deleteResult = await MediaLibrary.deleteAssetsAsync([resolvedAssetId]);
+          console.log(
+            `[CUT] deleteResult: MediaLibrary.deleteAssetsAsync | assetId=${resolvedAssetId} | ` +
+            `result=${JSON.stringify(deleteResult)}`,
+          );
+
+          const verification = await verifyMediaLibraryDeletion(resolvedAssetId);
+          console.log(
+            `[CUT] postDeleteVerification: MediaLibrary | assetId=${resolvedAssetId} | ` +
+            `deleted=${verification.deleted} | detail=${verification.detail}`,
+          );
+
+          if (verification.deleted) {
+            cutDeletedCount += 1;
+          } else {
+            const msg = `${metadata.fileName || originalUri}: deletion not confirmed (${verification.detail})`;
+            cutDeleteFailures.push(msg);
+            console.warn(`[CUT] delete failure reason: ${msg}`);
+          }
+        } catch (error) {
+          const msg = `${metadata.fileName || originalUri}: ${String(error).slice(0, 200)}`;
+          cutDeleteFailures.push(msg);
+          console.log('[CUT] deleteMethod: exception before verified deletion');
+          console.log(`[CUT] deleteResult: ${msg}`);
+          console.log('[CUT] postDeleteVerification: not verified');
+          console.warn(
+            `[CUT] delete failure reason: assetId=${resolvedAssetId ?? 'none'} | ` +
+            `originalUri=${originalUri} | provider=${uriAudit.provider} | ` +
+            `mediaType=${metadata.mediaType} | error=${String(error)}`,
+          );
         }
-      } catch { /* deletion failed — upload still succeeded */ }
+      }
     }
 
     setUploading(false);
@@ -237,53 +528,102 @@ export default function AIGirlsCloudScreen() {
     const reasonsText = failures.length
       ? '\n\nFail reasons:\n' + failures.slice(0, 3).map(f => `• ${f.name}: ${f.reason}`).join('\n')
       : '';
-    if (done > 0) {
-      const head = action === 'cut'
-        ? `${done}/${total} photos cloud-ல் save ஆச்சு. Mobile-ல் delete ஆச்சு.`
-        : `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.`;
+    if (done === 0) {
+      Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.` + reasonsText);
+    } else if (action !== 'cut') {
       Alert.alert(
         failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
-        head + (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
+        `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.` +
+          (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
+      );
+    } else if (cutDeletedCount === total && done === total) {
+      // CUT success only when every selected file uploaded and its original deletion was verified.
+      Alert.alert(
+        '✅ Upload ஆச்சு, Delete ஆச்சு!',
+        `${done}/${total} photos cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` +
+          (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
+      );
+    } else if (cutDeletedCount > 0) {
+      // Partial CUT — never present the full success message for an incomplete batch.
+      Alert.alert(
+        '⚠️ Partial Cut',
+        `${done}/${total} files cloud-ல் save ஆச்சு; ${cutDeletedCount}/${total} original files மட்டும் delete verify ஆச்சு.` +
+          `\n\n${cutDeleteFailures.slice(0, 3).join('\n') || 'சில files upload அல்லது delete ஆகவில்லை.'}` +
+          (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
       );
     } else {
-      Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.` + reasonsText);
+      // CUT — upload succeeded but no original deletion was verified.
+      Alert.alert(
+        '⚠️ Upload ஆச்சு, Delete ஆகல',
+        `${done}/${total} files cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; document delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nDocument provider delete permission அல்லது source file access-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
+          (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
+      );
     }
   };
 
   const openImagePicker = async (charId: string, charName: string, styleId: string, styleLabel: string) => {
     if (Platform.OS === 'web') { Alert.alert('Web', 'Upload mobile-ல் மட்டும் வேலை செய்யும்'); return; }
 
+    let result: DocumentPicker.DocumentPickerResult;
     try {
-      // Explicitly request permission first — avoids silent failure on Honor HMOS
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission வேணும்', 'Settings → My Girls → Permissions → Photos → Allow all');
-        return;
-      }
-    } catch { /* permission API not available on this device — proceed anyway */ }
-
-    let result: ImagePicker.ImagePickerResult;
-    try {
-      // ActivityResultLauncher registration settle panna wait pannrom
-      await new Promise(r => setTimeout(r, 350));
-      result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'] as any,
-        allowsMultipleSelection: true,
-        quality: 0.9,
-        exif: false,
+      // Android DocumentsUI: Recent → Phone → Folder → selected image/video.
+      // Preserve the original SAF content:// URI for Cut deletion; uploadAsync reads it directly.
+      // Do not use the cache copy as the deletion target.
+      result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'video/*'],
+        multiple: true,
+        copyToCacheDirectory: false,
       });
     } catch (e: any) {
-      Alert.alert('பிழை', 'Photo picker திறக்கல: ' + (e?.message ?? 'unknown'));
+      Alert.alert('பிழை', 'File picker திறக்கல: ' + (e?.message ?? 'unknown'));
       return;
     }
 
     if (result.canceled || result.assets.length === 0) return;
 
     const count = result.assets.length;
-    const picked = result.assets;
+    const picked: PickerAssetWithMetadata[] = await Promise.all(
+      result.assets.map(async asset => {
+        let fileSize = finiteNumber(asset.size);
+        if (fileSize == null) {
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+            fileSize = finiteNumber((fileInfo as any)?.size);
+          } catch {
+            fileSize = null;
+          }
+        }
+        const isVideo = asset.mimeType?.startsWith('video/') === true
+          || /\.(mp4|mov|m4v|avi|mkv|webm)$/i.test(asset.name ?? '');
+        const enriched: PickerAssetWithMetadata = {
+          uri: asset.uri,
+          assetId: null,
+          fileName: asset.name ?? null,
+          fileSize,
+          width: 0,
+          height: 0,
+          type: isVideo ? 'video' : 'image',
+          mimeType: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+          duration: null,
+          creationTime: null,
+          modificationTime: null,
+        };
+        enriched.cutMetadata = getPickerMetadata(enriched);
+        console.log('[CUT] picker-asset', JSON.stringify(enriched.cutMetadata));
+        return enriched;
+      }),
+    );
+
+    console.log(
+      '[CUT] picker result',
+      JSON.stringify({
+        canceled: result.canceled,
+        assets: picked.map(asset => asset.cutMetadata ?? getPickerMetadata(asset)),
+      }),
+    );
 
     Alert.alert(
-      `${count} photo${count > 1 ? 's' : ''} select ஆச்சு`,
+      `${count} file${count > 1 ? 's' : ''} select ஆச்சு`,
       'Cloud-ல் எப்படி save பண்ணணும்?',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -293,7 +633,7 @@ export default function AIGirlsCloudScreen() {
         },
         {
           text: '✂️ Cut  (Phone-ல் delete ஆகும்)',
-          style: 'destructive',
+          style: 'destructive' as const,
           onPress: () => doUpload(picked, charId, styleId, styleLabel, 'cut'),
         },
       ],
@@ -356,6 +696,18 @@ export default function AIGirlsCloudScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
+      // Sync to custom_photo_styles_v1 (used by chat.tsx)
+      try {
+        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
+        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
+        if (!chatList.some((s: any) => s.id === id)) {
+          await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, newStyle]));
+        }
+      } catch {}
+      // Auto-create Cloudinary folder for ALL female personas (global style)
+      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
+        createCloudinaryFolder(`my-girls/${p.id}/${id}`).catch(() => {});
+      });
     }
     Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
@@ -436,6 +788,9 @@ export default function AIGirlsCloudScreen() {
   const selectChar = (char: typeof personas[0]) => {
     setSelectedChar(char);
     setDepth(1);
+    AsyncStorage.getItem(`hidden_styles_${char.id}`).then(raw => {
+      setHiddenStyles(new Set(raw ? JSON.parse(raw) : []));
+    }).catch(() => {});
   };
 
   const selectStyle = (style: typeof PHOTO_STYLES[0]) => {
@@ -469,17 +824,22 @@ export default function AIGirlsCloudScreen() {
     if (savingPhoto) return;
     setSavingPhoto(true);
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync(true);
-      if (status !== 'granted') {
-        Alert.alert('Permission இல்லை', 'Gallery-ல் save பண்ண permission தேவை');
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission இல்லை', 'Settings → My Girls → Permissions → Files & Media → Allow all');
+        setSavingPhoto(false);
         return;
       }
-      const fileUri = FileSystem.cacheDirectory + 'save_' + Date.now() + '.jpg';
+      // Extract extension from URL to avoid mime-type mismatch
+      const urlClean = photo.url.split('?')[0];
+      const ext = urlClean.match(/.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
+      const fileUri = FileSystem.cacheDirectory + 'save_' + Date.now() + '.' + ext;
       const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
-      await MediaLibrary.createAssetAsync(uri);
-      Alert.alert('✅ Saved!', 'Photo Camera Roll-ல் save ஆச்சு');
-    } catch {
-      Alert.alert('Error', 'Save பண்ண முடியல — Try again');
+      await MediaLibrary.saveToLibraryAsync(uri);
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      Alert.alert('✅ Saved!', 'Photo Gallery-ல் save ஆச்சு! 🎉');
+    } catch (e: any) {
+      Alert.alert('Error', 'Save பண்ண முடியல: ' + (e?.message || 'Unknown error'));
     } finally {
       setSavingPhoto(false);
     }
@@ -489,20 +849,23 @@ export default function AIGirlsCloudScreen() {
     const isBuiltIn = type === 'char'
       ? basePersonas.some(p => p.id === id)
       : PHOTO_STYLES.some(s => s.id === id);
-    if (isBuiltIn) return; // built-in folders cannot be deleted
+    if (isBuiltIn && type === 'char') return; // only block built-in character folders
     setDeleteFolderTarget({ id, name, type });
   };
 
   const doDeleteFolder = async () => {
     if (!deleteFolderTarget) return;
     const { id, name, type } = deleteFolderTarget;
+    // Snapshot selectedChar NOW — before any setState calls that trigger re-renders
+    // and could produce stale closure values in async code below.
+    const charSnapshot = selectedChar;
     setDeleteFolderTarget(null);
+
     if (type === 'char') {
       const updated = customChars.filter(c => c.id !== id);
       setCustomChars(updated);
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_chars', updated).catch(() => {}); // sync to cloud
-      // Delete all Cloudinary photos in each style subfolder
+      setCloudinaryMeta('custom_chars', updated).catch(() => {});
       try {
         const allStyles = [...PHOTO_STYLES, ...customStyles];
         for (const style of allStyles) {
@@ -511,21 +874,45 @@ export default function AIGirlsCloudScreen() {
         }
       } catch {}
     } else {
+      // ── Custom style: remove from customStyles list ───────────────────────
       const updated = customStyles.filter(s => s.id !== id);
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
-      // Delete all Cloudinary photos in this style folder (for current character)
-      if (selectedChar) {
+      setCloudinaryMeta('custom_styles', updated).catch(() => {});
+
+      // ── Built-in style: add to hiddenStyles so it disappears from the list ─
+      const isBuiltInStyle = PHOTO_STYLES.some(s => s.id === id);
+      if (isBuiltInStyle && charSnapshot) {
+        // FIX: functional updater avoids stale-closure bug on hiddenStyles state
+        setHiddenStyles(prev => new Set([...prev, id]));
+        // Persist to AsyncStorage by reading current saved value (not stale closure)
         try {
-          const imgs = await listCloudinaryImages(`my-girls/${selectedChar.id}/${id}`).catch(() => []);
-          for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
+          const raw = await AsyncStorage.getItem(`hidden_styles_${charSnapshot.id}`);
+          const arr: string[] = raw ? JSON.parse(raw) : [];
+          if (!arr.includes(id)) arr.push(id);
+          await AsyncStorage.setItem(`hidden_styles_${charSnapshot.id}`, JSON.stringify(arr));
         } catch {}
       }
+
+      // Sync removal to custom_photo_styles_v1 (used by chat.tsx)
+      try {
+        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
+        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
+        const chatUpdated = chatList.filter((s: any) => s.id !== id);
+        await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify(chatUpdated));
+      } catch {}
+      // Delete Cloudinary photos for ALL female personas (global style)
+      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(async (p) => {
+        try {
+          const imgs = await listCloudinaryImages(`my-girls/${p.id}/${id}`).catch(() => []);
+          for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
+        } catch {}
+      });
     }
-    // Clear local AsyncStorage cache for deleted folder
-    const cacheKey = type === 'style' && selectedChar
-      ? `cloud_photos_${selectedChar.id}_${id}`
+
+    // Clear local photo cache for the deleted folder
+    const cacheKey = type === 'style' && charSnapshot
+      ? `cloud_photos_${charSnapshot.id}_${id}`
       : null;
     if (cacheKey) AsyncStorage.removeItem(cacheKey).catch(() => {});
   };
@@ -799,13 +1186,18 @@ export default function AIGirlsCloudScreen() {
         </View>
       )}
 
-      {/* Folder delete confirm modal */}
-      {deleteFolderTarget && (
+      {/* Folder delete confirm — proper Modal so Android FlatList touches don't block it */}
+      <Modal
+        visible={!!deleteFolderTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteFolderTarget(null)}
+      >
         <View style={s.confirmOverlay}>
           <View style={s.confirmBox}>
             <Text style={s.confirmIcon}>🗑️</Text>
             <Text style={s.confirmTitle}>Folder Delete பண்ணட்டுமா?</Text>
-            <Text style={s.confirmSub}>"{deleteFolderTarget.name}" folder remove ஆகும்.</Text>
+            <Text style={s.confirmSub}>"{deleteFolderTarget?.name}" folder remove ஆகும்.</Text>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancel} onPress={() => setDeleteFolderTarget(null)}>
                 <Text style={s.confirmCancelTxt}>Cancel</Text>
@@ -816,7 +1208,7 @@ export default function AIGirlsCloudScreen() {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* New Folder dialog */}
       <Modal visible={folderDialog} transparent animationType="fade" onRequestClose={() => setFolderDialog(false)}>

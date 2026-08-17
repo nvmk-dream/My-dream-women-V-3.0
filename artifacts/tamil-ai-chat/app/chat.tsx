@@ -8,9 +8,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 function cloudVideoThumbnail(videoUrl: string): string {
   try {
@@ -62,12 +63,20 @@ import {
 import { saveGeneratedImageToCloud } from './cloud-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { trim as videoTrim } from 'react-native-video-trim';
+import { Video, ResizeMode } from 'expo-av';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
+import {
+  kallaatamErrorCategory,
+  kallaatamFriendlyError,
+  mergeKallaatamCharacters,
+  parseKallaatamExtraction,
+} from '../utils/kallaatam-extraction';
 
 const { width, height } = Dimensions.get('window');
 
@@ -90,16 +99,21 @@ const BUBBLE_STYLES_LIST = [
 ];
 
 const BUILTIN_PHOTO_STYLES = [
-  { id: 'normal',    label: 'Normal Photo',          prompt: 'normal photo, fully clothed, casual' },
-  { id: 'nude',      label: 'Nude 🔞',               prompt: 'nude, fully naked, explicit' },
-  { id: 'seminude',  label: 'Semi-nude',             prompt: 'semi nude, partially undressed' },
-  { id: 'breast',    label: 'Breast show',           prompt: 'topless, showing breasts, bare chest' },
-  { id: 'seductive', label: 'Seductive pose',        prompt: 'seductive pose, alluring, provocative look' },
-  { id: 'wet',       label: 'Wet clothes',           prompt: 'wet clothes, drenched, see through wet fabric' },
-  { id: 'legs',      label: 'Legs spread',           prompt: 'legs spread wide, revealing pose' },
-  { id: 'saree',     label: 'சேலை தூக்கி காட்டு',  prompt: 'lifting saree up, revealing thighs, traditional saree' },
-  { id: 'sleeping',  label: 'Sleeping exposed',      prompt: 'sleeping pose, exposed, lying down' },
-  { id: 'halfbreast',label: 'Half breast visible',   prompt: 'half breast visible, deep cleavage, low cut top' },
+  { id: 'normal',    label: 'Normal Photo',   prompt: 'normal photo, fully clothed, casual' },
+  { id: 'nude',      label: 'Nude 🔞',        prompt: 'nude, fully naked, explicit' },
+  { id: 'seminude',  label: 'Semi Nude',      prompt: 'semi nude, partially undressed' },
+  { id: 'breast',    label: 'Breast Show',    prompt: 'topless, showing breasts, bare chest' },
+  { id: 'halfbreast',label: 'Half Breast',    prompt: 'half breast visible, deep cleavage, low cut top' },
+  { id: 'cleavage',  label: 'Cleavage',       prompt: 'deep cleavage, low neckline, cleavage showing' },
+  { id: 'lowneck',   label: 'Low Neckline',   prompt: 'low neckline, low cut dress, revealing neckline' },
+  { id: 'lingerie',  label: 'Lingerie',       prompt: 'wearing lingerie, bra and panties, underwear' },
+  { id: 'buttocks',  label: 'Buttocks',       prompt: 'showing buttocks, from behind, revealing buttocks' },
+  { id: 'highslit',  label: 'High Slit',      prompt: 'high slit dress, thigh high slit, leg revealing slit' },
+  { id: 'seductive', label: 'Seductive',      prompt: 'seductive pose, alluring, provocative look' },
+  { id: 'wet',       label: 'Wet Clothes',    prompt: 'wet clothes, drenched, see through wet fabric' },
+  { id: 'legs',      label: 'Legs Spread',    prompt: 'legs spread wide, revealing pose' },
+  { id: 'saree',     label: 'Saree Tuck',     prompt: 'lifting saree up, revealing thighs, traditional saree' },
+  { id: 'sleeping',  label: 'Sleeping',       prompt: 'sleeping pose, exposed, lying down' },
 ];
 const CUSTOM_STYLES_KEY = 'custom_photo_styles_v1';
 type CustomStyle = { id: string; label: string; prompt?: string };
@@ -275,8 +289,11 @@ export default function ChatScreen() {
   const [kTaskContinue, setKTaskContinue] = useState(true);
   const [kTaskOutline, setKTaskOutline] = useState(true);
   const [kAllAI, setKAllAI] = useState(true);
+  const [personaDataLoaded, setPersonaDataLoaded] = useState(false);
+  const autoStoryRequestRef = useRef<string | null>(null);
 
   const reloadPersona = useCallback(async () => {
+    setPersonaDataLoaded(false);
     // Step 1: Look up built-in personas first
     const base = ALL_PERSONAS.find(p => p.id === personaId);
 
@@ -316,11 +333,13 @@ export default function ChatScreen() {
         setUserNormalBeh(data.userNormalBeh ?? '');
         setUserPresanaBeh(data.userPresanaBeh ?? '');
         setUserBodyDesc(data.userBodyDesc ?? '');
+        setCharFontColor(data.charFontColor ?? '');
+        setCharFontSize(data.charFontSize ?? 0);
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoSystemPrompt(data.imageVideoPrompt ?? '');
         setTodayStory(data.todayStory ?? '');
-        // Load kallaatam character table
+        // Load kallaatam character table before allowing its automatic story request.
         if (finalPersona.id === 'kallaatam') {
           try {
             const kRaw = await AsyncStorage.getItem('kallaatam_engine');
@@ -345,8 +364,10 @@ export default function ChatScreen() {
         setAvatarUri(finalPersona.avatarPhotoUri);
         setTodayStory('');
       }
+      setPersonaDataLoaded(true);
     } catch {
       setPersona(finalPersona);
+      setPersonaDataLoaded(true);
     }
   }, [personaId]);
 
@@ -435,6 +456,64 @@ export default function ChatScreen() {
   } | null>(null);
   const [stagingCaption, setStagingCaption] = useState('');
   const [stagingUploading, setStagingUploading] = useState(false);
+
+  // ── Video Trim state ──────────────────────────────────────────────────────
+  const [trimPending, setTrimPending] = useState<{
+    uri: string; durationSec: number; mimeType: string; fileName: string;
+  } | null>(null);
+  const [trimStartSec, setTrimStartSec] = useState(0);
+  const [trimEndSec, setTrimEndSec] = useState(60);
+  const [trimCurrentSec, setTrimCurrentSec] = useState(0);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const trimVideoRef = useRef<any>(null);
+  // Prepare a selected image/video for the existing staging + Cloudinary flow
+  const prepareSelectedMedia = useCallback(async (pending: {
+    uri: string; isVideo: boolean; mimeType: string; fileName: string; durationSec?: number;
+  }) => {
+    setFileLoading(true);
+    const tempUri = FileSystem.cacheDirectory + 'chat_gallery_' + Date.now() + (pending.isVideo ? '.mp4' : '.jpg');
+    try {
+      await FileSystem.copyAsync({ from: pending.uri, to: tempUri });
+      const info = await FileSystem.getInfoAsync(tempUri);
+      const sizeMB = info.exists && 'size' in info ? (info.size || 0) / (1024 * 1024) : 0;
+      const sizeLimit = pending.isVideo ? 100 : 25;
+      if (sizeMB > sizeLimit) throw new Error((pending.isVideo ? 'வீடியோ' : 'படம்') + ' ' + sizeMB.toFixed(1) + 'MB உள்ளது — ' + sizeLimit + 'MB-க்கு கீழ் இருக்கணும்.');
+      if (pending.isVideo && pending.durationSec && pending.durationSec > 60) {
+        setTrimStartSec(0);
+        setTrimEndSec(Math.min(60, pending.durationSec));
+        setTrimCurrentSec(0);
+        setTrimPending({ uri: pending.uri, durationSec: pending.durationSec, mimeType: pending.mimeType, fileName: pending.fileName });
+        return;
+      }
+      let b64 = '';
+      if (pending.isVideo) {
+        b64 = await FileSystem.readAsStringAsync(tempUri, { encoding: FileSystem.EncodingType.Base64 });
+      } else {
+        const compressed = await ImageManipulator.manipulateAsync(
+          tempUri,
+          [{ resize: { width: 1280 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        b64 = await FileSystem.readAsStringAsync(compressed.uri, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.deleteAsync(compressed.uri, { idempotent: true }).catch(() => {});
+      }
+      if (!b64 || b64.length < 10) throw new Error('Selected media is empty');
+      setStagingCaption('');
+      setStagingMedia({ uri: pending.uri, isVideo: pending.isVideo, b64, mimeType: pending.mimeType, fileName: pending.fileName });
+    } catch (e: any) {
+      Alert.alert('❌ File Read பண்ண முடியல', e?.message || 'Selected media could not be read');
+    } finally {
+      await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+      setFileLoading(false);
+    }
+  }, []);
+  // Existing gallery route still works; it shares the same preparation path.
+  useFocusEffect(useCallback(() => {
+    const pending = ParamsStore.getPendingGalleryMedia();
+    if (!pending) return;
+    ParamsStore.clearPendingGalleryMedia();
+    prepareSelectedMedia(pending);
+  }, [prepareSelectedMedia]));
   const [showGenModal, setShowGenModal] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState('normal');
@@ -476,6 +555,8 @@ export default function ChatScreen() {
   const [chatWallpaper, setChatWallpaper] = useState('default');
   const [bubbleStyle, setBubbleStyle] = useState('classic');
   const [showStyleSheet, setShowStyleSheet] = useState(false);
+  const [charFontColor, setCharFontColor] = useState('');
+  const [charFontSize, setCharFontSize] = useState(0);
 
   // ── Birthday ──
   const [birthday, setBirthday] = useState('');
@@ -512,22 +593,33 @@ export default function ChatScreen() {
 
   const loadCustomStyles = useCallback(async () => {
     try {
-      const [rawCustom, rawHidden] = await Promise.all([
-        AsyncStorage.getItem(CUSTOM_STYLES_KEY),
-        AsyncStorage.getItem(HIDDEN_BUILTIN_KEY),
-      ]);
-      if (rawCustom) {
-        const parsed = JSON.parse(rawCustom);
-        if (Array.isArray(parsed)) {
-          const valid = parsed.filter(s => s && typeof s.id === 'string' && typeof s.label === 'string');
-          setCustomStyles(valid);
+      // Primary: load from global Cloudinary meta (managed via Settings → Photo Styles)
+      const global = await getGlobalPhotoStyles();
+      setCustomStyles(global.custom);
+      setHiddenBuiltinIds(global.hidden);
+      // Mirror to AsyncStorage as offline cache
+      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(global.custom)).catch(() => {});
+      await AsyncStorage.setItem(HIDDEN_BUILTIN_KEY, JSON.stringify(global.hidden)).catch(() => {});
+    } catch {
+      // Fallback: AsyncStorage if Cloudinary unavailable
+      try {
+        const [rawCustom, rawHidden] = await Promise.all([
+          AsyncStorage.getItem(CUSTOM_STYLES_KEY),
+          AsyncStorage.getItem(HIDDEN_BUILTIN_KEY),
+        ]);
+        if (rawCustom) {
+          const parsed = JSON.parse(rawCustom);
+          if (Array.isArray(parsed)) {
+            const valid = parsed.filter(s => s && typeof s.id === 'string' && typeof s.label === 'string');
+            setCustomStyles(valid);
+          }
         }
-      }
-      if (rawHidden) {
-        const parsedHidden = JSON.parse(rawHidden);
-        if (Array.isArray(parsedHidden)) setHiddenBuiltinIds(parsedHidden);
-      }
-    } catch {}
+        if (rawHidden) {
+          const parsedHidden = JSON.parse(rawHidden);
+          if (Array.isArray(parsedHidden)) setHiddenBuiltinIds(parsedHidden);
+        }
+      } catch {}
+    }
   }, []);
 
   useEffect(() => { loadCustomStyles(); }, [loadCustomStyles]);
@@ -559,6 +651,18 @@ export default function ChatScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
     }
+    // Sync to cloud_custom_styles key (used by Cloud Storage screen)
+    try {
+      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
+      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
+      if (!cloudList.some(s => s.id === newStyle.id)) {
+        await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, newStyle]));
+      }
+    } catch {}
+    // Auto-create Cloudinary folder for ALL female personas (global style)
+    ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
+      createCloudinaryFolder(`my-girls/${p.id}/${newStyle.id}`).catch(() => {});
+    });
     setNewStyleName('');
     setNewStylePrompt('');
     setShowAddStyleModal(false);
@@ -577,6 +681,13 @@ export default function ChatScreen() {
       setCustomStyles(updated);
       await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
     }
+    // Sync removal to cloud_custom_styles (used by Cloud Storage screen)
+    try {
+      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
+      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
+      const cloudUpdated = cloudList.filter(s => s.id !== id);
+      await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify(cloudUpdated));
+    } catch {}
   };
 
   const removeBuiltinStyle = async (id: string) => {
@@ -670,6 +781,100 @@ export default function ChatScreen() {
     }
   }, [persona?.id]);
 
+  // ── கல்லாட்டம்: auto story query — triggered when Story Save navigates here ──
+  useEffect(() => {
+    if (!historyLoaded || !personaDataLoaded || persona?.id !== 'kallaatam') return;
+    if (!ParamsStore.getAutoStoryQuery()) return;
+    if (autoStoryRequestRef.current) return;
+    const requestKey = `${personaId}:${todayStory.trim()}`;
+    autoStoryRequestRef.current = requestKey;
+    ParamsStore.clearAutoStoryQuery();
+
+    const queryText = 'கதையில் உள்ள கதாபாத்திரம் என்ன?';
+    const ts = new Date();
+    setMessages(prev => [...prev, {
+      id: `auto-sq-u-${Date.now()}`,
+      role: 'user' as const,
+      content: queryText,
+      timestamp: ts,
+    }]);
+
+    void (async () => {
+      setLoading(true);
+      try {
+        // Re-read the persisted values so the request never uses an older render.
+        const [personaRaw, engineRaw] = await Promise.all([
+          AsyncStorage.getItem(`persona_edit_${personaId}`),
+          AsyncStorage.getItem('kallaatam_engine'),
+        ]);
+        const personaData = personaRaw ? JSON.parse(personaRaw) : {};
+        const engine = engineRaw ? JSON.parse(engineRaw) : {};
+        const readyStory = String(personaData.todayStory ?? todayStory).trim();
+        const readyChars = Array.isArray(engine.kChars) ? engine.kChars : kChars;
+        setTodayStory(readyStory);
+        if (Array.isArray(engine.kChars)) setKChars(engine.kChars);
+        if (typeof engine.kOutline === 'string') setKOutline(engine.kOutline);
+
+        const storyCtx = readyStory
+          ? `
+
+கதை:
+${readyStory}
+
+இந்த கதைக்கான outline-ஐ சுருக்கமாக கொடுத்து, கதையில் உள்ள கதாபாத்திரங்களை name மற்றும் role உடன் கண்டுபிடி.`
+          : '';
+        const introHistory = [{ role: 'user' as const, content: queryText }];
+        const existingCharacterContext = JSON.stringify(
+          readyChars
+            .filter((character: any) => String(character?.name ?? '').trim())
+            .map((character: any) => ({ name: character.name, role: character.role ?? '' })),
+        );
+        const introPrompt = `${(persona as any).prompt ?? ''}
+${storyCtx}
+
+Return JSON only in this exact shape:
+{"outline":"","characters":[{"name":"","role":""}]}
+Do not invent characters. Existing Kallaatam character context:
+${existingCharacterContext}`;
+        const reply = await sendMessage(introHistory, provider, introPrompt, 'story');
+        setMessages(prev => [...prev, {
+          id: `auto-sq-a-${Date.now()}`,
+          role: 'assistant' as const,
+          content: reply,
+          timestamp: new Date(),
+        }]);
+        const extraction = parseKallaatamExtraction(reply);
+        const mergedChars = mergeKallaatamCharacters(readyChars, extraction.characters);
+        console.log('[STORY-AUTO]', {
+          responseLength: reply.length,
+          parsedJson: extraction.parsedJson,
+          characterCount: extraction.characters.length,
+        });
+        setKChars(mergedChars);
+        const currentEngineRaw = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
+        const currentEngine = currentEngineRaw ? JSON.parse(currentEngineRaw) : {};
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+          ...currentEngine,
+          kChars: mergedChars,
+        }));
+      } catch (e: any) {
+        const category = kallaatamErrorCategory(e);
+        console.log('[STORY-AUTO]', {
+          category,
+          stage: 'automatic-extraction',
+          error: e?.message ?? String(e),
+        });
+        setMessages(prev => [...prev, {
+          id: `auto-sq-err-${Date.now()}`,
+          role: 'assistant' as const,
+          content: kallaatamFriendlyError('auto', category, e),
+          timestamp: new Date(),
+        }]);
+      } finally { setLoading(false); }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyLoaded, persona?.id, personaDataLoaded]);
+
   const toggleDialect = async () => {
     const next = !dialectMode;
     setDialectMode(next);
@@ -679,16 +884,18 @@ export default function ChatScreen() {
   const toggleMood = async () => {
     const allowedModes = (persona as any)?.modes as Array<'presana' | 'normal' | 'whatsapp' | 'story'> | undefined;
     let next: 'presana' | 'normal' | 'whatsapp' | 'story';
-    if (allowedModes?.length) {
-      const cycle = allowedModes.includes('story') ? allowedModes : [...allowedModes, 'story'];
-      const idx = cycle.indexOf(moodMode);
-      next = cycle[(idx < 0 ? 0 : idx + 1) % cycle.length];
-    } else {
-      next = moodMode === 'presana' ? 'normal' : moodMode === 'normal' ? 'whatsapp' : moodMode === 'whatsapp' ? 'story' : 'presana';
-    }
+    // Keep the original four-mode order. Story is only part of the cycle
+    // when a story exists; otherwise it must not block Presana.
+    const configuredModes: Array<'presana' | 'normal' | 'whatsapp' | 'story'> =
+      allowedModes?.length
+        ? allowedModes
+        : ['whatsapp', 'normal', 'presana', 'story'];
+    const cycle = configuredModes.filter(mode => mode !== 'story' || Boolean(todayStory.trim()));
+    const idx = cycle.indexOf(moodMode);
+    next = cycle[(idx < 0 ? 0 : idx + 1) % cycle.length];
     if (next === 'story' && !todayStory.trim()) {
       Alert.alert('இன்றைய கதை இல்ல', 'Edit Character page-ல் "இன்றைய கதை" section-ல் ஒரு கதை add பண்ணுங்க, அப்புறம் Story mode use பண்ணலாம்.');
-      next = 'normal';
+      return;
     }
     setMoodMode(next);
     if (personaId) await AsyncStorage.setItem(`mood_mode_${personaId}`, next);
@@ -934,7 +1141,7 @@ export default function ChatScreen() {
   };
 
   const pickAvatarPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -969,13 +1176,15 @@ export default function ChatScreen() {
   const saveAiImageToGallery = async (imageUrl: string) => {
     try {
       // Request MediaLibrary permission
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission வேணும் 📷', 'Gallery-ல் save பண்ண permission allow பண்ணுங்க — Settings → Apps → Permissions');
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission வேணும் 📷', 'Settings → My Girls → Permissions → Files & Media → Allow all');
         return;
       }
-      // Download image to cache
-      const filename = `ai_girl_${Date.now()}.jpg`;
+      // Extract extension from URL
+      const urlClean = imageUrl.split('?')[0];
+      const ext = urlClean.match(/.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
+      const filename = `ai_girl_${Date.now()}.${ext}`;
       const localUri = FileSystem.cacheDirectory + filename;
       const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
       // Save to gallery
@@ -987,6 +1196,29 @@ export default function ChatScreen() {
     }
   };
 
+  // WhatsApp-style file selection: Android DocumentsUI (Recent → Phone → Folder → File)
+  const pickChatMediaFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'video/*'],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const isVideo = asset.mimeType?.startsWith('video/') === true || /\.(mp4|mov|m4v|avi|mkv|webm)$/i.test(asset.name ?? '');
+      const fallbackMime = isVideo ? 'video/mp4' : 'image/jpeg';
+      await prepareSelectedMedia({
+        uri: asset.uri,
+        isVideo,
+        mimeType: asset.mimeType || fallbackMime,
+        fileName: asset.name || (isVideo ? 'phone_video.mp4' : 'phone_photo.jpg'),
+      });
+    } catch (e: any) {
+      Alert.alert('❌ File picker பிழை', e?.message || 'File select பண்ண முடியல.');
+    }
+  }, [prepareSelectedMedia]);
   const handleFileAttach = useCallback(async () => {
     if (!persona) return;
     try {
@@ -997,82 +1229,7 @@ export default function ChatScreen() {
         [
           {
             text: '📷 Photo / Video',
-            onPress: async () => {
-              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { Alert.alert('Permission வேணும்', 'Gallery access allow பண்ணுங்க'); return; }
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.All,
-                base64: false,
-                quality: 0.8,
-              });
-              if (result.canceled || !result.assets[0]) return;
-              const asset = result.assets[0];
-              const isVideo = asset.type === 'video';
-
-              // Validate video duration — 45 seconds limit for full analysis
-              if (isVideo && asset.duration && asset.duration > 45000) {
-                Alert.alert(
-                  '⏱️ Video Too Long',
-                  `Video ${(asset.duration / 1000).toFixed(0)} seconds உள்ளது.\n\n✅ 45 seconds-க்கு கீழ் உள்ள clip மட்டும் full analyze ஆகும்.\n\nகுறுகிய clip trim பண்ணி அனுப்புங்க!`
-                );
-                return;
-              }
-
-              // Validate file size — video limit 100MB (File API), image 25MB
-              const fileSizeMB = (asset.fileSize || 0) / (1024 * 1024);
-              const sizeLimit = isVideo ? 100 : 25;
-              if (fileSizeMB > sizeLimit) {
-                const tip = isVideo
-                  ? `வீடியோ ${fileSizeMB.toFixed(1)}MB உள்ளது 😔 100MB-க்கு கீழ் (சுமார் 5-8 min) உள்ள clip அனுப்புங்க!`
-                  : `படம் ${fileSizeMB.toFixed(1)}MB உள்ளது — 25MB-க்கு கீழ் இருக்கணும்.`;
-                Alert.alert('File Too Large 📁', tip);
-                return;
-              }
-
-              // content:// URIs (Android picker) MUST be copied to cacheDirectory first
-              // Direct readAsStringAsync on content:// fails — same pattern as face-swap.tsx
-              let b64 = '';
-              try {
-                if (isVideo) {
-                  // Video: copy to cache then read as base64 (no compression)
-                  const tmp = FileSystem.cacheDirectory + `chat_${Date.now()}.mp4`;
-                  await FileSystem.copyAsync({ from: asset.uri, to: tmp });
-                  b64 = await FileSystem.readAsStringAsync(tmp, { encoding: FileSystem.EncodingType.Base64 });
-                } else {
-                  // Image: compress to max 1280px width, JPEG 70% quality → smaller base64
-                  const compressed = await ImageManipulator.manipulateAsync(
-                    asset.uri,
-                    [{ resize: { width: 1280 } }],
-                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-                  );
-                  b64 = await FileSystem.readAsStringAsync(compressed.uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                  });
-                  // Clean up compressed temp file
-                  FileSystem.deleteAsync(compressed.uri, { idempotent: true }).catch(() => {});
-                }
-              } catch (e: any) {
-                Alert.alert('❌ File Read பண்ண முடியல', `காரணம்: ${e?.message || 'Unknown error'}
-
-• Photo-க்கு: Gallery permission allow பண்ணுங்க
-• Video-க்கு: 100MB-க்கு கீழ் clip try பண்ணுங்க`);
-                return;
-              }
-              if (!b64 || b64.length < 10) {
-                Alert.alert('❌ Empty File', 'File data கிடைக்கல — storage permission allow பண்ணுங்க அல்லது வேற file try பண்ணுங்க.');
-                return;
-              }
-
-              // Show staging preview modal instead of immediate send
-              setStagingCaption('');
-              setStagingMedia({
-                uri: asset.uri,
-                isVideo,
-                b64,
-                mimeType: asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
-                fileName: asset.fileName || (isVideo ? 'video.mp4' : 'photo.jpg'),
-              });
-            },
+            onPress: pickChatMediaFile,
           },
           {
             text: '📄 Document (PDF/TXT)',
@@ -1147,7 +1304,7 @@ export default function ChatScreen() {
     } catch (e) {
       Alert.alert('Error', 'File pick பண்ண முடியல');
     }
-  }, [persona]);
+  }, [persona, pickChatMediaFile]);
 
   // ── Send staged photo/video: upload to Cloudinary → analyzeFile ──────────────
   const sendStagedMedia = useCallback(async () => {
@@ -1221,9 +1378,23 @@ export default function ChatScreen() {
       }]);
     } catch (e: any) {
       const errMsg = e?.message || 'Unknown error';
+      const step = e?.step as string | undefined;
+      const isColdStart = e?.name === 'AbortError' || errMsg === 'Aborted' || errMsg === 'Network request failed';
+
+      let errorContent: string;
+      if (isColdStart) {
+        errorContent = `${persona.name}: ⏳ Server கொஞ்சம் தூக்கத்திலிருக்கு\n\n30-60 seconds wait பண்ணி மீண்டும் அனுப்புங்க!`;
+      } else if (step === 'download') {
+        errorContent = `${persona.name}: ☁️ படி 3 தோல்வி — Video download ஆகல\n\nServer உங்க video-ஐ Cloudinary-லிருந்து download பண்ண முடியல.\n\nகாரணம்: ${errMsg}\n\n💡 மீண்டும் try பண்ணுங்க!`;
+      } else if (step === 'server') {
+        errorContent = `${persona.name}: 🖥️ படி 4 தோல்வி — Server crash\n\nServer-ல் எதோ problem வந்துச்சு.\n\nகாரணம்: ${errMsg}\n\n💡 சில seconds wait பண்ணி மீண்டும் try பண்ணுங்க!`;
+      } else {
+        errorContent = `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`;
+      }
+
       setMessages(prev => [...prev, {
         id: (Date.now()+1).toString(), role: 'assistant',
-        content: `${persona.name}: File analyze பண்ண முடியல 😔\n\nError: ${errMsg}`,
+        content: errorContent,
         timestamp: new Date(),
       }]);
     } finally {
@@ -1231,6 +1402,53 @@ export default function ChatScreen() {
       setFileLoading(false);
     }
   }, [stagingMedia, stagingCaption, persona]);
+
+  // ── Video Trim helpers ────────────────────────────────────────────────────
+  const fmtSec = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const handleTrimAndSend = useCallback(async () => {
+    if (!trimPending) return;
+    setIsTrimming(true);
+    try {
+      const startMs = Math.round(trimStartSec * 1000);
+      const endMs   = Math.round(trimEndSec   * 1000);
+      // react-native-video-trim v8 headless: startTime/endTime in milliseconds
+      const result = await videoTrim(trimPending.uri, { startTime: startMs, endTime: endMs });
+      if (!result.success) throw new Error('Trim returned success=false');
+      // react-native-video-trim returns bare path; FileSystem needs file:// scheme
+      const outputUri = result.outputPath.startsWith('file://')
+        ? result.outputPath
+        : `file://${result.outputPath}`;
+
+      // The native trimmer's output path can be temporary or inaccessible to
+      // Android's multipart uploader. Copy it into the app cache first so the
+      // upload and the base64 read both use one stable, local MP4.
+      const stableTrimmedUri = `${FileSystem.cacheDirectory}chat_trimmed_${Date.now()}.mp4`;
+      await FileSystem.copyAsync({ from: outputUri, to: stableTrimmedUri });
+      const trimmedInfo = await FileSystem.getInfoAsync(stableTrimmedUri);
+      if (!trimmedInfo.exists || (typeof trimmedInfo.size === 'number' && trimmedInfo.size < 1024)) {
+        throw new Error('Trimmed file could not be copied to app storage');
+      }
+
+      const b64 = await FileSystem.readAsStringAsync(stableTrimmedUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (!b64 || b64.length < 10) throw new Error('Trimmed file empty');
+      setTrimPending(null);
+      setStagingCaption('');
+      setStagingMedia({
+        uri: stableTrimmedUri, isVideo: true, b64,
+        mimeType: 'video/mp4', fileName: `trimmed_${trimPending.fileName}`,
+      });
+    } catch (e: any) {
+      Alert.alert('⚠️ Trim தோல்வி', e?.message || 'மீண்டும் try பண்ணுங்க.');
+    } finally {
+      setIsTrimming(false);
+    }
+  }, [trimPending, trimStartSec, trimEndSec]);
+
+
 
 
   const handleSend = useCallback(async () => {
@@ -1716,6 +1934,8 @@ export default function ChatScreen() {
   const aiBubbleBg   = bubbleStyle === 'modern' ? (isDark ? '#2c2c2e' : '#fff') : (isDark ? '#2c2c2e' : '#fff');
   const userBubbleBg = bubbleStyle === 'modern' ? (isDark ? '#1a3d2b' : '#d4f5d4') : '#DCF8C6';
   const msgTextColor = isDark ? '#f0f0f0' : '#111';
+  const aiMsgTextColor = charFontColor || msgTextColor;
+  const aiMsgFontSize = charFontSize > 0 ? charFontSize : 15;
   const timeTextColor = isDark ? '#888' : '#888';
 
   // ── Copy helper ────────────────────────────────────────────────
@@ -1770,7 +1990,7 @@ export default function ChatScreen() {
 
   // ── Pick image from gallery → get AI prompt ───────────────────
   const pickImageForPrompt = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும் — settings-ல் allow பண்ணுங்க.'); return; }
     let picked: ImagePicker.ImagePickerResult;
     try {
@@ -1833,6 +2053,7 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
+    const aiTextStyle = isUser ? { color: msgTextColor } : { color: aiMsgTextColor, fontSize: aiMsgFontSize };
     return (
       <View style={[styles.msgRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && persona && (
@@ -1860,7 +2081,7 @@ export default function ChatScreen() {
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
               <ActivityIndicator color="#075E54" size="small" />
-              <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
             </View>
           ) : item.imageUrl ? (
             <View>
@@ -1868,7 +2089,7 @@ export default function ChatScreen() {
                 <Image source={{ uri: item.imageUrl }} style={styles.generatedImg} resizeMode="cover" />
               </TouchableOpacity>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 8 }}>
-                <Text selectable style={[styles.msgText, { color: msgTextColor, flex: 1 }]}>{item.content}</Text>
+                <Text selectable style={[styles.msgText, aiTextStyle, { flex: 1 }]}>{item.content}</Text>
                 <TouchableOpacity
                   onPress={() => saveAiImageToGallery(item.imageUrl!)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(37,211,102,0.15)', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(37,211,102,0.4)' }}
@@ -1900,17 +2121,17 @@ export default function ChatScreen() {
                   <Text style={{ color: '#fff', fontSize: 10, marginTop: 6, fontWeight: '600', opacity: 0.9 }}>🎬 Video</Text>
                 </View>
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, { color: msgTextColor, marginTop: 6 }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 6 }]}>{item.content}</Text>
             </View>
           ) : item.sentMediaType === 'image' && item.sentMediaUri ? (
             <View>
               <TouchableOpacity activeOpacity={0.88} onPress={() => setFullViewImg(item.sentMediaUri!)}>
                 <Image source={{ uri: item.sentMediaUri }} style={{ width: 200, height: 200, borderRadius: 10 }} resizeMode="cover" />
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, { color: msgTextColor, marginTop: 4 }]}>{item.content}</Text>
+              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 4 }]}>{item.content}</Text>
             </View>
           ) : (
-            <Text selectable style={[styles.msgText, { color: msgTextColor }]}>{item.content}</Text>
+            <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
           )}
           {item.videoUrl && (
             <View style={{ marginBottom: 6 }}>
@@ -1971,7 +2192,7 @@ export default function ChatScreen() {
     : (normalAvatarUri || avatarUri);
 
   const headerTitle = () => (
-    <TouchableOpacity style={styles.headerTitleWrap} onPress={pickAvatarPhoto}>
+    <TouchableOpacity style={styles.headerTitleWrap} onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}>
       {avatarUri
         ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
         : persona
@@ -2101,22 +2322,7 @@ export default function ChatScreen() {
         <View style={{ position: 'relative' }}>
           {/* Floating action buttons — absolute right side, above input bar */}
           <View style={styles.chatFabs}>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#E91E8C' }]}
-              onPress={() => router.push('/prompt-image')}
-            >
-              <Text style={styles.cameraIcon}>🎨</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#7B1FA2' }]}
-              onPress={pickImageForPrompt}
-              disabled={promptLoading}
-            >
-              {promptLoading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.cameraIcon}>📋</Text>
-              }
-            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.chatFabItem, { backgroundColor: '#E53935' }]}
               onPress={() => setShowGenModal(true)}
@@ -2128,6 +2334,12 @@ export default function ChatScreen() {
               }
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.chatFabItem, { backgroundColor: '#00897B' }]}
+              onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
+            >
+              <Text style={styles.cameraIcon}>☁️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.chatFabItem, { backgroundColor: '#1565C0' }]}
               onPress={() => handleTranslate(input)}
               disabled={translateLoading}
@@ -2137,12 +2349,7 @@ export default function ChatScreen() {
                 : <Text style={styles.cameraIcon}>🔤</Text>
               }
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#FF6D00' }]}
-              onPress={() => router.push('/face-swap')}
-            >
-              <Text style={styles.cameraIcon}>🔄</Text>
-            </TouchableOpacity>
+
           </View>
           {/* Compact input bar — WhatsApp style */}
           <View style={styles.inputBar}>
@@ -2739,6 +2946,100 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* ── Video Trim Modal ── */}
+      <Modal
+        visible={!!trimPending}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTrimPending(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.90)', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            paddingBottom: 36, paddingTop: 4,
+          }}>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              padding: 16, borderBottomWidth: 1, borderBottomColor: '#2a2a4a',
+            }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>✂️ Video Trim</Text>
+              <TouchableOpacity onPress={() => setTrimPending(null)} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
+                <Text style={{ fontSize: 24, color: '#888' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {trimPending && (
+              <Video
+                ref={trimVideoRef}
+                source={{ uri: trimPending.uri }}
+                style={{ width: '100%', height: 200, backgroundColor: '#000' }}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                onPlaybackStatusUpdate={(status: any) => {
+                  if (status.isLoaded) setTrimCurrentSec(status.positionMillis / 1000);
+                }}
+              />
+            )}
+            <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+              <Text style={{ color: '#aaa', fontSize: 12 }}>
+                தற்போதைய நேரம்:{' '}
+                <Text style={{ color: '#25D366', fontWeight: '700' }}>{fmtSec(trimCurrentSec)}</Text>
+                {' '}/ {trimPending ? fmtSec(trimPending.durationSec) : '00:00'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 }}>
+              <TouchableOpacity
+                onPress={() => setTrimStartSec(Math.min(trimCurrentSec, trimEndSec - 1))}
+                style={{ flex: 1, backgroundColor: '#1b5e20', paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#69f0ae', fontWeight: '700', fontSize: 13 }}>▶ Start இங்கே வை</Text>
+                <Text style={{ color: '#69f0ae', fontSize: 11, marginTop: 2 }}>{fmtSec(trimStartSec)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTrimEndSec(Math.max(trimCurrentSec, trimStartSec + 1))}
+                style={{ flex: 1, backgroundColor: '#7b1fa2', paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#ea80fc', fontWeight: '700', fontSize: 13 }}>⏹ End இங்கே வை</Text>
+                <Text style={{ color: '#ea80fc', fontSize: 11, marginTop: 2 }}>{fmtSec(trimEndSec)}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{
+              marginHorizontal: 16, backgroundColor: '#0d1b2a', borderRadius: 12,
+              padding: 12, marginBottom: 14, alignItems: 'center',
+            }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                {fmtSec(trimStartSec)} → {fmtSec(trimEndSec)}
+                {'  '}<Text style={{ color: '#25D366' }}>({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)</Text>
+              </Text>
+              <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+                Video play பண்ணி சரியான நேரத்தில் ▶ Start / ⏹ End press பண்ணுங்க
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16 }}>
+              <TouchableOpacity
+                onPress={() => setTrimPending(null)}
+                style={{ flex: 1, backgroundColor: '#2a2a3e', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#aaa', fontWeight: '600' }}>ரத்து</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTrimAndSend}
+                disabled={isTrimming}
+                style={{
+                  flex: 2, backgroundColor: isTrimming ? '#555' : '#00897b',
+                  paddingVertical: 14, borderRadius: 14, alignItems: 'center',
+                  flexDirection: 'row', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {isTrimming ? <ActivityIndicator color="#fff" size="small" /> : null}
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
+                  {isTrimming ? 'Trimming...' : '✂️ Trim & Send'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Staging Preview Modal (Photo/Video before send) ── */}
       <Modal

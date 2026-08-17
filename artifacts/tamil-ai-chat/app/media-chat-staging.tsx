@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 // The Replit shared proxy routes /api → your Express server automatically.
@@ -69,8 +70,8 @@ export default function MediaChatStaging() {
   // ── Request media permissions ────────────────────────────────────────────
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS === 'web') return true;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const permission = await requestPhotoVideoPermissionsAsync();
+    if (!permission.granted) {
       Alert.alert('Permission needed', 'Gallery access வேணும் — Settings-ல் allow பண்ணுங்க.');
       return false;
     }

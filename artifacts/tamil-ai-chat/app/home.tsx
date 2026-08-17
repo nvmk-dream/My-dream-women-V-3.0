@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadUriToCloudinary } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 const COLS = 4;
@@ -106,7 +107,7 @@ export default function HomeScreen() {
   const pickFromGallery = useCallback(async () => {
     setShowPickModal(false);
     await new Promise(r => setTimeout(r, 400));
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access allow பண்ணுங்க'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -149,7 +150,7 @@ export default function HomeScreen() {
     setCloudSheet(null);
     await new Promise(r => setTimeout(r, 300));
 
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access allow பண்ணுங்க'); return; }
 
     const isVideo = catKey === 'videos' || catKey === 'movies';

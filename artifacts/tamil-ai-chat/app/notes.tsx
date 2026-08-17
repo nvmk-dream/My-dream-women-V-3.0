@@ -22,9 +22,11 @@ type Page = { id: string; title: string; content: string; updatedAt: number; acc
 type CharNotes = Record<string, Page[]>;
 type CustomStyle = { id: string; label: string; prompt?: string };
 type PersonaMerged = (typeof ALL_PERSONAS)[0] & { avatarPhotoUri?: string };
+type NotesOwner = { id: string; name: string; emoji?: string };
 
 const STORAGE_KEY = 'character_notes_v2';
 const CUSTOM_STYLES_KEY = 'custom_photo_styles_v1';
+const USER_NOTES_ID = 'user_notes';
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 function formatDate(ts: number) {
@@ -46,7 +48,8 @@ export default function NotesScreen() {
   const [showAddStyleModal, setShowAddStyleModal] = useState(false);
   const [newStyleName, setNewStyleName] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
-  const [activeChar, setActiveChar] = useState<PersonaMerged | null>(null);
+  const [activeChar, setActiveChar] = useState<NotesOwner | null>(null);
+  const [userNotesName, setUserNotesName] = useState('User');
   const [activePage, setActivePage] = useState<Page | null>(null);
   const [editorText, setEditorText] = useState('');
   const [editorTitle, setEditorTitle] = useState('');
@@ -89,6 +92,8 @@ export default function NotesScreen() {
   // (so edits in My AI Girls sync, and custom styles added in Chat appear here)
   const reloadShared = useCallback(async () => {
     try {
+      const savedUserName = await AsyncStorage.getItem('user_name').catch(() => null);
+      if (savedUserName?.trim()) setUserNotesName(savedUserName.trim());
       const customRaw = await AsyncStorage.getItem('custom_personas_v1').catch(() => null);
       const customs: typeof ALL_PERSONAS = customRaw ? JSON.parse(customRaw) : [];
       const allSrc = [...ALL_PERSONAS, ...customs];
@@ -172,7 +177,7 @@ export default function NotesScreen() {
 
   const pages: Page[] = activeChar ? (allNotes[activeChar.id] ?? []) : [];
 
-  const openChar = (persona: PersonaMerged) => { setActiveChar(persona); setSearchQ(''); setShowSearch(false); setView('pages'); };
+  const openChar = (persona: NotesOwner) => { setActiveChar(persona); setSearchQ(''); setShowSearch(false); setView('pages'); };
 
   const openPage = (page: Page) => {
     setActivePage(page); setEditorText(page.content); setEditorTitle(page.title); setView('editor');
@@ -258,7 +263,9 @@ export default function NotesScreen() {
     }
   }, [editorText]);
 
-  const filteredChars = personas.filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()));
+  const userNotesOwner: NotesOwner = { id: USER_NOTES_ID, name: userNotesName, emoji: '👤' };
+  const allNotesOwners: NotesOwner[] = [userNotesOwner, ...personas];
+  const filteredChars = allNotesOwners.filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()));
   const filteredPages = pages.filter(p => !searchQ || p.title.toLowerCase().includes(searchQ.toLowerCase()) || p.content.toLowerCase().includes(searchQ.toLowerCase()));
 
   // ── Shared modals (rendered in all views) ──

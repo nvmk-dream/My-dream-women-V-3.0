@@ -9,7 +9,12 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateImageHuggingFace, HF_IMAGE_MODEL, HF_NSFW_MODELS } from '../services/api';
+import {
+  generateImage,
+  HF_IMAGE_MODEL,
+  HF_NSFW_MODELS,
+} from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 
@@ -126,7 +131,7 @@ export default function PromptImageScreen() {
 
   // Pick image from gallery
   const pickImage = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும்.'); return; }
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'] as any, quality: 0.85, base64: true,
@@ -185,17 +190,7 @@ export default function PromptImageScreen() {
       return;
     }
 
-    if (!hfToken) {
-      Alert.alert(
-        'HuggingFace Token இல்லை',
-        'Settings → Keys-ல் HuggingFace token add பண்ணுங்க.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: '⚙️ Settings', onPress: () => router.push('/keys') },
-        ],
-      );
-      return;
-    }
+
 
     setLoading(true);
     setError(null);
@@ -208,11 +203,10 @@ export default function PromptImageScreen() {
         ? `${activePrompt} ### negative: ${negPrompt.trim()}`
         : activePrompt;
 
-      const result = await generateImageHuggingFace(
-        fullPrompt, hfToken, selectedModel,
-        (msg) => setProgressMsg(msg),
-        (pct) => setProgress(pct),
-      );
+      setProgressMsg('Render AI image generate பண்றது...');
+      setProgress(30);
+      const result = await generateImage({ imagePrompt: fullPrompt });
+      setProgress(90);
       setProgress(100);
       setProgressMsg('✅ Done!');
       await new Promise(r => setTimeout(r, 300));
@@ -259,11 +253,9 @@ export default function PromptImageScreen() {
 
           {/* Model badge */}
           <View style={s.modelBadge}>
-            <Text style={s.modelBadgeTxt}>🤗 {HF_NSFW_MODELS.find(m => m.id === selectedModel)?.label ?? 'DreamShaper XL'}</Text>
-            <View style={[s.dot, { backgroundColor: hfToken ? '#22c55e' : '#ef4444' }]} />
-            <Text style={[s.tokenStatus, { color: hfToken ? '#22c55e' : '#ef4444' }]}>
-              {hfToken ? 'Token ✅' : 'Token இல்லை ❌'}
-            </Text>
+            <Text style={s.modelBadgeTxt}>🎨 Render AI Image Studio</Text>
+            <View style={[s.dot, { backgroundColor: '#22c55e' }]} />
+            <Text style={[s.tokenStatus, { color: '#22c55e' }]}>Connected ✅</Text>
           </View>
 
           {/* ── IMAGE UPLOAD MODE ── */}
@@ -417,14 +409,7 @@ export default function PromptImageScreen() {
             )}
           </TouchableOpacity>
 
-          {/* No token warning */}
-          {!hfToken && (
-            <TouchableOpacity style={s.tokenWarning} onPress={() => router.push('/keys')}>
-              <Text style={s.tokenWarningTxt}>
-                ⚠️ HuggingFace Token இல்லை — Settings → Keys-ல் add பண்ணுங்க
-              </Text>
-            </TouchableOpacity>
-          )}
+
 
           {/* Error */}
           {error && (

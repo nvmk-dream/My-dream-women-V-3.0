@@ -12,6 +12,7 @@ import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
+import { PHOTO_STYLES } from '../constants/photo-styles';
 import { ParamsStore } from '../context/params-store';
 import { isModelCached, isWebGPUSupported } from '../services/webllm';
 import {
@@ -24,24 +25,12 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, getGlobalPhotoStyles, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
-const PHOTO_FOLDERS = [
-  { id: 'breast',     label: 'Breast Show',  color: '#E91E63' },
-  { id: 'buttocks',   label: 'Buttocks',     color: '#9C27B0' },
-  { id: 'cleavage',   label: 'Cleavage',     color: '#E53935' },
-  { id: 'halfbreast', label: 'Half Breast',  color: '#F44336' },
-  { id: 'highslit',   label: 'High Slit',    color: '#FF5722' },
-  { id: 'legs',       label: 'Legs Spread',  color: '#FF9800' },
-  { id: 'lingerie',   label: 'Lingerie',     color: '#8E24AA' },
-  { id: 'lowneck',    label: 'Low Neckline', color: '#E91E63' },
-  { id: 'nude',       label: 'Nude',         color: '#C62828' },
-  { id: 'seductive',  label: 'Seductive',    color: '#AD1457' },
-  { id: 'wet',        label: 'Wet Clothes',  color: '#1565C0' },
-  { id: 'sleeping',   label: 'Sleeping',     color: '#4527A0' },
-];
+const PHOTO_FOLDERS = PHOTO_STYLES;
 
 const STYLE_TO_PROMPT: Record<string, string> = {
   breast: 'topless, showing breasts, bare chest',
@@ -52,10 +41,13 @@ const STYLE_TO_PROMPT: Record<string, string> = {
   legs: 'legs spread wide, revealing pose',
   lingerie: 'wearing lingerie, seductive pose',
   lowneck: 'low neckline, showing chest',
+  normal: 'natural everyday photo, fully clothed',
   nude: 'nude, fully naked, explicit',
   seductive: 'seductive pose, alluring, provocative look',
+  seminude: 'semi-nude, partially clothed, revealing pose',
   wet: 'wet clothes, drenched, see through wet fabric',
   sleeping: 'sleeping pose, exposed, lying down',
+  saree: 'wearing a traditional saree, elegant drape',
 };
 
 const INTERVALS = [10, 20, 30] as const;
@@ -268,10 +260,15 @@ export default function AIGirlsScreen() {
     loadPersonas();
 
     // ── Auto-create Cloudinary folders (sequential / waterfall) ──
-    // Step 1: parent → Step 2: sub-folders (style + videos)
-    // Cloudinary path-based: my-girls/{name}/{style} auto-creates parent too.
-    const STYLE_IDS = PHOTO_FOLDERS.map(f => f.id);
-    const charFolder   = `my-girls/${folderName}`;
+    // The persona ID is the canonical character folder key used by the camera
+    // requests. Keep this aligned with ai-girls-cloud.tsx so uploads and reads
+    // always use the same Cloudinary path.
+    const globalStyles = await getGlobalPhotoStyles().catch(() => ({ hidden: [], custom: [] }));
+    const STYLE_IDS = [
+      ...PHOTO_STYLES.map(style => style.id),
+      ...globalStyles.custom.map(style => style.id),
+    ].filter((styleId, index, all) => Boolean(styleId) && all.indexOf(styleId) === index);
+    const charFolder   = `my-girls/${id}`;
     const videosFolder = `my-girls/videos/${folderName}`;
 
     Alert.alert(
@@ -338,7 +335,7 @@ AsyncStorage-ல் save ஆச்சு!`
 
   // Load settings + check auto-messages in one shot (no interval state dep → no loop)
   const pickUserPhotoFromPhone = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -743,7 +740,7 @@ AsyncStorage-ல் save ஆச்சு!`
 
   // ── Photo to Script (Gemini key direct → All 13 Gemini keys auto-retry) ──
   const handlePhotoToScript = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
     if (res.canceled || !res.assets[0]) return;
@@ -1640,7 +1637,7 @@ Then write these prompts:
                 placeholderTextColor="#aaa" textAlignVertical="top" />
 
               <Text style={{ fontSize: 10, color: '#888', marginTop: 8, marginBottom: 12, lineHeight: 15 }}>
-                {'📁 Cloudinary: my-girls/பெயர்/ + '}{PHOTO_FOLDERS.length}{' photo style folders auto-create ஆகும்'}{' | 💾 AsyncStorage-ல் save ஆகும்'}
+                {'📁 Cloudinary: character ID folder + '}{PHOTO_FOLDERS.length}{' built-in style folders auto-create ஆகும்'}{' | 💾 AsyncStorage-ல் save ஆகும்'}
               </Text>
 
               <View style={{ flexDirection: 'row', gap: 10 }}>

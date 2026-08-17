@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
         "backgroundColor": "#000000"
       },
       "package": "com.smk1.tamilaichat",
@@ -86,7 +86,10 @@
           "savePhotosPermission": "Allow My Dream Women to save photos and media files.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "./plugins/withPlayProtect",
+      "./plugins/withSafDocumentDelete",
+      "./plugins/withInstalledApk"
     ],
     "experiments": {
       "typedRoutes": true

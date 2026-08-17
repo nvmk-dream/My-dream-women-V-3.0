@@ -83,6 +83,32 @@ async function generateViaFal(prompt: string): Promise<{ b64_json: string; mimeT
   return { b64_json: Buffer.from(buffer).toString("base64"), mimeType: "image/jpeg" };
 }
 
+
+// ── 3. HuggingFace Inference API — uses HUGGING_FACE_KEY ─────────
+async function generateViaHuggingFace(prompt: string): Promise<{ b64_json: string; mimeType: string }> {
+  const key = process.env["HUGGING_FACE_KEY"] || process.env["HUGGING_FACE_API_KEY"] || process.env["HF_TOKEN"];
+  if (!key) throw new Error("HUGGING_FACE_KEY not configured");
+
+  const model = "black-forest-labs/FLUX.1-schnell";
+  const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "x-wait-for-model": "true",
+    },
+    body: JSON.stringify({ inputs: prompt, parameters: { width: 512, height: 768, num_inference_steps: 4 } }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`HuggingFace error ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const buf = await res.arrayBuffer();
+  const mime = res.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+  return { b64_json: Buffer.from(buf).toString("base64"), mimeType: mime };
+}
+
 // ── Background processor (tries in order) ────────────────────────
 async function processGenerate(jobId: string, prompt: string) {
   const update = (data: Partial<Job>) => {
@@ -90,8 +116,9 @@ async function processGenerate(jobId: string, prompt: string) {
     if (j) jobs.set(jobId, { ...j, ...data });
   };
 
-  // Try Pollinations first (free), then fal.ai as fallback
+  // Try HuggingFace first (if key set), then Pollinations (free), then fal.ai fallback
   const providers: Array<{ name: string; fn: () => Promise<{ b64_json: string; mimeType: string }> }> = [
+    { name: "HuggingFace",   fn: () => generateViaHuggingFace(prompt) },
     { name: "Pollinations",  fn: () => generateViaPollinations(prompt) },
     { name: "fal.ai Flux",   fn: () => generateViaFal(prompt) },
   ];

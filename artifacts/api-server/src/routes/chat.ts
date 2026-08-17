@@ -10,7 +10,7 @@ function getServerKeys(): string[] {
     process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
     process.env["GEMINI_API_KEY"],
   ];
-  for (let i = 2; i <= 20; i++) {
+  for (let i = 1; i <= 20; i++) {
     candidates.push(process.env[`GEMINI_API_KEY_${i}`]);
   }
   const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);

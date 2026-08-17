@@ -7,15 +7,17 @@ import {
 } from "@expo-google-fonts/inter";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   View, Text, TouchableOpacity, StyleSheet, Image,
-  StatusBar, Dimensions, ScrollView,
+  StatusBar, Dimensions, ScrollView, Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import * as Notifications from "expo-notifications";
+import { requestPhotoVideoPermissionsAsync } from "@/services/media-permissions";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,6 +61,10 @@ if (typeof window !== 'undefined' && typeof (window as any).addEventListener ===
 const { width } = Dimensions.get("window");
 const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
+// Permission onboarding — one-time on first install
+const PERMISSIONS_ONBOARDED_KEY = 'permissions_onboarded_v2';
+type OnboardStep = 'intro' | 'requesting';
+
 const AUTO_GREETINGS = [
   'என்ன பண்ற? miss ஆகுது 😊',
   'நீ வருவியா? 🥺',
@@ -84,12 +90,41 @@ export default function RootLayout() {
   const [pinError, setPinError] = useState('');
   const [launchSplashVisible, setLaunchSplashVisible] = useState(true);
 
+  // ── Permission onboarding (one-time, Meta AI style) ──────────
+  // null = still checking AsyncStorage; undefined = done (no overlay)
+  const [onboardStep, setOnboardStep] = useState<OnboardStep | null | undefined>(undefined);
+
+  // Check on mount whether onboarding is needed
+  useEffect(() => {
+    if (Platform.OS !== 'android') { setOnboardStep(undefined); return; }
+    AsyncStorage.getItem(PERMISSIONS_ONBOARDED_KEY)
+      .then(val => {
+        if (val === 'true') { setOnboardStep(undefined); return; }
+        setOnboardStep('intro');
+      })
+      .catch(() => setOnboardStep(undefined));
+  }, []);
+
+  // "Next" tapped on intro screen — request permissions sequentially
+  const handleStartPermissions = useCallback(async () => {
+    setOnboardStep('requesting');
+
+    // Step 1: Notifications (system dialog)
+    try { await Notifications.requestPermissionsAsync(); } catch {}
+
+    // Step 2: Photos & Videos (system dialog)
+    try { await requestPhotoVideoPermissionsAsync(); } catch {}
+
+    // All done
+    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, 'true').catch(() => {});
+    setOnboardStep(undefined);
+  }, []);
+
   // ── Crash log state ──────────────────────────────────────────
   const [crashLog, setCrashLog] = useState<string | null>(null);
   const [crashChecked, setCrashChecked] = useState(false);
 
   useEffect(() => {
-    // Read saved crash on every launch
     AsyncStorage.getItem(CRASH_KEY).then(log => {
       if (log) setCrashLog(log);
       setCrashChecked(true);
@@ -203,6 +238,56 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
           </Stack>
 
+          {/* ── Permission onboarding overlay (one-time, first install) ── */}
+
+          {/* Step 1: Intro — explain all permissions */}
+          {onboardStep === 'intro' && (
+            <View style={ob.overlay}>
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
+              <Text style={ob.appName}>My Dream Women ☁️</Text>
+              <Text style={ob.heading}>Permissions தேவை</Text>
+              <Text style={ob.subheading}>இந்த app சரியாக வேலை செய்ய கீழே உள்ள permissions தேவை. ஒரு முறை மட்டும் கேட்கும்.</Text>
+
+              <View style={ob.card}>
+                <View style={ob.row}>
+                  <Text style={ob.rowIcon}>🔔</Text>
+                  <View style={ob.rowText}>
+                    <Text style={ob.rowTitle}>Notifications</Text>
+                    <Text style={ob.rowDesc}>Auto-messages & updates receive பண்ண</Text>
+                  </View>
+                </View>
+                <View style={ob.divider} />
+                <View style={ob.row}>
+                  <Text style={ob.rowIcon}>🖼️</Text>
+                  <View style={ob.rowText}>
+                    <Text style={ob.rowTitle}>Photos & Videos</Text>
+                    <Text style={ob.rowDesc}>Gallery-ல் upload & save பண்ண</Text>
+                  </View>
+                </View>
+                <View style={ob.noteBox}>
+                  <Text style={ob.noteText}>⚙️ Settings-ல் permissions-ஐ எந்த நேரத்திலும் மாற்றலாம்</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={ob.nextBtn} onPress={handleStartPermissions} activeOpacity={0.85}>
+                <Text style={ob.nextBtnTxt}>Next →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Step 2: Requesting — system dialogs are showing, show minimal UI */}
+          {onboardStep === 'requesting' && (
+            <View style={ob.overlay}>
+              <StatusBar backgroundColor="#000" barStyle="light-content" />
+              <Text style={ob.appName}>My Dream Women ☁️</Text>
+              <View style={ob.card}>
+                <Text style={ob.requestingIcon}>⏳</Text>
+                <Text style={ob.requestingText}>Permissions கேட்கிறோம்...</Text>
+                <Text style={ob.requestingDesc}>System dialogs-ல் Allow பண்ணுங்க</Text>
+              </View>
+            </View>
+          )}
+
           {/* ── 4-Digit PIN Lock Overlay ── */}
           {pinLocked && (
             <View style={pin.overlay}>
@@ -265,6 +350,45 @@ const crash = StyleSheet.create({
   btnRow: { padding: 16, paddingBottom: 32 },
   clearBtn: { backgroundColor: '#b71c1c', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   clearTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+});
+
+// Permission onboarding styles
+const ob = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a0a0a',
+    zIndex: 9998,
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 24,
+  },
+  appName: {
+    color: '#fff', fontSize: 26, fontWeight: 'bold', marginBottom: 8,
+    textShadowColor: '#E91E8C', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 },
+  },
+  heading: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  subheading: { color: '#6b7280', fontSize: 13, lineHeight: 20, textAlign: 'center', marginBottom: 24 },
+  card: {
+    backgroundColor: '#141414', borderRadius: 20, padding: 20,
+    width: '100%', borderWidth: 1, borderColor: '#1f2937', marginBottom: 24,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  rowIcon: { fontSize: 28, marginRight: 14 },
+  rowText: { flex: 1 },
+  rowTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  rowDesc: { color: '#6b7280', fontSize: 12, lineHeight: 17 },
+  divider: { height: 1, backgroundColor: '#1f2937', marginVertical: 2 },
+  noteBox: { marginTop: 14, backgroundColor: '#1f2937', borderRadius: 10, padding: 10 },
+  noteText: { color: '#4b5563', fontSize: 12, textAlign: 'center' },
+  nextBtn: {
+    backgroundColor: '#25D366', borderRadius: 16, paddingVertical: 16,
+    width: '100%', alignItems: 'center',
+  },
+  nextBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.5 },
+  // Requesting step
+  requestingIcon: { fontSize: 40, textAlign: 'center', marginBottom: 12 },
+  requestingText: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  requestingDesc: { color: '#6b7280', fontSize: 13, textAlign: 'center' },
 });
 
 const pin = StyleSheet.create({

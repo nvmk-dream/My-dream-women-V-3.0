@@ -6,13 +6,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { ParamsStore } from '../context/params-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
-import { ParamsStore } from '../context/params-store';
+import { RichEditor } from 'react-native-pell-rich-editor';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import {
+  kallaatamErrorCategory,
+  kallaatamFriendlyError,
+  mergeKallaatamCharacters,
+  parseKallaatamExtraction,
+} from '../utils/kallaatam-extraction';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -30,10 +38,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
+
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
-function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle }: {
+function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle, headerExtra }: {
   sectionKey: string; icon: string; title: string; subtitle?: string; color?: string;
   children: React.ReactNode; openSections: Record<string, boolean>; onToggle: (key: string) => void;
+  headerExtra?: React.ReactNode;
 }) {
   const isOpen = !!openSections[sectionKey];
   return (
@@ -48,6 +60,7 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', chi
           <Text style={[styles.sectionCardTitle, { color }]}>{title}</Text>
           {subtitle ? <Text style={styles.sectionCardSubtitle}>{subtitle}</Text> : null}
         </View>
+        {headerExtra ? <View onStartShouldSetResponder={() => true}>{headerExtra}</View> : null}
         <Text style={styles.sectionCardChevron}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
@@ -55,43 +68,72 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', chi
   );
 }
 
-// Extract button — uses multimedia_gemini_1..5 keys only (separate from chat gemini_1..13 keys)
-const EXTRACT_API: string = (process.env['EXPO_PUBLIC_API_URL'] ?? '').replace(/\/$/, '');
-async function sendExtractMessage(content: string): Promise<string> {
-  const AS = (await import('@react-native-async-storage/async-storage')).default;
-  const [saved, enabledRaw] = await Promise.all([
-    AS.getItem('api_keys_store').catch(() => null),
-    AS.getItem('api_keys_enabled_v1').catch(() => null),
-  ]);
-  const parsed = saved ? JSON.parse(saved) as Record<string, string> : {};
-  const enabled = enabledRaw ? JSON.parse(enabledRaw) as Record<string, boolean> : {};
-  const multimediaKeys: string[] = [];
-  for (let i = 1; i <= 5; i++) {
-    const k = parsed[`multimedia_gemini_${i}`];
-    if (k?.trim() && enabled[`multimedia_gemini_${i}`] !== false) multimediaKeys.push(k.trim());
-  }
-  const tryKeys = multimediaKeys.length > 0 ? multimediaKeys : [undefined as any];
-  const messages = [{ role: 'user', content }];
-  let lastErr: any;
-  for (const key of tryKeys) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 100000);
-      const res = await fetch(`${EXTRACT_API}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, ...(key ? { apiKey: key } : {}) }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (res.status === 429) { lastErr = new Error('quota'); continue; }
-      if (!res.ok) { const e = await res.json().catch(() => ({})) as any; throw new Error(e?.error || `HTTP ${res.status}`); }
-      const data = await res.json() as any;
-      if (data.error) throw new Error(data.error);
-      return data.content || '';
-    } catch (e: any) { lastErr = e; continue; }
-  }
-  throw lastErr ?? new Error('Extract failed');
+// Field defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
+function Field({ label, hint, value, onChange, minH = 60, wordInputs, onSetWordInputs }: {
+  label: string; hint?: string; value: string;
+  onChange: (v: string) => void; minH?: number;
+  wordInputs: Record<string, string>;
+  onSetWordInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  const wordInput = wordInputs[label] ?? '';
+  const addWord = () => {
+    const w = wordInput.trim();
+    if (!w) return;
+    onChange(value.trim() ? `${value.trim()}, ${w}` : w);
+    onSetWordInputs(prev => ({ ...prev, [label]: '' }));
+  };
+  const copyValue = async () => {
+    if (!value.trim()) return;
+    await Clipboard.setStringAsync(value);
+    Alert.alert('✅ Copy ஆனது', 'Text clipboard-க்கு copy ஆயிடுச்சு');
+  };
+  return (
+    <View style={styles.fieldWrap}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <TouchableOpacity onPress={copyValue} style={{ paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 13 }}>📋 Copy</Text>
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        style={[styles.fieldInput, { minHeight: minH }]}
+        value={value}
+        onChangeText={onChange}
+        multiline
+        textAlignVertical="top"
+        placeholderTextColor="#bbb"
+      />
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+        <TextInput
+          style={styles.wordAddInput}
+          value={wordInput}
+          onChangeText={(t) => onSetWordInputs(prev => ({ ...prev, [label]: t }))}
+          placeholder="புதுசா வார்த்தை சேர்..."
+          placeholderTextColor="#bbb"
+          onSubmitEditing={addWord}
+          returnKeyType="done"
+        />
+        <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const KALLAATAM_EXTRACTION_SYSTEM_PROMPT = `You extract structured story data for the Kallaatam character engine.
+Return JSON only in this exact shape:
+{"outline":"short story outline","characters":[{"name":"character name","role":"role in story"}]}
+Include every meaningful character found in the story, with an empty role when unknown. Do not invent characters.`;
+
+async function requestKallaatamExtraction(content: string): Promise<string> {
+  return sendMessage(
+    [{ role: 'user', content }],
+    'gemini',
+    KALLAATAM_EXTRACTION_SYSTEM_PROMPT,
+    'story',
+  );
 }
 
 export default function EditCharacterScreen() {
@@ -115,6 +157,8 @@ export default function EditCharacterScreen() {
   const [showModeCloud, setShowModeCloud] = useState<'normal' | 'presana' | null>(null);
   const [modeCloudInput, setModeCloudInput] = useState('');
   const [relationship, setRelationship] = useState('');
+  const baseRulesEditorRef = useRef<RichEditor>(null);
+  const charPromptEditorRef = useRef<RichEditor>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [analyzingFields, setAnalyzingFields] = useState(false);
@@ -144,6 +188,7 @@ export default function EditCharacterScreen() {
   const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>(DEFAULT_K_CHARS);
   const [kAllAI, setKAllAI] = useState(true);
   const [kOutline, setKOutline] = useState('');
+  const [kAiFill, setKAiFill] = useState(false);
   const [kExtracting, setKExtracting] = useState(false);
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
@@ -168,6 +213,10 @@ export default function EditCharacterScreen() {
   const [avatarReflectionEnabled, setAvatarReflectionEnabled] = useState(true);
   const [avatarReflectionPrompt, setAvatarReflectionPrompt] = useState('');
   const [imageVideoPrompt, setImageVideoPrompt] = useState('');
+  const [charFontColor, setCharFontColor] = useState('');
+  const [charFontSize, setCharFontSize] = useState(0);
+  const [promptFontSize, setPromptFontSize] = useState(0);
+  const [promptFontColor, setPromptFontColor] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -249,6 +298,10 @@ export default function EditCharacterScreen() {
         setAvatarReflectionEnabled(data.avatarReflectionEnabled !== false);
         setAvatarReflectionPrompt(data.avatarReflectionPrompt ?? '');
         setImageVideoPrompt(data.imageVideoPrompt ?? DEFAULT_IMAGE_VIDEO_PROMPT);
+        setCharFontColor(data.charFontColor ?? '');
+        setCharFontSize(data.charFontSize ?? 0);
+        setPromptFontSize(data.promptFontSize ?? 0);
+        setPromptFontColor(data.promptFontColor ?? '');
       } catch {}
     };
     load();
@@ -262,7 +315,7 @@ export default function EditCharacterScreen() {
   };
 
   const pickUserPrasanaPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, allowsEditing: false,
@@ -289,52 +342,115 @@ export default function EditCharacterScreen() {
     }
   };
 
+  const [storySaving, setStorySaving] = useState(false);
+
+  const handleKAiFill = async () => {
+    if (!todayStory.trim()) {
+      Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணி 💾 Save பண்ணுங்க');
+      setKAiFill(false);
+      return;
+    }
+    const story = todayStory.trim();
+    setKExtracting(true);
+    try {
+      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory outline மற்றும் கதையில் உள்ள முக்கிய கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
+      const extraction = parseKallaatamExtraction(reply);
+      console.log('[EXTRACT]', {
+        responseLength: reply.length,
+        parsedJson: extraction.parsedJson,
+        characterCount: extraction.characters.length,
+      });
+      const names = extraction.characters.map(character => character.name).slice(0, 6);
+      await new Promise<void>(resolve => {
+        Alert.alert(
+          '👥 கதாபாத்திரங்கள் பெயர்கள்',
+          `கதையில் இந்த பெயர்கள் கிடைச்சது:\n\n${names.map((n: string, i: number) => `${i + 1}. ${n}`).join('\n')}\n\nCharacter name-ஆக fill செய்யவா?`,
+          [
+            { text: '✅ Yes, Fill பண்ணு', onPress: () => {
+              const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
+              setKChars(arr);
+              AsyncStorage.getItem('kallaatam_engine')
+                .then(raw => {
+                  const engine = raw ? JSON.parse(raw) : {};
+                  return AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: arr }));
+                })
+                .catch(error => {
+                  console.log('[EXTRACT]', { category: kallaatamErrorCategory(error), stage: 'persist-ai-fill' });
+                });
+              resolve();
+            }},
+            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
+          ]
+        );
+      });
+    } catch (e: any) {
+      const category = kallaatamErrorCategory(e);
+        console.log('[EXTRACT]', {
+          category,
+          stage: 'ai-fill',
+          error: e?.message ?? String(e),
+        });
+      Alert.alert(
+        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : 'Error',
+        category === 'quota'
+          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+          : kallaatamFriendlyError('extract', category, e),
+      );
+    } finally {
+      setKExtracting(false);
+      setKAiFill(false);
+    }
+  };
+
+  const handleStorySave = async () => {
+    if (!persona || persona.id !== 'kallaatam') return;
+    setStorySaving(true);
+    try {
+      const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory }));
+      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
+      // Navigate to chat — auto-send "கதையில் உள்ள கதாபாத்திரம் என்ன?" and save reply to kChars
+      ParamsStore.setAutoStoryQuery(true);
+      ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
+      router.push('/chat');
+    } catch (e: any) {
+      const category = kallaatamErrorCategory(e);
+      console.log('[STORY-SAVE]', {
+        category,
+        stage: 'persist-and-navigate',
+        error: e?.message ?? String(e),
+      });
+      Alert.alert(
+        'Story Save Error',
+        kallaatamFriendlyError('auto', category, e),
+      );
+    } finally {
+      setStorySaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!persona) return;
     setSaving(true);
     try {
       const data = {
-        name, avatarLetter, greeting, prompt: (basePromptEdit.trim() || BASE_PROMPT) + '\n**இப்போ உன்னோட character:**\n' + charOnly,
+        name, avatarLetter, greeting, prompt: (stripHtml(basePromptEdit ?? '').trim() || stripHtml(BASE_PROMPT)) + '\n**இப்போ உன்னோட character:**\n' + stripHtml(charOnly ?? ''),
         faceDesc, bodyDesc, attireDesc, avatarPhotoUri,
         normalAvatarUri, presanaAvatarUri, relationship,
         presanaBehaviour, normalBehaviour,
         userWhatsappBeh, userNormalBeh, userPresanaBeh, userBodyDesc,
         todayStory,
-        basePromptEdit: basePromptEdit.trim() || BASE_PROMPT,
+        basePromptEdit: (basePromptEdit ?? '').trim() || BASE_PROMPT,
         avatarReflectionEnabled, avatarReflectionPrompt,
         imageVideoPrompt,
+        charFontColor, charFontSize,
+        promptFontSize, promptFontColor,
       };
       await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(data));
-      // Save கல்லாட்டம் engine data — auto-extract outline & characters if story exists
+      // Save கல்லாட்டம் engine data
       if (persona.id === 'kallaatam') {
-        let finalOutline = kOutline;
-        let finalChars  = kChars;
-        // Only auto-extract if outline is empty OR all character names are blank
-        const needsExtract = !finalOutline.trim() || finalChars.every(ch => !ch.name.trim());
-        if (todayStory.trim() && needsExtract) {
-          try {
-            const story = todayStory.trim();
-            // Message 1: character names
-            const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-            const names = namesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-            // Message 2: character roles
-            const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-            const roles = rolesReply.split('\n').map((l: string) => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-            // Message 3: story outline
-            const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-            finalOutline = outlineReply.trim();
-            setKOutline(finalOutline);
-            if (names.length > 0) {
-              const newChars = [...DEFAULT_K_CHARS];
-              names.forEach((nm: string, i: number) => {
-                if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
-              });
-              finalChars = newChars;
-              setKChars(newChars);
-            }
-          } catch { /* silent — save still proceeds */ }
-        }
-        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars: finalChars, kAllAI, kOutline: finalOutline })).catch(() => {});
+        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
       }
       // Save per-character user prasana photo separately
       const userPrasanaKey = `user_prasana_photo_${persona.id}`;
@@ -356,8 +472,8 @@ export default function EditCharacterScreen() {
   };
 
   const saveDefaultPrompt = async () => {
-    if (!charOnly.trim()) { Alert.alert('Prompt இல்லை', 'Green box-ல் முதலில் prompt type பண்ணுங்க'); return; }
-    await AsyncStorage.setItem('default_char_prompt', charOnly.trim());
+    if (!(charOnly ?? '').trim()) { Alert.alert('Prompt இல்லை', 'Green box-ல் முதலில் prompt type பண்ணுங்க'); return; }
+    await AsyncStorage.setItem('default_char_prompt', (charOnly ?? '').trim());
     setDefaultPromptExists(true);
     Alert.alert('✅ Default Save ஆச்சு!', 'இந்த prompt புதிய characters-க்கு green box-ல் auto-load ஆகும்.');
   };
@@ -426,7 +542,7 @@ export default function EditCharacterScreen() {
   };
 
   const pickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -472,7 +588,7 @@ export default function EditCharacterScreen() {
   };
 
   const pickModeAvatar = async (mode: 'normal' | 'presana') => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery permission வேணும்'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -504,57 +620,6 @@ export default function EditCharacterScreen() {
 
   // Per-field "+ வார்த்தை சேர்" quick-add input value, keyed by field label.
   const [wordInputs, setWordInputs] = useState<Record<string, string>>({});
-
-  const Field = ({ label, hint, value, onChange, minH = 60 }: {
-    label: string; hint?: string; value: string;
-    onChange: (v: string) => void; minH?: number;
-  }) => {
-    const wordInput = wordInputs[label] ?? '';
-    const addWord = () => {
-      const w = wordInput.trim();
-      if (!w) return;
-      onChange(value.trim() ? `${value.trim()}, ${w}` : w);
-      setWordInputs(prev => ({ ...prev, [label]: '' }));
-    };
-    const copyValue = async () => {
-      if (!value.trim()) return;
-      await Clipboard.setStringAsync(value);
-      Alert.alert('✅ Copy ஆனது', 'Text clipboard-க்கு copy ஆயிடுச்சு');
-    };
-    return (
-      <View style={styles.fieldWrap}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.fieldLabel}>{label}</Text>
-          <TouchableOpacity onPress={copyValue} style={{ paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 13 }}>📋 Copy</Text>
-          </TouchableOpacity>
-        </View>
-        <TextInput
-          style={[styles.fieldInput, { minHeight: minH }]}
-          value={value}
-          onChangeText={onChange}
-          multiline
-          textAlignVertical="top"
-          placeholderTextColor="#bbb"
-        />
-        {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-          <TextInput
-            style={styles.wordAddInput}
-            value={wordInput}
-            onChangeText={(t) => setWordInputs(prev => ({ ...prev, [label]: t }))}
-            placeholder="புதுசா வார்த்தை சேர்..."
-            placeholderTextColor="#bbb"
-            onSubmitEditing={addWord}
-            returnKeyType="done"
-          />
-          <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
 
 
   if (!persona) {
@@ -697,7 +762,26 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="todayStory" icon="📖" title="இன்றைய கதை" subtitle="Today's Story" color="#8D6E63" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard
+          sectionKey="todayStory"
+          icon="📖"
+          title="இன்றைய கதை"
+          subtitle="Today's Story"
+          color="#8D6E63"
+          openSections={openSections}
+          onToggle={toggleSection}
+          headerExtra={persona?.id === 'kallaatam' ? (
+            <TouchableOpacity
+              onPress={handleStorySave}
+              disabled={storySaving}
+              style={{ backgroundColor: '#2E7D32', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
+            >
+              {storySaving
+                ? <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
+                : <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>💾 Save</Text>}
+            </TouchableOpacity>
+          ) : undefined}
+        >
           <Text style={styles.fieldHint}>இங்க ஒரு கதை type பண்ணுங்க — Chat screen-ல் "📖 Story" mode select பண்ணா, character இந்த கதைய scene-by-scene ஆ நடிச்சு பேசும். நீங்க மாத்தும் வரைக்கும் இதே கதை save-ஆ இருக்கும்.</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 160 }]}
@@ -720,7 +804,19 @@ export default function EditCharacterScreen() {
 
         {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
         {persona?.id === 'kallaatam' && (
-          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}>
+          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}
+            headerExtra={
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }} pointerEvents="box-none">
+                <Text style={{ fontSize: 11, color: '#fff', marginRight: 4, fontWeight: '700' }}>{kExtracting ? '⏳' : '🤖 AI Fill'}</Text>
+                <Switch
+                  value={kAiFill}
+                  onValueChange={(v) => { if (!kExtracting) { setKAiFill(v); if (v) handleKAiFill(); } }}
+                  trackColor={{ true: '#81C784', false: '#888' }}
+                  thumbColor="#fff"
+                  style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
+                />
+              </View>
+            }>
 
             {/* Tasks */}
             <View style={{ backgroundColor: '#f1f8e9', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#c8e6c9' }}>
@@ -746,32 +842,39 @@ export default function EditCharacterScreen() {
                   onPress={async () => {
                     if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
                     setKExtracting(true);
-                    try {
+                      try {
                       const story = todayStory.trim();
-                      // Message 1: character names
-                      const namesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் பெயர்களை மட்டும் list பண்ணு. ஒவ்வொரு பெயரையும் தனி line-ல் போடு. Maximum 6 பெயர்கள். வேற எதுவும் எழுதாதே.`);
-                      const names = namesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-                      // Message 2: character roles
-                      const rolesReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையில் உள்ள முக்கிய கதாபாத்திரங்களின் role அல்லது relationship மட்டும் list பண்ணு (e.g. கணவர், அம்மா, மகன், நண்பன்). ஒவ்வொன்றையும் தனி line-ல் போடு. Maximum 6. வேற எதுவும் எழுதாதே.`);
-                      const roles = rolesReply.split('\n').map(l => l.replace(/^[\d\.\-\*\s]+/, '').trim()).filter(Boolean).slice(0, 6);
-                      // Message 3: story outline
-                      const outlineReply = await sendExtractMessage(`இந்த கதையை படி:\n\n${story}\n\nகதையின் முக்கிய scenes outline மட்டும் எழுது. Numbered list-ஆக போடு (1. 2. 3. ...). வேற எதுவும் வேண்டாம்.`);
-                      setKOutline(outlineReply.trim());
-                      // Fill character details
-                      const newChars = [...DEFAULT_K_CHARS];
-                      names.forEach((nm, i) => {
-                        if (i < newChars.length) newChars[i] = { ...newChars[i], name: nm, role: roles[i] ?? newChars[i].role };
+                      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory Outline மற்றும் கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
+                      const extraction = parseKallaatamExtraction(reply);
+                      console.log('[EXTRACT]', {
+                        responseLength: reply.length,
+                        parsedJson: extraction.parsedJson,
+                        characterCount: extraction.characters.length,
                       });
-                      setKChars(newChars);
-                      Alert.alert('✅ Extract ஆச்சு!', 'Outline + Characters auto-fill ஆச்சு. Edit பண்ணலாம்.');
+                      const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
+                      const nextOutline = extraction.outline || kOutline;
+                      setKChars(arr);
+                      setKOutline(nextOutline);
+                      const rawEngine = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
+                      const engine = rawEngine ? JSON.parse(rawEngine) : {};
+                      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+                        ...engine,
+                        kChars: arr,
+                        kOutline: nextOutline,
+                      }));
+                      Alert.alert('✅ Extract முடிந்தது!', `${extraction.characters.length} கதாபாத்திரங்கள் மற்றும் Story Outline update ஆச்சு.`);
                     } catch (e: any) {
-                      const msg = String(e?.message ?? e);
-                      const isQuota = msg.includes('quota') || msg.includes('429') || msg.includes('நாளைக்கு') || msg.includes('resource_exhausted') || msg.includes('rate limit');
+                      const category = kallaatamErrorCategory(e);
+                      console.log('[EXTRACT]', {
+                        category,
+                        stage: 'outline-extract',
+                        error: e?.message ?? String(e),
+                      });
                       Alert.alert(
-                        isQuota ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
-                        isQuota
-                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது.\nநாளை மீண்டும் try பண்ணுங்க (அல்லது Settings-ல் புதிய API key சேர்க்கவும்).'
-                          : msg.slice(0, 300));
+                        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
+                        category === 'quota'
+                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+                          : kallaatamFriendlyError('extract', category, e));
                     } finally { setKExtracting(false); }
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
@@ -898,9 +1001,80 @@ export default function EditCharacterScreen() {
             placeholder="e.g. User 30 வயது, medium height, athletic build, dark skin. Character இதை அறிஞ்சு interact பண்ணும்."
             placeholderTextColor="#bbb"
           />
+
+          {/* ── Character Message Font Style ── */}
+          <View style={styles.divider} />
+          <Text style={[styles.sectionLabel, { color: '#1565C0', marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
+          <Text style={{ color: '#888', fontSize: 11, marginBottom: 10 }}>Character reply messages-ல் font color & size set பண்ணுங்க.</Text>
+
+          <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>🖌️ Font Color</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+            {[
+              { color: '#111111', label: 'Black' },
+              { color: '#1565C0', label: 'Blue' },
+              { color: '#075E54', label: 'Green' },
+              { color: '#B71C1C', label: 'Red' },
+              { color: '#7c3aed', label: 'Purple' },
+              { color: '#f59e0b', label: 'Amber' },
+              { color: '#06b6d4', label: 'Cyan' },
+              { color: '#ec4899', label: 'Pink' },
+              { color: '#15803d', label: 'Forest' },
+              { color: '#ea580c', label: 'Orange' },
+              { color: '#78350f', label: 'Brown' },
+              { color: '#6b7280', label: 'Gray' },
+            ].map(({ color }) => (
+              <TouchableOpacity
+                key={color}
+                onPress={() => setCharFontColor(charFontColor === color ? '' : color)}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: color,
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: charFontColor === color ? 3 : 1.5,
+                  borderColor: charFontColor === color ? '#075E54' : '#ddd',
+                }}
+              >
+                {charFontColor === color && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+          {!!charFontColor && (
+            <TouchableOpacity onPress={() => setCharFontColor('')} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, backgroundColor: '#f0f0f0', borderRadius: 10, marginBottom: 8 }}>
+              <Text style={{ fontSize: 11, color: '#555' }}>↺ Default Color Reset</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={[styles.sectionLabel, { marginBottom: 8, marginTop: 4 }]}>📏 Font Size</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            {[{ label: 'Small', size: 12 }, { label: 'Medium', size: 14 }, { label: 'Large', size: 16 }, { label: 'XL', size: 18 }].map(({ label, size }) => (
+              <TouchableOpacity
+                key={size}
+                onPress={() => setCharFontSize(charFontSize === size ? 0 : size)}
+                style={{
+                  flex: 1, paddingVertical: 10, borderRadius: 10,
+                  alignItems: 'center',
+                  borderWidth: 1.5,
+                  borderColor: charFontSize === size ? '#1565C0' : '#ddd',
+                  backgroundColor: charFontSize === size ? '#e3f2fd' : '#fafafa',
+                }}
+              >
+                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? '#1565C0' : '#555' }}>{label}</Text>
+                <Text style={{ fontSize: 9, color: '#999', marginTop: 2 }}>{size}px</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {(!!charFontColor || charFontSize > 0) && (
+            <View style={{ backgroundColor: '#f8f9fa', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#e0e0e0' }}>
+              <Text style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>👀 Preview:</Text>
+              <Text style={{ fontSize: charFontSize || 15, color: charFontColor || '#111', fontWeight: '500' }}>
+                நான் உன்னை ரொம்ப miss பண்றேன்! 💕
+              </Text>
+            </View>
+          )}
         </SectionCard>
 
-        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="Avatar Reflection" subtitle="அவதார பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ color: '#888', fontSize: 11, lineHeight: 17 }}>
@@ -1056,20 +1230,38 @@ export default function EditCharacterScreen() {
         </SectionCard>
 
         <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 200, fontSize: 11, lineHeight: 18, color: '#555', backgroundColor: '#fff5f5' }]}
-            value={basePromptEdit}
-            onChangeText={setBasePromptEdit}
-            multiline
-            textAlignVertical="top"
-            editable={true}
-            selectTextOnFocus={false}
-            contextMenuHidden={false}
-            scrollEnabled={false}
+          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
+          {/* ── Rich Format Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
+            {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
+              <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
+            {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
+              <TouchableOpacity key={clr} onPress={() => baseRulesEditorRef.current?.setForeColor(clr)}
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
+            ))}
+            <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setForeColor('#111111')}
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+            </TouchableOpacity>
+          </View>
+          <RichEditor
+            ref={baseRulesEditorRef}
+            initialContentHTML={basePromptEdit}
+            onChange={(html) => setBasePromptEdit(html ?? '')}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#ffcdd2', backgroundColor: '#fff5f5' }}
+            editorStyle={{ backgroundColor: '#fff5f5', color: '#555', fontSize: 13 }}
+            useContainer={false}
             autoCorrect={false}
-            autoCapitalize="none"
-            spellCheck={false}
           />
           <TouchableOpacity
             onPress={() => setBasePromptEdit(BASE_PROMPT)}
@@ -1095,21 +1287,38 @@ export default function EditCharacterScreen() {
               <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={[styles.fieldInput, { minHeight: 200, backgroundColor: '#f9fff9' }]}
-            value={charOnly}
-            onChangeText={setCharOnly}
-            multiline
-            textAlignVertical="top"
-            editable={true}
-            selectTextOnFocus={false}
-            contextMenuHidden={false}
-            scrollEnabled={false}
-            autoCorrect={false}
-            autoCapitalize="none"
-            spellCheck={false}
+          {/* ── Rich Format Toolbar ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+            <TouchableOpacity onPress={() => charPromptEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
+            {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
+              <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
+            {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
+              <TouchableOpacity key={clr} onPress={() => charPromptEditorRef.current?.setForeColor(clr)}
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
+            ))}
+            <TouchableOpacity onPress={() => charPromptEditorRef.current?.setForeColor('#111111')}
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
+              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+            </TouchableOpacity>
+          </View>
+          <RichEditor
+            ref={charPromptEditorRef}
+            initialContentHTML={charOnly}
+            onChange={(html) => setCharOnly(html ?? '')}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#c8e6c9', backgroundColor: '#f9fff9' }}
+            editorStyle={{ backgroundColor: '#f9fff9', color: '#333', fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
-            placeholderTextColor="#bbb"
+            useContainer={false}
+            autoCorrect={false}
           />
         </SectionCard>
 
@@ -1140,7 +1349,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Mode Avatars / Image Generation" subtitle="Mode அவதார்கள் / Image உருவாக்கம்" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
           <View style={{ alignItems: 'center' }}>
             <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
@@ -1172,11 +1381,11 @@ export default function EditCharacterScreen() {
               <Text style={{ color:'#1565C0', fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
             </View>
           )}
-          <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} />
+          <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
           <View style={styles.divider} />
-          <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} />
+          <Field label="B. உடல் அமைப்பு (BODY)" value={bodyDesc} onChange={setBodyDesc} hint="e.g. slim curvy figure, natural proportioned..." minH={60} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
           <View style={styles.divider} />
-          <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} />
+          <Field label="C. உடை (ATTIRE)" value={attireDesc} onChange={setAttireDesc} hint="e.g. casual salwar or jeans and top..." minH={80} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
         </SectionCard>
 
         <Text style={styles.footerNote}>

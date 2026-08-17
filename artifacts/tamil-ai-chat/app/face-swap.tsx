@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const { width } = Dimensions.get('window');
 
@@ -374,7 +375,7 @@ export default function FaceSwapScreen() {
   const [showVidmage, setShowVidmage] = useState(false);
 
   const pickImage = async (slot: 'target' | 'face') => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const perm = await requestPhotoVideoPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission', 'Gallery access வேணும்.'); return; }
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'] as any, quality: 0.85, base64: true,
@@ -496,8 +497,8 @@ export default function FaceSwapScreen() {
   const saveResult = async () => {
     if (!resultUrl) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Permission', 'Gallery permission வேணும்.'); return; }
+      const permission = await requestPhotoVideoPermissionsAsync();
+      if (!permission.granted) { Alert.alert('Permission', 'Gallery permission வேணும்.'); return; }
       let localUri = resultUrl;
       if (resultUrl.startsWith('http')) {
         const tmp = FileSystem.cacheDirectory + `faceswap_${Date.now()}.jpg`;
@@ -654,12 +655,18 @@ export default function FaceSwapScreen() {
           </View>
         ) : null}
 
-        {/* Always-visible alternative link */}
+        {/* Always-visible alternative links */}
         <TouchableOpacity
           style={s.altLink}
           onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
         >
-          <Text style={s.altLinkTxt}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
+          <Text style={s.altLinkTxtBlue}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.altLink}
+          onPress={() => Linking.openURL('https://remaker.ai/features/batche-face-swap/')}
+        >
+          <Text style={s.altLinkTxtGreen}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -715,5 +722,6 @@ const s = StyleSheet.create({
   retryBtn: { backgroundColor: '#1a1a2e', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#7c3aed44' },
   retryBtnTxt: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
   altLink: { marginTop: 16, paddingVertical: 10, alignItems: 'center' },
-  altLinkTxt: { color: '#555', fontSize: 12, textDecorationLine: 'underline' },
+  altLinkTxtBlue: { color: '#3b82f6', fontSize: 12, textDecorationLine: 'underline' },
+  altLinkTxtGreen: { color: '#22c55e', fontSize: 12, textDecorationLine: 'underline' },
 });
