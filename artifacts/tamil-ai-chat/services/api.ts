@@ -283,6 +283,7 @@ export async function uploadUriToCloudinary(
   uri: string,
   mimeType: string = 'image/jpeg',
   folder: string = 'my-girls',
+  onProgress?: (progress: number) => void,
 ): Promise<{ url: string; public_id: string; width?: number; height?: number }> {
   const isVideo = mimeType.startsWith('video');
   const isRaw = mimeType === 'application/zip' || /\.zip(?:\?|$)/i.test(uri);
@@ -296,19 +297,32 @@ export async function uploadUriToCloudinary(
   // Primary: legacy uploadAsync — best for content:// URIs on Android
   try {
     const Legacy = await import('expo-file-system/legacy');
-    const res = await Legacy.uploadAsync(endpoint, uri, {
-      httpMethod: 'POST',
-      uploadType: Legacy.FileSystemUploadType.MULTIPART,
-      fieldName: 'file',
-      mimeType,
-      parameters: { upload_preset: CLOUDINARY_PRESET, folder, tags: folderToTag(folder) },
-    });
+    const task = Legacy.createUploadTask(
+      endpoint,
+      uri,
+      {
+        httpMethod: 'POST',
+        uploadType: Legacy.FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType,
+        parameters: { upload_preset: CLOUDINARY_PRESET, folder, tags: folderToTag(folder) },
+      },
+      (progress) => {
+        const expected = progress.totalBytesExpectedToSend;
+        if (expected > 0) {
+          onProgress?.(Math.min(100, Math.round((progress.totalBytesSent / expected) * 100)));
+        }
+      },
+    );
+    const res = await task.uploadAsync();
+    if (!res) throw new Error('Upload cancelled');
     if (res.status < 200 || res.status >= 300) {
       let msg = `Upload failed: HTTP ${res.status}`;
       try { msg = (JSON.parse(res.body) as any)?.error?.message || msg; } catch {}
       throw new Error(msg);
     }
     const data = JSON.parse(res.body) as any;
+    onProgress?.(100);
     return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
   } catch (legacyErr: any) {
     // Fallback: fetch FormData (works for file:// URIs and iOS)
@@ -316,16 +330,18 @@ export async function uploadUriToCloudinary(
     form.append('file', { uri, type: mimeType, name: `upload.${ext}` } as any);
     form.append('upload_preset', CLOUDINARY_PRESET);
     form.append('folder', folder);
-  form.append('tags', folderToTag(folder));
+    form.append('tags', folderToTag(folder));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
     try {
+      onProgress?.(0);
       const res = await fetch(endpoint, { method: 'POST', body: form, signal: controller.signal });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as any;
         throw new Error(err?.error?.message || legacyErr?.message || `Upload failed: ${res.status}`);
       }
       const data = await res.json() as any;
+      onProgress?.(100);
       return { url: data.secure_url, public_id: data.public_id, width: data.width, height: data.height };
     } finally {
       clearTimeout(timer);
@@ -411,6 +427,55 @@ export async function listCloudinaryImages(
     }
   } catch {}
 
+  return [];
+}
+
+export interface CloudinaryBackup {
+  url: string;
+  public_id: string;
+  fileName: string;
+  created_at?: string;
+  backupDate?: string;
+  bytes?: number;
+  sizeBytes?: number;
+  format?: string;
+}
+
+export async function listCloudinaryBackups(
+  folder: string = 'my-girls/storage/projects/Backup',
+): Promise<CloudinaryBackup[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(
+        `${REPLIT_API}/api/cloudinary/backups?folder=${encodeURIComponent(folder)}`,
+        { signal: controller.signal },
+      );
+      if (res.ok) {
+        const data = await res.json() as any;
+        if (Array.isArray(data.backups) && data.backups.length > 0) return data.backups;
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {}
+
+  // Metadata fallback keeps backups visible while the Render server is waking.
+  try {
+    const history = await getCloudinaryMeta('project_backups_v1');
+    if (Array.isArray(history)) {
+      return (history as any[])
+        .filter(item => item?.url && item?.public_id)
+        .map(item => ({
+          ...item,
+          fileName: item.fileName || String(item.public_id).split('/').pop() || 'backup.zip',
+          created_at: item.created_at || item.backupDate,
+          bytes: item.bytes ?? item.sizeBytes,
+        }))
+        .reverse();
+    }
+  } catch {}
   return [];
 }
 

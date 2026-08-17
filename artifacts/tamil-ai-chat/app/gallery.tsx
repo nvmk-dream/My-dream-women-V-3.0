@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
   ActivityIndicator, Image, Dimensions, ScrollView, FlatList,
-  Platform, TextInput, Modal, BackHandler, StatusBar,
+  Platform, TextInput, Modal, BackHandler, StatusBar, Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -10,7 +10,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, type CloudinaryBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -20,6 +20,15 @@ const COLS = 3;
 const THUMB = (width - (COLS + 1) * 2) / COLS;
 
 interface CloudFile { url: string; public_id: string; isVideo?: boolean }
+
+type PendingBackup = {
+  zipUri: string;
+  outputName: string;
+  sizeBytes: number;
+  backupInfo: Record<string, unknown>;
+  uploaded?: { url: string; public_id: string };
+};
+
 interface SubFolder  { id: string; label: string }
 
 const ALBUM_META: Record<string, { label: string; emoji: string; color: string; mediaType: MediaLibrary.MediaTypeValue[] }> = {
@@ -73,6 +82,10 @@ export default function GalleryScreen() {
   const [uploadTotal, setUploadTotal]       = useState(0);
   const [backingUp, setBackingUp]           = useState(false);
   const [backupStep, setBackupStep]         = useState('');
+  const [backupZipReady, setBackupZipReady] = useState(false);
+  const [backupUploadProgress, setBackupUploadProgress] = useState(0);
+  const [backups, setBackups] = useState<CloudinaryBackup[]>([]);
+  const pendingBackupRef = React.useRef<PendingBackup | null>(null);
 
   // ── MediaLibrary permission ──────────────────────────────────────
   const [mlPermission, requestMlPermission] = MediaLibrary.usePermissions();
@@ -120,6 +133,16 @@ export default function GalleryScreen() {
   useEffect(() => {
     if (depth === 0) loadCloudFiles(undefined);
   }, [depth, albumKey]);
+
+  const loadProjectBackups = useCallback(async () => {
+    if (albumKey !== 'projects' || depth !== 0) return;
+    const listed = await listCloudinaryBackups().catch(() => []);
+    setBackups(listed);
+  }, [albumKey, depth]);
+
+  useEffect(() => {
+    loadProjectBackups();
+  }, [loadProjectBackups]);
 
   useEffect(() => {
     if (!isChatSelectMode) return;
@@ -424,10 +447,82 @@ export default function GalleryScreen() {
     };
   };
 
+  const showBackupFailure = (error: unknown) => {
+    const reason = error instanceof Error ? error.message : String(error || 'Unknown backup error');
+    setBackingUp(false);
+    setBackupStep('');
+    setBackupZipReady(Boolean(pendingBackupRef.current));
+    setBackupUploadProgress(0);
+    Alert.alert(
+      'Backup failed',
+      `${reason}\n\nZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Retry', onPress: () => setTimeout(() => runProjectBackup(), 0) },
+      ],
+    );
+  };
+
+  const uploadPendingBackup = async (pending: PendingBackup) => {
+    setBackingUp(true);
+    setBackupZipReady(true);
+    setBackupUploadProgress(pending.uploaded ? 100 : 0);
+    try {
+      const uploaded = pending.uploaded ?? await uploadUriToCloudinary(
+        pending.zipUri,
+        'application/zip',
+        'my-girls/storage/projects/Backup',
+        (progress) => {
+          setBackupUploadProgress(progress);
+          setBackupStep(`Uploading Backup... ${progress}%`);
+        },
+      );
+      pending.uploaded = uploaded;
+      setBackupUploadProgress(100);
+
+      setBackupStep('Saving backup record...');
+      const oldHistory = await getCloudinaryMeta('project_backups_v1').catch(() => null);
+      const history = Array.isArray(oldHistory) ? oldHistory : [];
+      const record = {
+        ...pending.backupInfo,
+        fileName: pending.outputName,
+        url: uploaded.url,
+        public_id: uploaded.public_id,
+        sizeBytes: pending.sizeBytes,
+      };
+      await setCloudinaryMeta('project_backups_v1', [...history, record].slice(-25));
+      setBackups(prev => [
+        { ...record, created_at: String(record.backupDate), bytes: pending.sizeBytes },
+        ...prev.filter(item => item.public_id !== uploaded.public_id),
+      ]);
+      pendingBackupRef.current = null;
+      setBackupStep('Backup completed');
+      Alert.alert(
+        '✅ Backup completed',
+        `${pending.outputName}\n\nAPK + Projects data + ${String(pending.backupInfo['mediaCount'] ?? 0)} media file(s) Cloudinary-ல் save ஆச்சு.`,
+      );
+    } catch (error) {
+      showBackupFailure(error);
+    } finally {
+      setBackingUp(false);
+      setBackupStep('');
+      setBackupZipReady(false);
+      setBackupUploadProgress(0);
+    }
+  };
+
   const runProjectBackup = async () => {
     if (albumKey !== 'projects' || backingUp) return;
+    const pending = pendingBackupRef.current;
+    if (pending) {
+      await uploadPendingBackup(pending);
+      return;
+    }
+
     setBackingUp(true);
-    setBackupStep('Preparing backup...');
+    setBackupStep('Creating Backup...');
+    setBackupZipReady(false);
+    setBackupUploadProgress(0);
     try {
       const apkInfo = await getInstalledApkInfo();
       setBackupStep('Collecting Projects data...');
@@ -442,6 +537,7 @@ export default function GalleryScreen() {
         backupDate: new Date().toISOString(),
         backupType: 'full',
         apkFormat: 'single-apk',
+        mediaCount: collected.mediaFiles.length,
       };
 
       setBackupStep('Creating ZIP...');
@@ -451,41 +547,22 @@ export default function GalleryScreen() {
         projectDataJson: JSON.stringify(collected.projectData, null, 2),
         mediaFilesJson: JSON.stringify(collected.mediaFiles),
       });
-
-      setBackupStep('Uploading backup to Cloudinary...');
-      const uploaded = await uploadUriToCloudinary(
-        zip.uri,
-        'application/zip',
-        'my-girls/storage/projects/Backup',
-      );
-      const record = {
-        ...backupInfo,
-        fileName: outputName,
-        url: uploaded.url,
-        public_id: uploaded.public_id,
+      const nextPending: PendingBackup = {
+        zipUri: zip.uri,
+        outputName,
         sizeBytes: zip.sizeBytes,
+        backupInfo,
       };
-      const oldHistory = await getCloudinaryMeta('project_backups_v1').catch(() => null);
-      const history = Array.isArray(oldHistory) ? oldHistory : [];
-      setCloudinaryMeta('project_backups_v1', [...history, record].slice(-25)).catch(() => {});
-
-      Alert.alert(
-        '✅ Backup completed',
-        `${outputName}\n\nAPK + Projects data + ${collected.mediaFiles.length} media file(s) Cloudinary-ல் save ஆச்சு.`,
-      );
-    } catch (error: any) {
-      const reason = error?.message || String(error) || 'Unknown backup error';
-      Alert.alert(
-        'Backup failed',
-        reason,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Retry', onPress: () => { runProjectBackup(); } },
-        ],
-      );
+      pendingBackupRef.current = nextPending;
+      setBackupZipReady(true);
+      setBackupStep('Uploading Backup... 0%');
+      await uploadPendingBackup(nextPending);
+    } catch (error) {
+      showBackupFailure(error);
     } finally {
       setBackingUp(false);
       setBackupStep('');
+      setBackupUploadProgress(0);
     }
   };
 
@@ -688,12 +765,23 @@ export default function GalleryScreen() {
       </View>
 
       {/* Upload progress */}
-      {(uploading || backingUp) && (
+      {uploading && (
         <View style={s.uploadBar}>
           <ActivityIndicator color="#fff" size="small" />
-          <Text style={s.uploadBarTxt}>
-            {backingUp ? backupStep : `Upload பண்றேன்... ${uploadProgress}/${uploadTotal}`}
-          </Text>
+          <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
+        </View>
+      )}
+      {backingUp && (
+        <View style={s.backupProgressCard}>
+          <Text style={s.backupProgressTitle}>Creating Backup</Text>
+          <Text style={s.backupProgressRow}>APK <Text style={s.backupDone}>✓</Text></Text>
+          <Text style={s.backupProgressRow}>Project Data <Text style={s.backupDone}>✓</Text></Text>
+          <Text style={s.backupProgressRow}>Creating ZIP <Text style={s.backupProgressValue}>{backupZipReady ? '68%' : '...'}</Text></Text>
+          <Text style={s.backupProgressRow}>Uploading Backup <Text style={s.backupProgressValue}>{backupZipReady ? `${backupUploadProgress}%` : '0%'}</Text></Text>
+          <View style={s.backupBarBg}>
+            <View style={[s.backupBarFill, { width: `${backupZipReady ? 68 + Math.round(backupUploadProgress * 0.32) : 18}%` as any }]} />
+          </View>
+          {!!backupStep && <Text style={s.backupProgressHint}>{backupStep}</Text>}
         </View>
       )}
 
@@ -741,6 +829,36 @@ export default function GalleryScreen() {
                 <Text style={s.folderChipLabel} numberOfLines={1}>{folder.label}</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        )}
+
+        {albumKey === 'projects' && depth === 0 && backups.length > 0 && (
+          <View style={s.backupsSection}>
+            <View style={s.backupsHeader}>
+              <Text style={s.backupsTitle}>☁️ Backup files</Text>
+              <Text style={s.backupsCount}>{backups.length}</Text>
+            </View>
+            {backups.map(backup => {
+              const size = backup.sizeBytes ?? backup.bytes;
+              const sizeText = typeof size === 'number' && size > 0
+                ? `${(size / (1024 * 1024)).toFixed(1)} MB`
+                : 'ZIP backup';
+              const date = backup.backupDate || backup.created_at;
+              return (
+                <TouchableOpacity
+                  key={backup.public_id}
+                  style={s.backupFileRow}
+                  onPress={() => Linking.openURL(backup.url).catch(() => Alert.alert('Download error', 'Backup open ஆகவில்லை'))}
+                >
+                  <Text style={s.backupFileIcon}>ZIP</Text>
+                  <View style={s.backupFileInfo}>
+                    <Text style={s.backupFileName} numberOfLines={1}>{backup.fileName}</Text>
+                    <Text style={s.backupFileMeta}>{date ? new Date(date).toLocaleString('en-IN') : 'Cloudinary backup'} · {sizeText}</Text>
+                  </View>
+                  <Text style={s.backupDownload}>↓</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -998,6 +1116,24 @@ const s = StyleSheet.create({
   doneBtnTxt:     { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   uploadBar:      { flexDirection: 'row', backgroundColor: '#1565C0', padding: 10, gap: 10, alignItems: 'center' },
   uploadBarTxt:   { color: '#fff', fontSize: 14 },
+  backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: '#f3f3f3', borderRadius: 18, borderWidth: 1, borderColor: '#ddd' },
+  backupProgressTitle: { color: '#222', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  backupProgressRow: { color: '#222', fontSize: 14, marginBottom: 7 },
+  backupDone: { color: '#111', fontSize: 18, fontWeight: '800', marginLeft: 8 },
+  backupProgressValue: { color: '#222', marginLeft: 18 },
+  backupBarBg: { height: 12, backgroundColor: '#ddd', borderRadius: 6, overflow: 'hidden', marginTop: 10 },
+  backupBarFill: { height: '100%', backgroundColor: '#111', borderRadius: 6 },
+  backupProgressHint: { color: '#666', fontSize: 12, marginTop: 9 },
+  backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#1a2340', borderRadius: 14 },
+  backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  backupsTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  backupsCount: { color: '#FFD700', fontWeight: '800' },
+  backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 10, padding: 10, marginTop: 7 },
+  backupFileIcon: { color: '#FFD700', fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: '#FFD700', borderRadius: 5, padding: 5, marginRight: 10 },
+  backupFileInfo: { flex: 1 },
+  backupFileName: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  backupFileMeta: { color: '#9ca3af', fontSize: 10, marginTop: 3 },
+  backupDownload: { color: '#60a5fa', fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
   selBar:         { flexDirection: 'row', backgroundColor: '#333', padding: 10, alignItems: 'center', gap: 12 },
   selCount:       { color: '#fff', fontSize: 14, flex: 1 },
   selDelBtn:      { backgroundColor: '#c62828', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },

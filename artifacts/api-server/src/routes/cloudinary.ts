@@ -202,6 +202,44 @@ router.get("/cloudinary/list", async (req, res) => {
   }
 });
 
+
+// Lists ZIP/raw project backups separately from image assets.
+// Project Gallery uses the image list endpoint, so raw ZIPs need their own
+// resource_type=raw query to remain visible after a successful upload.
+router.get("/cloudinary/backups", async (req, res) => {
+  try {
+    const folder = (req.query["folder"] as string) || "my-girls/storage/projects/Backup";
+    const prefix = folder.endsWith("/") ? folder : `${folder}/`;
+    const cl = cfg();
+    const result = await cl.api.resources({
+      type: "upload",
+      resource_type: "raw",
+      prefix,
+      max_results: 100,
+    });
+    const backups = (result.resources || [])
+      .filter((r: any) => {
+        const format = String(r.format || "").toLowerCase();
+        const id = String(r.public_id || "").toLowerCase();
+        const url = String(r.secure_url || "").toLowerCase();
+        return format === "zip" || id.endsWith(".zip") || url.endsWith(".zip");
+      })
+      .map((r: any) => ({
+        url: r.secure_url || r.url,
+        public_id: r.public_id,
+        fileName: String(r.public_id || "").split("/").pop() || "backup.zip",
+        created_at: r.created_at,
+        bytes: r.bytes,
+        format: r.format || "zip",
+      }))
+      .sort((a: any, b: any) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    return res.json({ backups });
+  } catch (err: any) {
+    req.log.error({ err }, "Cloudinary backups list failed");
+    return res.status(500).json({ error: err?.message || "Backups list failed" });
+  }
+});
+
 router.get("/cloudinary/debug-all", async (req, res) => {
   try {
     const cl = cfg();
