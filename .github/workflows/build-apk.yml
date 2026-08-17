@@ -112,6 +112,7 @@ jobs:
       - name: Inject custom icons via ImageMagick
         run: |
           ICON="artifacts/tamil-ai-chat/assets/images/icon.png"
+          ADAPTIVE="artifacts/tamil-ai-chat/assets/images/adaptive-icon.png"
           RES="artifacts/tamil-ai-chat/android/app/src/main/res"
 
           find "$RES" -name "ic_launcher*.webp" -delete
@@ -135,7 +136,7 @@ jobs:
               -define png:compression-level=9 "$DIR/ic_launcher.png"
             convert "$ICON" -resize "${LAUNCHER_PX}x${LAUNCHER_PX}!" \
               -define png:compression-level=9 "$DIR/ic_launcher_round.png"
-            convert "$ICON" -resize "${FOREGROUND_PX}x${FOREGROUND_PX}!" \
+            convert "$ADAPTIVE" -resize "${FOREGROUND_PX}x${FOREGROUND_PX}!" \
               -define png:compression-level=9 "$DIR/ic_launcher_foreground.png"
 
             echo "$FOLDER done"
