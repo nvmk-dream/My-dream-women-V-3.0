@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
-import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, clearBackupUploadState, type NativeBackupUploadState } from '../services/installed-apk';
+import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
@@ -678,11 +678,15 @@ export default function GalleryScreen() {
   useEffect(() => {
     if (albumKey !== 'projects') return;
     let active = true;
+    const subscription = addBackupUploadListener(() => {
+      if (active) syncBackupUploadState();
+    });
     const poll = () => { if (active) syncBackupUploadState(); };
     poll();
     const timer = setInterval(poll, 1000);
     return () => {
       active = false;
+      subscription.remove();
       clearInterval(timer);
     };
   }, [albumKey, syncBackupUploadState]);
