@@ -38,15 +38,19 @@ class BackupUploadService : Service() {
     when (intent?.action) {
       ACTION_CANCEL -> {
         stopRequested.set(true)
-        updateState(loadState()?.apply {
+        loadState()?.apply {
           put("status", "paused")
           put("error", "Upload paused by user")
-        })
+        }?.also {
+          updateState(it)
+          notifyState(it)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         return START_NOT_STICKY
       }
       ACTION_START -> {
+        stopRequested.set(false)
         if (!running.compareAndSet(false, true)) return START_REDELIVER_INTENT
         startForegroundCompat(buildNotification(loadState() ?: JSONObject().put("status", "starting")))
         val filePath = intent.getStringExtra(EXTRA_FILE_PATH).orEmpty()
@@ -89,12 +93,14 @@ class BackupUploadService : Service() {
       if (!file.exists() || !file.isFile) throw IOException("Backup ZIP not found")
       if (cloudName.isBlank() || uploadPreset.isBlank()) throw IOException("Cloudinary upload configuration is missing")
 
+      val total = if (sizeBytes > 0) sizeBytes else file.length()
       val previous = loadState()
       val sameJob = previous != null &&
         previous.optString("filePath") == file.absolutePath &&
+        previous.optLong("totalBytes", total) == total &&
+        previous.optLong("fileLength", file.length()) == file.length() &&
         previous.optString("status") != "completed"
       val state = if (sameJob && previous != null) previous else JSONObject()
-      val total = if (sizeBytes > 0) sizeBytes else file.length()
       val uploadId = state.optString("uploadId").ifBlank { UUID.randomUUID().toString() }
       var offset = if (sameJob) state.optLong("uploadedBytes", 0L) else 0L
       offset = offset.coerceIn(0L, total)
@@ -106,6 +112,7 @@ class BackupUploadService : Service() {
         .put("folder", folder)
         .put("mimeType", mimeType)
         .put("totalBytes", total)
+        .put("fileLength", file.length())
         .put("uploadedBytes", offset)
         .put("uploadId", uploadId)
         .put("backupInfoJson", backupInfoJson)
@@ -115,7 +122,7 @@ class BackupUploadService : Service() {
 
       while (offset < total && !stopRequested.get()) {
         val end = min(offset + CHUNK_SIZE, total) - 1L
-        val response = uploadChunk(
+        val response = uploadChunkWithRetry(
           file = file,
           start = offset,
           end = end,
@@ -157,6 +164,61 @@ class BackupUploadService : Service() {
       stopSelf()
     }
   }
+
+  private fun uploadChunkWithRetry(
+    file: File,
+    start: Long,
+    end: Long,
+    total: Long,
+    uploadId: String,
+    cloudName: String,
+    uploadPreset: String,
+    folder: String,
+    mimeType: String,
+    outputName: String,
+  ): ChunkResponse {
+    var attempt = 0
+    while (!stopRequested.get()) {
+      try {
+        return uploadChunk(
+          file = file,
+          start = start,
+          end = end,
+          total = total,
+          uploadId = uploadId,
+          cloudName = cloudName,
+          uploadPreset = uploadPreset,
+          folder = folder,
+          mimeType = mimeType,
+          outputName = outputName,
+        )
+      } catch (error: Exception) {
+        if (!isRetryable(error)) throw error
+        attempt += 1
+        val delaySeconds = (2L shl (attempt - 1).coerceAtMost(5)).coerceAtMost(60L)
+        val state = loadState() ?: JSONObject()
+        state.put("status", "uploading")
+          .put("error", "Network unavailable. Retrying in ${delaySeconds}s")
+        updateState(state)
+        notifyState(state)
+        try {
+          Thread.sleep(delaySeconds * 1000L)
+        } catch (_: InterruptedException) {
+          Thread.currentThread().interrupt()
+          throw IOException("Upload paused")
+        }
+      }
+    }
+    throw IOException("Upload paused")
+  }
+
+  private fun isRetryable(error: Exception): Boolean =
+    when (error) {
+      is CloudinaryUploadException ->
+        error.statusCode == 408 || error.statusCode == 429 || error.statusCode >= 500
+      is IOException -> true
+      else -> false
+    }
 
   private fun uploadChunk(
     file: File,
@@ -222,7 +284,10 @@ class BackupUploadService : Service() {
       } catch (_: Exception) { "" }
       if (status !in 200..299) {
         val message = try { JSONObject(body).optJSONObject("error")?.optString("message") } catch (_: Exception) { null }
-        throw IOException(message?.ifBlank { null } ?: "Cloudinary upload failed: HTTP $status")
+        throw CloudinaryUploadException(
+          status,
+          message?.ifBlank { null } ?: "Cloudinary upload failed: HTTP $status",
+        )
       }
       val json = try { JSONObject(body) } catch (_: Exception) { JSONObject() }
       return ChunkResponse(
@@ -258,13 +323,16 @@ class BackupUploadService : Service() {
     val percent = if (total > 0) ((uploaded * 100L) / total).toInt().coerceIn(0, 100) else 0
     val title = when (status) {
       "completed" -> "Backup completed"
-      "failed" -> "Backup upload paused"
+      "failed" -> "Backup upload failed"
       "paused" -> "Backup paused"
       else -> "Uploading backup"
     }
     val text = when (status) {
       "completed" -> state.optString("outputName", "Backup is ready")
       "failed", "paused" -> state.optString("error", "Tap the app to resume")
+      "uploading" -> state.optString("error").ifBlank {
+        "${state.optString("outputName", "Backup.zip")} • $percent% • ${formatBytes(uploaded)} / ${formatBytes(total)}"
+      }
       else -> "${state.optString("outputName", "Backup.zip")} • $percent% • ${formatBytes(uploaded)} / ${formatBytes(total)}"
     }
     val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
@@ -285,6 +353,11 @@ class BackupUploadService : Service() {
 
   private fun notifyState(state: JSONObject) {
     getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(state))
+    sendBroadcast(
+      Intent(ACTION_STATE)
+        .setPackage(packageName)
+        .putExtra(EXTRA_STATE_JSON, state.toString()),
+    )
   }
 
   private fun loadState(): JSONObject? {
@@ -293,7 +366,7 @@ class BackupUploadService : Service() {
   }
 
   private fun updateState(state: JSONObject) {
-    getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_STATE, state.toString()).apply()
+    getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_STATE, state.toString()).commit()
   }
 
   private fun formatBytes(value: Long): String {
@@ -311,10 +384,13 @@ class BackupUploadService : Service() {
   }
 
   data class ChunkResponse(val url: String?, val publicId: String?)
+  class CloudinaryUploadException(val statusCode: Int, message: String) : IOException(message)
 
   companion object {
     const val ACTION_START = "com.smk1.tamilaichat.BACKUP_UPLOAD_START"
     const val ACTION_CANCEL = "com.smk1.tamilaichat.BACKUP_UPLOAD_CANCEL"
+    const val ACTION_STATE = "com.smk1.tamilaichat.BACKUP_UPLOAD_STATE"
+    const val EXTRA_STATE_JSON = "stateJson"
     private const val CHANNEL_ID = "backup-uploads"
     private const val NOTIFICATION_ID = 4107
     private const val PREFS = "backup_upload_state"
@@ -372,7 +448,7 @@ class BackupUploadService : Service() {
         val state = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_STATE, null)
         try { state?.let { JSONObject(it).optString("filePath").takeIf(String::isNotBlank)?.let { path -> File(path).delete() } } } catch (_: Exception) {}
       }
-      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit()
       context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
     }
   }
