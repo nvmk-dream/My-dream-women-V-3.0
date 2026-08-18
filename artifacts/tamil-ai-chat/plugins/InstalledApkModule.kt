@@ -1,9 +1,13 @@
 package com.smk1.tamilaichat
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -22,7 +26,33 @@ import org.json.JSONArray
 class InstalledApkModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
+  private val uploadStateReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+      val rawState = intent?.getStringExtra(BackupUploadService.EXTRA_STATE_JSON) ?: return
+      if (!reactContext.hasActiveCatalystInstance()) return
+      val json = try { org.json.JSONObject(rawState) } catch (_: Exception) { return }
+      reactContext
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        .emit("backupUploadState", jsonToWritableMap(json))
+    }
+  }
+
+  init {
+    val filter = IntentFilter(BackupUploadService.ACTION_STATE)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      reactContext.registerReceiver(uploadStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      @Suppress("DEPRECATION")
+      reactContext.registerReceiver(uploadStateReceiver, filter)
+    }
+  }
+
   override fun getName(): String = "InstalledApk"
+
+  override fun invalidate() {
+    try { reactContext.unregisterReceiver(uploadStateReceiver) } catch (_: Exception) {}
+    super.invalidate()
+  }
 
   @ReactMethod
   fun getInstalledApkInfo(promise: Promise) {
@@ -116,6 +146,21 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
 
   private fun currentApplicationInfo(): ApplicationInfo =
     reactContext.packageManager.getApplicationInfo(reactContext.packageName, 0)
+
+  private fun jsonToWritableMap(json: org.json.JSONObject): WritableMap =
+    Arguments.createMap().apply {
+      val keys = json.keys()
+      while (keys.hasNext()) {
+        val key = keys.next()
+        val value = json.opt(key)
+        when (value) {
+          is Number -> putDouble(key, value.toDouble())
+          is Boolean -> putBoolean(key, value)
+          org.json.JSONObject.NULL -> putNull(key)
+          else -> putString(key, value.toString())
+        }
+      }
+    }
 
   private fun createBackup(
     outputName: String,
