@@ -1,5 +1,6 @@
 package com.smk1.tamilaichat
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import com.facebook.react.bridge.Arguments
@@ -45,6 +46,60 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun startBackupUpload(
+    filePath: String,
+    outputName: String,
+    cloudName: String,
+    uploadPreset: String,
+    folder: String,
+    mimeType: String,
+    sizeBytes: Double,
+    backupInfoJson: String,
+    promise: Promise,
+  ) {
+    try {
+      BackupUploadService.start(reactContext, mapOf(
+        "filePath" to filePath,
+        "outputName" to outputName,
+        "cloudName" to cloudName,
+        "uploadPreset" to uploadPreset,
+        "folder" to folder,
+        "mimeType" to mimeType,
+        "sizeBytes" to sizeBytes.toLong().toString(),
+        "backupInfoJson" to backupInfoJson,
+      ))
+      promise.resolve(true)
+    } catch (error: Exception) {
+      promise.reject("BACKUP_UPLOAD_START_FAILED", error.message, error)
+    }
+  }
+
+  @ReactMethod
+  fun getBackupUploadState(promise: Promise) {
+    promise.resolve(BackupUploadService.readState(reactContext))
+  }
+
+  @ReactMethod
+  fun cancelBackupUpload(promise: Promise) {
+    try {
+      BackupUploadService.cancel(reactContext)
+      promise.resolve(true)
+    } catch (error: Exception) {
+      promise.reject("BACKUP_UPLOAD_CANCEL_FAILED", error.message, error)
+    }
+  }
+
+  @ReactMethod
+  fun clearBackupUploadState(deleteFile: Boolean, promise: Promise) {
+    try {
+      BackupUploadService.clearState(reactContext, deleteFile)
+      promise.resolve(true)
+    } catch (error: Exception) {
+      promise.reject("BACKUP_UPLOAD_CLEAR_FAILED", error.message, error)
+    }
+  }
+
+  @ReactMethod
   fun createBackup(
     outputName: String,
     backupInfoJson: String,
@@ -68,7 +123,7 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
     projectDataJson: String,
     mediaFilesJson: String,
   ): WritableMap {
-    val backupDir = File(reactContext.cacheDir, "project-backups").apply { mkdirs() }
+    val backupDir = File(reactContext.filesDir, "project-backups").apply { mkdirs() }
     val safeName = outputName.replace(Regex("[^A-Za-z0-9_.-]"), "_")
       .ifBlank { "MyDreamWoman_FullBackup.zip" }
     val zipFile = File(backupDir, safeName)

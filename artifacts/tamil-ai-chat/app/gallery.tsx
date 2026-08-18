@@ -10,8 +10,8 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, type CloudinaryBackup } from '../services/api';
-import { createBackupZip, getInstalledApkInfo } from '../services/installed-apk';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
+import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, clearBackupUploadState, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
@@ -22,7 +22,7 @@ const THUMB = (width - (COLS + 1) * 2) / COLS;
 interface CloudFile { url: string; public_id: string; isVideo?: boolean }
 
 type PendingBackup = {
-  zipUri: string;
+  zipPath: string;
   outputName: string;
   sizeBytes: number;
   backupInfo: Record<string, unknown>;
@@ -86,6 +86,9 @@ export default function GalleryScreen() {
   const [backupUploadProgress, setBackupUploadProgress] = useState(0);
   const [backups, setBackups] = useState<CloudinaryBackup[]>([]);
   const pendingBackupRef = React.useRef<PendingBackup | null>(null);
+  const lastBackupNoticeRef = React.useRef('');
+  const finalizingBackupRef = React.useRef<string | null>(null);
+  const runProjectBackupRef = React.useRef<() => Promise<void>>(async () => {});
 
   // ── MediaLibrary permission ──────────────────────────────────────
   const [mlPermission, requestMlPermission] = MediaLibrary.usePermissions();
@@ -458,29 +461,42 @@ export default function GalleryScreen() {
       `${reason}\n\nZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Retry', onPress: () => setTimeout(() => runProjectBackup(), 0) },
+        { text: 'Retry', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
       ],
     );
   };
 
-  const uploadPendingBackup = async (pending: PendingBackup) => {
+  const pendingFromNativeState = (state: NativeBackupUploadState): PendingBackup => {
+    let backupInfo: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(state.backupInfoJson || '{}');
+      if (parsed && typeof parsed === 'object') backupInfo = parsed;
+    } catch {}
+    return {
+      zipPath: state.filePath,
+      outputName: state.outputName || 'MyDreamWoman_FullBackup.zip',
+      sizeBytes: Number(state.totalBytes || 0),
+      backupInfo,
+      uploaded: state.url && state.public_id ? { url: state.url, public_id: state.public_id } : undefined,
+    };
+  };
+
+  const finalizeCompletedBackup = async (pending: PendingBackup, state: NativeBackupUploadState) => {
+    const uploaded = pending.uploaded ?? (state.url && state.public_id
+      ? { url: state.url, public_id: state.public_id }
+      : undefined);
+    if (!uploaded) {
+      showBackupFailure(new Error('Cloudinary completed the upload without returning the backup URL.'));
+      return;
+    }
+    const finalizationKey = state.uploadId || uploaded.public_id;
+    if (finalizingBackupRef.current === finalizationKey) return;
+    finalizingBackupRef.current = finalizationKey;
     setBackingUp(true);
     setBackupZipReady(true);
-    setBackupUploadProgress(pending.uploaded ? 100 : 0);
+    setBackupUploadProgress(100);
+    setBackupStep('Saving backup record...');
     try {
-      const uploaded = pending.uploaded ?? await uploadUriToCloudinary(
-        pending.zipUri,
-        'application/zip',
-        'my-girls/storage/projects/Backup',
-        (progress) => {
-          setBackupUploadProgress(progress);
-          setBackupStep(`Uploading Backup... ${progress}%`);
-        },
-      );
-      pending.uploaded = uploaded;
-      setBackupUploadProgress(100);
-
-      setBackupStep('Saving backup record...');
       const oldHistory = await getCloudinaryMeta('project_backups_v1').catch(() => null);
       const history = Array.isArray(oldHistory) ? oldHistory : [];
       const record = {
@@ -492,10 +508,12 @@ export default function GalleryScreen() {
       };
       await setCloudinaryMeta('project_backups_v1', [...history, record].slice(-25));
       setBackups(prev => [
-        { ...record, created_at: String(record.backupDate), bytes: pending.sizeBytes },
+        { ...record, created_at: String(record.backupDate || new Date().toISOString()), bytes: pending.sizeBytes },
         ...prev.filter(item => item.public_id !== uploaded.public_id),
       ]);
+      await clearBackupUploadState(true);
       pendingBackupRef.current = null;
+      lastBackupNoticeRef.current = '';
       setBackupStep('Backup completed');
       Alert.alert(
         '✅ Backup completed',
@@ -504,6 +522,7 @@ export default function GalleryScreen() {
     } catch (error) {
       showBackupFailure(error);
     } finally {
+      finalizingBackupRef.current = null;
       setBackingUp(false);
       setBackupStep('');
       setBackupZipReady(false);
@@ -511,11 +530,93 @@ export default function GalleryScreen() {
     }
   };
 
+  const startOrResumePendingBackup = async (pending: PendingBackup, state?: NativeBackupUploadState | null) => {
+    lastBackupNoticeRef.current = '';
+    setBackingUp(true);
+    setBackupZipReady(true);
+    const currentProgress = state && state.totalBytes > 0
+      ? Math.round((state.uploadedBytes / state.totalBytes) * 100)
+      : 0;
+    setBackupUploadProgress(Math.min(100, Math.max(0, currentProgress)));
+    setBackupStep(`Uploading Backup... ${currentProgress}%`);
+    await startBackupUpload({
+      filePath: pending.zipPath,
+      outputName: pending.outputName,
+      cloudName: CLOUDINARY_UPLOAD_CLOUD,
+      uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+      folder: 'my-girls/storage/projects/Backup',
+      mimeType: 'application/zip',
+      sizeBytes: pending.sizeBytes,
+      backupInfoJson: JSON.stringify(pending.backupInfo),
+    });
+  };
+
+  const syncBackupUploadState = useCallback(async () => {
+    if (albumKey !== 'projects') return;
+    const state = await getBackupUploadState().catch(() => null);
+    if (!state || !state.status) return;
+
+    let pending = pendingBackupRef.current;
+    if (!pending && state.filePath) {
+      pending = pendingFromNativeState(state);
+      pendingBackupRef.current = pending;
+    }
+    if (!pending) return;
+
+    const total = Number(state.totalBytes || pending.sizeBytes || 0);
+    const uploaded = Number(state.uploadedBytes || 0);
+    const percent = total > 0 ? Math.min(100, Math.round((uploaded / total) * 100)) : 0;
+    setBackupZipReady(true);
+    setBackupUploadProgress(percent);
+
+    if (state.status === 'starting' || state.status === 'uploading') {
+      setBackingUp(true);
+      setBackupStep(`Uploading Backup... ${percent}%`);
+      return;
+    }
+
+    if (state.status === 'completed') {
+      pending.uploaded = state.url && state.public_id ? { url: state.url, public_id: state.public_id } : pending.uploaded;
+      await finalizeCompletedBackup(pending, state);
+      return;
+    }
+
+    if (state.status === 'failed' || state.status === 'paused') {
+      setBackingUp(false);
+      setBackupStep('');
+      const noticeKey = `${state.uploadId}:${state.status}:${state.error || ''}:${state.uploadedBytes}`;
+      if (lastBackupNoticeRef.current === noticeKey) return;
+      lastBackupNoticeRef.current = noticeKey;
+      Alert.alert(
+        state.status === 'paused' ? 'Backup paused' : 'Backup upload failed',
+        `${state.error || 'Upload stopped unexpectedly'}\n\n${percent}% வரை upload ஆனது. ZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Resume', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
+        ],
+      );
+    }
+  }, [albumKey]);
+
   const runProjectBackup = async () => {
     if (albumKey !== 'projects' || backingUp) return;
-    const pending = pendingBackupRef.current;
+    const nativeState = await getBackupUploadState().catch(() => null);
+    let pending = pendingBackupRef.current;
+
+    if (!pending && nativeState?.filePath && nativeState.status !== 'idle') {
+      pending = pendingFromNativeState(nativeState);
+      pendingBackupRef.current = pending;
+    }
     if (pending) {
-      await uploadPendingBackup(pending);
+      if (nativeState?.status === 'completed') {
+        await finalizeCompletedBackup(pending, nativeState);
+      } else {
+        try {
+          await startOrResumePendingBackup(pending, nativeState);
+        } catch (error) {
+          showBackupFailure(error);
+        }
+      }
       return;
     }
 
@@ -547,22 +648,16 @@ export default function GalleryScreen() {
         projectDataJson: JSON.stringify(collected.projectData, null, 2),
         mediaFilesJson: JSON.stringify(collected.mediaFiles),
       });
-      const nextPending: PendingBackup = {
-        zipUri: zip.uri,
+      pending = {
+        zipPath: zip.path,
         outputName,
         sizeBytes: zip.sizeBytes,
         backupInfo,
       };
-      pendingBackupRef.current = nextPending;
-      setBackupZipReady(true);
-      setBackupStep('Uploading Backup... 0%');
-      await uploadPendingBackup(nextPending);
+      pendingBackupRef.current = pending;
+      await startOrResumePendingBackup(pending, null);
     } catch (error) {
       showBackupFailure(error);
-    } finally {
-      setBackingUp(false);
-      setBackupStep('');
-      setBackupUploadProgress(0);
     }
   };
 
@@ -577,6 +672,20 @@ export default function GalleryScreen() {
       ],
     );
   };
+
+  runProjectBackupRef.current = runProjectBackup;
+
+  useEffect(() => {
+    if (albumKey !== 'projects') return;
+    let active = true;
+    const poll = () => { if (active) syncBackupUploadState(); };
+    poll();
+    const timer = setInterval(poll, 1000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [albumKey, syncBackupUploadState]);
 
   // ── Upload selected MediaLibrary assets ─────────────────────────
   const doMediaUpload = async (mode: 'copy' | 'cut') => {

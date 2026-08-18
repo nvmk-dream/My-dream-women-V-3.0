@@ -268,6 +268,11 @@ export async function generateImage(params: {
 const CLOUDINARY_CLOUD = 'dazmrxsyc';
 const CLOUDINARY_PRESET = 'my_girls_upload';
 
+// Shared with the native Android foreground uploader. Keep these values in one place
+// so foreground image uploads and background backup uploads target the same preset.
+export const CLOUDINARY_UPLOAD_CLOUD = CLOUDINARY_CLOUD;
+export const CLOUDINARY_UPLOAD_PRESET = CLOUDINARY_PRESET;
+
 // URI-based upload — expo-file-system/legacy uploadAsync (required for v19+).
 // Handles content://, file://, ph:// URIs natively on Android/iOS.
 // Falls back to fetch FormData for edge cases.

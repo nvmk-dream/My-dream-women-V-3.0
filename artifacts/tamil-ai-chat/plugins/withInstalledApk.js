@@ -1,4 +1,4 @@
-const { withMainApplication, withDangerousMod } = require('@expo/config-plugins');
+const { withMainApplication, withDangerousMod, withAndroidManifest } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,10 +12,12 @@ function withInstalledApk(config) {
       'com', 'smk1', 'tamilaichat',
     );
     fs.mkdirSync(packageDir, { recursive: true });
-    fs.copyFileSync(
-      path.join(__dirname, 'InstalledApkModule.kt'),
-      path.join(packageDir, 'InstalledApkModule.kt'),
-    );
+    for (const source of ['InstalledApkModule.kt', 'BackupUploadService.kt']) {
+      fs.copyFileSync(
+        path.join(__dirname, source),
+        path.join(packageDir, source),
+      );
+    }
     fs.writeFileSync(
       path.join(packageDir, 'InstalledApkPackage.kt'),
       `package com.smk1.tamilaichat
@@ -36,6 +38,36 @@ class InstalledApkPackage : ReactPackage {
     );
     return config;
   }]);
+
+  config = withAndroidManifest(config, (config) => {
+    const manifest = config.modResults.manifest;
+    const permissionNames = [
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+    ];
+    const permissions = manifest['uses-permission'] ?? [];
+    for (const name of permissionNames) {
+      if (!permissions.some((item) => item?.$?.['android:name'] === name)) {
+        permissions.push({ $: { 'android:name': name } });
+      }
+    }
+    manifest['uses-permission'] = permissions;
+    const application = manifest.application?.[0];
+    if (application) {
+      application.service = application.service ?? [];
+      const exists = application.service.some((item) => item?.$?.['android:name'] === '.BackupUploadService');
+      if (!exists) {
+        application.service.push({
+          $: {
+            'android:name': '.BackupUploadService',
+            'android:exported': 'false',
+            'android:foregroundServiceType': 'dataSync',
+          },
+        });
+      }
+    }
+    return config;
+  });
 
   return withMainApplication(config, (config) => {
     const { contents, language } = config.modResults;
