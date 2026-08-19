@@ -191,6 +191,13 @@ jobs:
           if [ -f "$BUNDLE" ]; then echo "Bundle: $(stat -c%s $BUNDLE) bytes"
           else echo "Bundle not created"; exit 1; fi
 
+      - name: Verify ZIP upload feature is bundled
+        run: |
+          grep -q "ZIP Files" artifacts/tamil-ai-chat/app/cloud-storage.tsx
+          grep -q "Upload ZIP" artifacts/tamil-ai-chat/app/cloud-storage.tsx
+          grep -q "Upload ZIP" artifacts/tamil-ai-chat/android/app/src/main/assets/index.android.bundle
+          echo "ZIP upload feature verified in source and Android bundle"
+
       - name: Build APK
         working-directory: artifacts/tamil-ai-chat/android
         run: |
