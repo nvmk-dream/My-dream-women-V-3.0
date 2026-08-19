@@ -9,13 +9,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, deleteFromCloudinary } from '../services/api';
+import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, listCloudinaryBackups, deleteFromCloudinary, CloudinaryBackup } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
 
 const { width } = Dimensions.get('window');
 const THUMB = (width - 6) / 3;
 const LOCAL_KEY = 'my_girls_cloud_images';
 const LOCAL_VIDEO_KEY = 'my_girls_cloud_videos';
+const LOCAL_ZIP_KEY = 'my_girls_cloud_zips';
+const ZIP_FOLDER = 'my-girls/storage/projects/Backup';
 
 export interface CloudImage {
   url: string;
@@ -76,6 +78,7 @@ const CATEGORIES = [
   { key: 'group',    label: 'Group',     icon: '👥' },
   { key: 'videos',   label: 'Videos',    icon: '🎬' },
   { key: 'app-icon', label: 'App Icon',  icon: '🎯' },
+  { key: 'zips',     label: 'ZIP Files', icon: '🗜️' },
 ];
 
 const APP_ICON_KEY = 'my_girls_app_icons';
@@ -95,6 +98,8 @@ export default function CloudStorageScreen() {
   const [deleteConfirm, setDeleteConfirm] = useState<CloudImage | null>(null);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [appIcons, setAppIcons] = useState<CloudImage[]>([]);
+  const [zipFiles, setZipFiles] = useState<CloudinaryBackup[]>([]);
+  const [uploadingZip, setUploadingZip] = useState(false);
 
   // Video states
   const [videos, setVideos] = useState<CloudVideo[]>([]);
@@ -130,6 +135,14 @@ export default function CloudStorageScreen() {
         if (s.cloudApiSecret) setCloudApiSecret(s.cloudApiSecret);
         setSecretsSaved(!!(s.cloudName && s.cloudApiKey && s.cloudApiSecret));
       }
+    } catch {}
+    try {
+      const rawZ = await AsyncStorage.getItem(LOCAL_ZIP_KEY);
+      const localZips: CloudinaryBackup[] = rawZ ? JSON.parse(rawZ) : [];
+      const cloudZips = await listCloudinaryBackups(ZIP_FOLDER);
+      const mergedZips = [...localZips, ...cloudZips].filter((z, i, a) => z?.public_id && a.findIndex(x => x.public_id === z.public_id) === i);
+      setZipFiles(mergedZips);
+      await AsyncStorage.setItem(LOCAL_ZIP_KEY, JSON.stringify(mergedZips));
     } catch {}
     try {
       const rawV = await AsyncStorage.getItem(LOCAL_VIDEO_KEY);
@@ -252,6 +265,36 @@ export default function CloudStorageScreen() {
       setUploadingVideo(false);
     }
   }, [selectedPersona]);
+
+  // ── ZIP / project backup upload (separate from image/video upload) ──
+  const uploadZip = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setUploadingZip(true);
+    try {
+      const data = await uploadUriToCloudinary(asset.uri, 'application/zip', ZIP_FOLDER);
+      const zip: CloudinaryBackup = {
+        url: data.url,
+        public_id: data.public_id,
+        fileName: asset.name || data.public_id.split('/').pop() || 'backup.zip',
+        backupDate: new Date().toISOString(),
+        format: 'zip',
+      };
+      const updated = [zip, ...zipFiles.filter(z => z.public_id !== zip.public_id)];
+      setZipFiles(updated);
+      await AsyncStorage.setItem(LOCAL_ZIP_KEY, JSON.stringify(updated));
+      Alert.alert('✅ ZIP Upload ஆச்சு!', 'Backup folder-ல் save ஆனது.\n\n' + zip.fileName);
+    } catch (e: any) {
+      Alert.alert('ZIP Upload பிழை', e?.message || 'ZIP upload முடியல. மீண்டும் try பண்ணுங்க');
+    } finally {
+      setUploadingZip(false);
+    }
+  }, [zipFiles]);
 
   // ── Sync videos from cloud ───────────────────────────────────
   const syncVideos = useCallback(async () => {
@@ -393,7 +436,9 @@ export default function CloudStorageScreen() {
         ? appIcons.length
         : c.key === 'videos'
           ? videos.length
-          : images.filter(i => i.category === c.key).length,
+          : c.key === 'zips'
+            ? zipFiles.length
+            : images.filter(i => i.category === c.key).length,
   }));
 
   const femalePersonas = ALL_PERSONAS.filter((p: any) => p.gender === 'female');
@@ -669,6 +714,18 @@ export default function CloudStorageScreen() {
             )}
           </View>
 
+        ) : activeCategory === 'zips' ? (
+          <View style={styles.appIconSection}>
+            <View style={styles.appIconHeader}>
+              <View><Text style={styles.appIconTitle}>🗜️ Project ZIP Files</Text><Text style={styles.appIconSub}>Cloudinary: {ZIP_FOLDER}/</Text></View>
+              <TouchableOpacity style={[styles.appIconUploadBtn, uploadingZip && { opacity: 0.6 }]} onPress={uploadZip} disabled={uploadingZip}>
+                {uploadingZip ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.appIconUploadTxt}>📤 Upload ZIP</Text>}
+              </TouchableOpacity>
+            </View>
+            <View style={styles.appIconInfo}><Text style={styles.appIconInfoTxt}>📌 File Manager திறக்கும் → ZIP file select → Cloudinary raw folder-ல் save ஆகும்</Text></View>
+            {zipFiles.length === 0 ? <View style={styles.appIconEmpty}><Text style={styles.appIconEmptyIcon}>🗜️</Text><Text style={styles.appIconEmptyTxt}>ZIP files இல்லை</Text><Text style={styles.appIconEmptyHint}>மேலே Upload ZIP அழுத்துங்கள்</Text></View> :
+              <View>{zipFiles.map(zip => <View key={zip.public_id} style={{ backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}><Text style={{ fontSize: 28, marginRight: 12 }}>🗜️</Text><View style={{ flex: 1 }}><Text style={{ color: '#fff', fontWeight: '700' }} numberOfLines={1}>{zip.fileName}</Text><Text style={{ color: '#888', fontSize: 11, marginTop: 4 }}>{zip.format || 'zip'} · {zip.backupDate ? new Date(zip.backupDate).toLocaleDateString('ta-IN') : ''}</Text></View><TouchableOpacity onPress={() => Linking.openURL(zip.url)} style={{ backgroundColor: '#6C63FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}><Text style={{ color: '#fff', fontWeight: '700' }}>Open</Text></TouchableOpacity></View>)}</View>}
+          </View>
         ) : activeCategory === 'app-icon' ? (
           <View style={styles.appIconSection}>
             <View style={styles.appIconHeader}>
