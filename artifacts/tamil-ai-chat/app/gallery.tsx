@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
-import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
+import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
@@ -88,6 +88,7 @@ export default function GalleryScreen() {
   const pendingBackupRef = React.useRef<PendingBackup | null>(null);
   const lastBackupNoticeRef = React.useRef('');
   const finalizingBackupRef = React.useRef<string | null>(null);
+  const cancelRequestedRef = React.useRef(false);
   const runProjectBackupRef = React.useRef<() => Promise<void>>(async () => {});
 
   // ── MediaLibrary permission ──────────────────────────────────────
@@ -532,6 +533,7 @@ export default function GalleryScreen() {
 
   const startOrResumePendingBackup = async (pending: PendingBackup, state?: NativeBackupUploadState | null) => {
     lastBackupNoticeRef.current = '';
+    cancelRequestedRef.current = false;
     setBackingUp(true);
     setBackupZipReady(true);
     const currentProgress = state && state.totalBytes > 0
@@ -570,6 +572,11 @@ export default function GalleryScreen() {
     setBackupUploadProgress(percent);
 
     if (state.status === 'starting' || state.status === 'uploading') {
+      if (cancelRequestedRef.current) {
+        setBackingUp(false);
+        setBackupStep('Backup paused by user');
+        return;
+      }
       setBackingUp(true);
       setBackupStep(`Uploading Backup... ${percent}%`);
       return;
@@ -584,6 +591,10 @@ export default function GalleryScreen() {
     if (state.status === 'failed' || state.status === 'paused') {
       setBackingUp(false);
       setBackupStep('');
+      if (cancelRequestedRef.current && state.status === 'paused') {
+        lastBackupNoticeRef.current = `${state.uploadId}:${state.status}:${state.error || ''}:${state.uploadedBytes}`;
+        return;
+      }
       const noticeKey = `${state.uploadId}:${state.status}:${state.error || ''}:${state.uploadedBytes}`;
       if (lastBackupNoticeRef.current === noticeKey) return;
       lastBackupNoticeRef.current = noticeKey;
@@ -598,8 +609,56 @@ export default function GalleryScreen() {
     }
   }, [albumKey]);
 
+  const cancelProjectBackup = () => {
+    if (!backingUp || !backupZipReady || !backupStep.startsWith('Uploading Backup')) return;
+    Alert.alert(
+      'Cancel Backup Upload?',
+      'இதுவரை upload ஆன ZIP பாதுகாப்பாக இருக்கும். பின்னர் Backup அழுத்தி இதே இடத்திலிருந்து Resume செய்யலாம்.',
+      [
+        { text: 'Keep Uploading', style: 'cancel' },
+        {
+          text: 'Cancel Backup',
+          style: 'destructive',
+          onPress: async () => {
+            cancelRequestedRef.current = true;
+            try {
+              await cancelBackupUpload();
+              const state = await getBackupUploadState().catch(() => null);
+              const total = Number(state?.totalBytes || pendingBackupRef.current?.sizeBytes || 0);
+              const uploaded = Number(state?.uploadedBytes || 0);
+              const percent = total > 0 ? Math.min(100, Math.round((uploaded / total) * 100)) : backupUploadProgress;
+              setBackingUp(false);
+              setBackupZipReady(true);
+              setBackupUploadProgress(percent);
+              setBackupStep('Backup paused — press Backup to resume');
+              Alert.alert(
+                'Backup Cancelled',
+                `${percent}% வரை upload ஆனது. ZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
+                [
+                  { text: 'OK', style: 'cancel' },
+                  {
+                    text: 'Resume',
+                    onPress: () => {
+                      cancelRequestedRef.current = false;
+                      setTimeout(() => runProjectBackupRef.current(), 0);
+                    },
+                  },
+                ],
+              );
+            } catch (error) {
+              cancelRequestedRef.current = false;
+              const reason = error instanceof Error ? error.message : String(error || 'Unknown cancel error');
+              Alert.alert('Cancel failed', reason);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const runProjectBackup = async () => {
     if (albumKey !== 'projects' || backingUp) return;
+    cancelRequestedRef.current = false;
     const nativeState = await getBackupUploadState().catch(() => null);
     let pending = pendingBackupRef.current;
 
@@ -895,6 +954,11 @@ export default function GalleryScreen() {
             <View style={[s.backupBarFill, { width: `${backupZipReady ? 68 + Math.round(backupUploadProgress * 0.32) : 18}%` as any }]} />
           </View>
           {!!backupStep && <Text style={s.backupProgressHint}>{backupStep}</Text>}
+          {backupZipReady && backupStep.startsWith('Uploading Backup') && (
+            <TouchableOpacity style={s.backupCancelBtn} onPress={cancelProjectBackup}>
+              <Text style={s.backupCancelTxt}>✕ Cancel Backup</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -1237,6 +1301,8 @@ const s = StyleSheet.create({
   backupBarBg: { height: 12, backgroundColor: '#ddd', borderRadius: 6, overflow: 'hidden', marginTop: 10 },
   backupBarFill: { height: '100%', backgroundColor: '#111', borderRadius: 6 },
   backupProgressHint: { color: '#666', fontSize: 12, marginTop: 9 },
+  backupCancelBtn: { marginTop: 12, backgroundColor: '#7f1d1d', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  backupCancelTxt: { color: '#fecaca', fontSize: 13, fontWeight: '800' },
   backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#1a2340', borderRadius: 14 },
   backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backupsTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
