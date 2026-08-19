@@ -93,6 +93,10 @@ async function backgroundSyncFolder(folder: string, cl: typeof cloudinary): Prom
 }
 
 const PRESET_NAME = "my_girls_upload";
+// Project backups contain the installed APK plus project media. The previous
+// preset limit was 10 MiB, so a normal ~200 MB APK backup failed after the
+// first few chunks even though the native uploader was resumable.
+const MAX_BACKUP_BYTES = 500 * 1024 * 1024;
 let presetReady = false;
 
 async function ensurePreset() {
@@ -104,6 +108,7 @@ async function ensurePreset() {
     use_asset_folder_as_public_id_prefix: true,
     unique_filename: true,
     overwrite: false,
+    max_file_size: MAX_BACKUP_BYTES,
   };
   try {
     await cl.api.update_upload_preset(PRESET_NAME, presetOpts);
