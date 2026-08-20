@@ -451,6 +451,18 @@ export default function GalleryScreen() {
     };
   };
 
+  const discardPendingBackup = async () => {
+    cancelRequestedRef.current = true;
+    await clearBackupUploadState(true).catch(() => {});
+    pendingBackupRef.current = null;
+    lastBackupNoticeRef.current = '';
+    finalizingBackupRef.current = null;
+    setBackingUp(false);
+    setBackupStep('');
+    setBackupZipReady(false);
+    setBackupUploadProgress(0);
+  };
+
   const showBackupFailure = (error: unknown) => {
     const reason = error instanceof Error ? error.message : String(error || 'Unknown backup error');
     setBackingUp(false);
@@ -461,7 +473,7 @@ export default function GalleryScreen() {
       'Backup failed',
       `${reason}\n\nZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => { void discardPendingBackup(); } },
         { text: 'Retry', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
       ],
     );
@@ -600,9 +612,13 @@ export default function GalleryScreen() {
       lastBackupNoticeRef.current = noticeKey;
       Alert.alert(
         state.status === 'paused' ? 'Backup paused' : 'Backup upload failed',
-        `${state.error || 'Upload stopped unexpectedly'}\n\n${percent}% வரை upload ஆனது. ZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
+        `${state.error || 'Upload stopped unexpectedly'}\n\n${percent}% வரை upload ஆனது.`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => { void discardPendingBackup(); },
+          },
           { text: 'Resume', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
         ],
       );
@@ -623,27 +639,11 @@ export default function GalleryScreen() {
             cancelRequestedRef.current = true;
             try {
               await cancelBackupUpload();
-              const state = await getBackupUploadState().catch(() => null);
-              const total = Number(state?.totalBytes || pendingBackupRef.current?.sizeBytes || 0);
-              const uploaded = Number(state?.uploadedBytes || 0);
-              const percent = total > 0 ? Math.min(100, Math.round((uploaded / total) * 100)) : backupUploadProgress;
-              setBackingUp(false);
-              setBackupZipReady(true);
-              setBackupUploadProgress(percent);
-              setBackupStep('Backup paused — press Backup to resume');
+              await discardPendingBackup();
               Alert.alert(
                 'Backup Cancelled',
-                `${percent}% வரை upload ஆனது. ZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
-                [
-                  { text: 'OK', style: 'cancel' },
-                  {
-                    text: 'Resume',
-                    onPress: () => {
-                      cancelRequestedRef.current = false;
-                      setTimeout(() => runProjectBackupRef.current(), 0);
-                    },
-                  },
-                ],
+                'இந்த backup முழுமையாக cancel செய்யப்பட்டது. புதிய Backup அழுத்தினால் fresh upload தொடங்கும்.',
+                [{ text: 'OK', style: 'cancel' }],
               );
             } catch (error) {
               cancelRequestedRef.current = false;
