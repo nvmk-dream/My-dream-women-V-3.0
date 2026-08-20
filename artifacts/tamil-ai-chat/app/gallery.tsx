@@ -9,6 +9,7 @@ import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-rou
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
@@ -238,6 +239,73 @@ export default function GalleryScreen() {
       );
     } catch (e: any) {
       Alert.alert('Upload பிழை', e?.message || 'மீண்டும் try பண்ணுங்க');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadTotal(0);
+    }
+  };
+
+  // ── Projects: pick any document/media file for Cloudinary ─────────
+  const pickProjectDocuments = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'image/*',
+        'video/*',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/pdf',
+        'text/plain',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ],
+      copyToCacheDirectory: true,
+      multiple: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    const folder = currentFolder
+      ? `my-girls/storage/${albumKey}/${currentFolder.id}`
+      : `my-girls/storage/${albumKey}`;
+    const selected = result.assets;
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadTotal(selected.length);
+    const uploaded: CloudFile[] = [];
+    const failures: string[] = [];
+    try {
+      for (let i = 0; i < selected.length; i++) {
+        const asset = selected[i];
+        const mimeType = asset.mimeType || 'application/octet-stream';
+        try {
+          const data = await uploadUriToCloudinary(asset.uri, mimeType, folder);
+          uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/') });
+          trackCloudinaryUpload(folder, data.public_id, data.url).catch(() => {});
+        } catch (error: any) {
+          failures.push(`${asset.name || 'file'}: ${error?.message || 'upload failed'}`);
+        }
+        setUploadProgress(i + 1);
+      }
+
+      if (uploaded.length) {
+        const key = filesKey(albumKey, currentFolder?.id);
+        const existingRaw = await AsyncStorage.getItem(key).catch(() => null);
+        const existing: CloudFile[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const updated = [...uploaded, ...existing.filter(file => !uploaded.some(item => item.public_id === file.public_id))];
+        await AsyncStorage.setItem(key, JSON.stringify(updated));
+        setFiles(updated);
+      }
+      if (failures.length) {
+        Alert.alert('⚠️ Partial Upload', `${uploaded.length}/${selected.length} files Cloudinary-ல் save ஆச்சு.
+
+${failures[0]}`);
+      } else {
+        Alert.alert('✅ Upload ஆச்சு', `${uploaded.length} file(s) Projects folder-ல் Cloudinary-ல் save ஆச்சு.`);
+      }
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -979,7 +1047,11 @@ export default function GalleryScreen() {
           <View style={s.actionRow}>
             <TouchableOpacity
               style={[s.uploadBtn, albumKey === 'icons' && { backgroundColor: '#FF6B35' }]}
-              onPress={albumKey === 'icons' ? pickIconWithCrop : openFolderBrowser}
+              onPress={albumKey === 'icons'
+                ? pickIconWithCrop
+                : albumKey === 'projects'
+                ? pickProjectDocuments
+                : openFolderBrowser}
               disabled={uploading || backingUp}
             >
               <Text style={s.uploadBtnTxt}>
