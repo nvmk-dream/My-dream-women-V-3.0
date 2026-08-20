@@ -291,13 +291,29 @@ export async function uploadUriToCloudinary(
   onProgress?: (progress: number) => void,
 ): Promise<{ url: string; public_id: string; width?: number; height?: number }> {
   const isVideo = mimeType.startsWith('video');
-  const isRaw = mimeType === 'application/zip' || /\.zip(?:\?|$)/i.test(uri);
+  const isRaw = mimeType === 'application/zip'
+    || mimeType === 'application/x-zip-compressed'
+    || mimeType === 'application/pdf'
+    || mimeType === 'text/plain'
+    || mimeType.includes('msword')
+    || mimeType.includes('wordprocessingml')
+    || mimeType.includes('ms-excel')
+    || mimeType.includes('spreadsheetml')
+    || mimeType.includes('ms-powerpoint')
+    || mimeType.includes('presentationml')
+    || /\.(zip|pdf|docx?|xlsx?|pptx?|txt)(?:\?|$)/i.test(uri);
   const endpoint = isRaw
     ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/raw/upload`
     : isVideo
     ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`
     : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
-  const ext = isRaw ? 'zip' : isVideo ? 'mp4' : 'jpg';
+  const ext = isRaw
+    ? mimeType === 'application/pdf' ? 'pdf'
+      : mimeType.includes('word') ? 'docx'
+      : mimeType.includes('excel') || mimeType.includes('spreadsheet') ? 'xlsx'
+      : mimeType.includes('powerpoint') || mimeType.includes('presentation') ? 'pptx'
+      : mimeType === 'text/plain' ? 'txt' : 'zip'
+    : isVideo ? 'mp4' : 'jpg';
 
   // Primary: legacy uploadAsync — best for content:// URIs on Android
   try {
