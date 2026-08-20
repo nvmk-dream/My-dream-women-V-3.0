@@ -38,13 +38,17 @@ class BackupUploadService : Service() {
     when (intent?.action) {
       ACTION_CANCEL -> {
         stopRequested.set(true)
-        loadState()?.apply {
-          put("status", "paused")
-          put("error", "Upload paused by user")
-        }?.also {
-          updateState(it)
-          notifyState(it)
-        }
+        // User cancellation is permanent: clear the saved resumable upload state.
+        // The next backup must always start as a fresh upload, never resume this job.
+        val cancelled = loadState() ?: JSONObject()
+        cancelled.put("status", "cancelled")
+        cancelled.put("error", "Upload cancelled by user")
+        sendBroadcast(
+          Intent(ACTION_STATE)
+            .setPackage(packageName)
+            .putExtra(EXTRA_STATE_JSON, cancelled.toString()),
+        )
+        clearState(this, deleteFile = true)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         return START_NOT_STICKY
