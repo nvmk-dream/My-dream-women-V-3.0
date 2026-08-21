@@ -81,6 +81,7 @@ export default function GalleryScreen() {
   const [uploading, setUploading]           = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal]       = useState(0);
+  const [backupFileUploadProgress, setBackupFileUploadProgress] = useState<number | null>(null);
   const [backingUp, setBackingUp]           = useState(false);
   const [backupStep, setBackupStep]         = useState('');
   const [backupZipReady, setBackupZipReady] = useState(false);
@@ -272,6 +273,12 @@ export default function GalleryScreen() {
       ? `my-girls/storage/${albumKey}/${currentFolder.id}`
       : `my-girls/storage/${albumKey}`;
     const selected = result.assets;
+    const isBackupZip = selected.length === 1 && (
+      selected[0].mimeType === 'application/zip'
+      || selected[0].mimeType === 'application/x-zip-compressed'
+      || /\.zip$/i.test(selected[0].name || '')
+    );
+    setBackupFileUploadProgress(isBackupZip ? 0 : null);
     setUploading(true);
     setUploadProgress(0);
     setUploadTotal(selected.length);
@@ -282,7 +289,12 @@ export default function GalleryScreen() {
         const asset = selected[i];
         const mimeType = asset.mimeType || 'application/octet-stream';
         try {
-          const data = await uploadUriToCloudinary(asset.uri, mimeType, folder);
+          const data = await uploadUriToCloudinary(
+            asset.uri,
+            mimeType,
+            folder,
+            isBackupZip ? (progress) => setBackupFileUploadProgress(progress) : undefined,
+          );
           uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/') });
           trackCloudinaryUpload(folder, data.public_id, data.url).catch(() => {});
         } catch (error: any) {
@@ -300,16 +312,31 @@ export default function GalleryScreen() {
         setFiles(updated);
       }
       if (failures.length) {
-        Alert.alert('⚠️ Partial Upload', `${uploaded.length}/${selected.length} files Cloudinary-ல் save ஆச்சு.
-
-${failures[0]}`);
+        if (isBackupZip) {
+          setBackupFileUploadProgress(null);
+          Alert.alert(
+            'Backup failed',
+            failures[0],
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Retry', onPress: () => setTimeout(() => pickProjectDocuments(), 0) },
+            ],
+          );
+        } else {
+          Alert.alert('⚠️ Partial Upload', `${uploaded.length}/${selected.length} files Cloudinary-ல் save ஆச்சு.\n\n${failures[0]}`);
+        }
       } else {
+        if (isBackupZip) {
+          setBackupFileUploadProgress(100);
+          await new Promise(resolve => setTimeout(resolve, 350));
+        }
         Alert.alert('✅ Upload ஆச்சு', `${uploaded.length} file(s) Projects folder-ல் Cloudinary-ல் save ஆச்சு.`);
       }
     } finally {
       setUploading(false);
       setUploadProgress(0);
       setUploadTotal(0);
+      if (isBackupZip) setBackupFileUploadProgress(null);
     }
   };
 
@@ -1007,8 +1034,19 @@ ${failures[0]}`);
       {/* Upload progress */}
       {uploading && (
         <View style={s.uploadBar}>
-          <ActivityIndicator color="#fff" size="small" />
-          <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
+          {backupFileUploadProgress !== null ? (
+            <>
+              <Text style={s.uploadBarTxt}>📦 Backup Uploading... {backupFileUploadProgress}%</Text>
+              <View style={s.backupFileBarBg}>
+                <View style={[s.backupFileBarFill, { width: `${backupFileUploadProgress}%` as any }]} />
+              </View>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
+            </>
+          )}
         </View>
       )}
       {backingUp && (
@@ -1365,6 +1403,8 @@ const s = StyleSheet.create({
   doneBtnTxt:     { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   uploadBar:      { flexDirection: 'row', backgroundColor: '#1565C0', padding: 10, gap: 10, alignItems: 'center' },
   uploadBarTxt:   { color: '#fff', fontSize: 14 },
+  backupFileBarBg: { height: 6, flex: 1, minWidth: 90, marginLeft: 8, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
+  backupFileBarFill: { height: '100%', borderRadius: 3, backgroundColor: '#7CFFB2' },
   backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: '#f3f3f3', borderRadius: 18, borderWidth: 1, borderColor: '#ddd' },
   backupProgressTitle: { color: '#222', fontSize: 16, fontWeight: '700', marginBottom: 12 },
   backupProgressRow: { color: '#222', fontSize: 14, marginBottom: 7 },
