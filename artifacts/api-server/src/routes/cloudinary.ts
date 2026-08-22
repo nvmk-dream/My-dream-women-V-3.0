@@ -156,57 +156,71 @@ router.post("/cloudinary/upload", async (req, res) => {
 });
 
 router.get("/cloudinary/list", async (req, res) => {
-  try {
-    const folder = (req.query["folder"] as string) || "my-girls";
-    const cl = cfg();
-
-    // Primary: Cloudinary meta track store — survives Render redeploy + app reinstall
-    const tracked = await getTracked(folder, cl);
-    if (tracked.length > 0) {
-      const images = tracked.map(t => ({ url: t.url, public_id: t.public_id, created_at: t.created_at }));
-      res.json({ images, source: "track" });
-      // Background: once per server-session, sync Admin API to catch photos uploaded
-      // while server was sleeping (fire-and-forget — does not delay response)
-      backgroundSyncFolder(folder, cl).catch(() => {});
-      return;
-    }
-
-    // Fallback: Admin API (3 methods)
-    let resources: any[] = [];
     try {
-      const r1 = await (cl.api as any).resources_by_asset_folder(folder, { max_results: 50, resource_type: "image" });
-      if (r1?.resources?.length) resources = r1.resources;
-    } catch {}
-    if (resources.length === 0) {
-      try {
-        const r2 = await cl.api.resources({ type: "upload", resource_type: "image", prefix: folder + "/", max_results: 50 });
-        if (r2?.resources?.length) resources = r2.resources;
-      } catch {}
-    }
-    // NOTE: a 3rd fallback using `resources({ asset_folder: folder })` used to exist here.
-    // Cloudinary's generic resources() endpoint silently ignores an `asset_folder` filter,
-    // so it returned unfiltered account-wide results — causing every empty folder to show
-    // random photos from OTHER folders. Removed; if methods 1+2 find nothing, the folder
-    // is genuinely empty.
-    const images = resources.map((r: any) => ({
-      url: r.secure_url, public_id: r.public_id,
-      width: r.width, height: r.height, created_at: r.created_at,
-    }));
-    // Write-through: save Admin API results to track store so future reads don't need Admin API
-    if (images.length > 0) {
-      const entries: TrackEntry[] = images.map(i => ({
-        url: i.url, public_id: i.public_id,
-        created_at: i.created_at || new Date().toISOString(),
-      }));
-      saveTracked(folder, entries, cl).catch(() => {});
-    }
-    res.json({ images, source: "admin_api" });
-  } catch (err: any) {
-    req.log.error({ err }, "Cloudinary list failed");
-    res.status(500).json({ error: err?.message || "List failed" });
-  }
-});
+      const folder = (req.query["folder"] as string) || "my-girls";
+      const cl = cfg();
+      const resources: any[] = [];
 
+      // Keep tracked uploads as a fast/offline-safe source, then reconcile with
+      // Cloudinary Admin API for both image and raw resource types.
+      const tracked = await getTracked(folder, cl);
+      for (const item of tracked) {
+        resources.push({
+          secure_url: item.url,
+          public_id: item.public_id,
+          created_at: item.created_at,
+          resource_type: item.resource_type || "image",
+        });
+      }
+
+      for (const resource_type of ["image", "raw"] as const) {
+        let found: any[] = [];
+        try {
+          const r = await (cl.api as any).resources_by_asset_folder(folder, {
+            max_results: 100,
+            resource_type,
+          });
+          if (r?.resources?.length) found = r.resources;
+        } catch {}
+        if (found.length === 0) {
+          try {
+            const r = await cl.api.resources({
+              type: "upload",
+              resource_type,
+              prefix: folder.endsWith("/") ? folder : folder + "/",
+              max_results: 100,
+            });
+            if (r?.resources?.length) found = r.resources;
+          } catch {}
+        }
+        resources.push(...found);
+      }
+
+      const unique = new Map<string, any>();
+      for (const r of resources) {
+        if (!r?.public_id || !r?.secure_url) continue;
+        const resource_type = r.resource_type || "image";
+        unique.set(resource_type + ":" + r.public_id, r);
+      }
+      const images = Array.from(unique.values())
+        .map((r: any) => ({
+          url: r.secure_url || r.url,
+          public_id: r.public_id,
+          width: r.width,
+          height: r.height,
+          created_at: r.created_at,
+          resource_type: r.resource_type || "image",
+          format: r.format,
+          bytes: r.bytes,
+          fileName: r.original_filename || String(r.public_id).split("/").pop(),
+        }))
+        .sort((a: any, b: any) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+      res.json({ images, source: "cloudinary_image_and_raw" });
+    } catch (err: any) {
+      req.log.error({ err }, "Cloudinary list failed");
+      res.status(500).json({ error: err?.message || "List failed" });
+    }
+    });
 
 // Lists ZIP/raw project backups separately from image assets.
 // Project Gallery uses the image list endpoint, so raw ZIPs need their own
