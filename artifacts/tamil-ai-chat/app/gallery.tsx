@@ -20,7 +20,7 @@ const { width } = Dimensions.get('window');
 const COLS = 3;
 const THUMB = (width - (COLS + 1) * 2) / COLS;
 
-interface CloudFile { url: string; public_id: string; isVideo?: boolean }
+interface CloudFile { url: string; public_id: string; isVideo?: boolean; isRaw?: boolean; resource_type?: string; format?: string; fileName?: string; bytes?: number }
 
 type PendingBackup = {
   zipPath: string;
@@ -171,9 +171,13 @@ export default function GalleryScreen() {
           : `my-girls/storage/${albumKey}`;
         const cloud = await listCloudinaryImages(folder);
         if (cloud.length > 0) {
-          const cloudIds = new Set(cloud.map(p => p.public_id));
-          const merged = [...cloud, ...local.filter(p => !cloudIds.has(p.public_id))];
-          setFiles(merged);
+          const cloudFiles: CloudFile[] = cloud.map((p: any) => ({
+            url: p.url, public_id: p.public_id,
+            isRaw: p.resource_type === 'raw', isVideo: p.resource_type === 'video',
+            resource_type: p.resource_type, format: p.format, fileName: p.fileName, bytes: p.bytes,
+          }));
+          const cloudIds = new Set(cloudFiles.map(p => p.public_id));
+          const merged = [...cloudFiles, ...local.filter(p => !cloudIds.has(p.public_id))];
           await AsyncStorage.setItem(key, JSON.stringify(merged));
         }
       } catch {}
@@ -295,7 +299,7 @@ export default function GalleryScreen() {
             folder,
             isBackupZip ? (progress) => setBackupFileUploadProgress(progress) : undefined,
           );
-          uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/') });
+          uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/'), isRaw: !mimeType.startsWith('image/') && !mimeType.startsWith('video/'), format: mimeType.split('/').pop(), fileName: asset.name });
           trackCloudinaryUpload(folder, data.public_id, data.url).catch(() => {});
         } catch (error: any) {
           failures.push(`${asset.name || 'file'}: ${error?.message || 'upload failed'}`);
@@ -1173,7 +1177,9 @@ export default function GalleryScreen() {
                   onPress={() => cloudSelMode ? setCloudSelIds(prev => { const n = new Set(prev); n.has(file.public_id) ? n.delete(file.public_id) : n.add(file.public_id); return n; }) : setFullView(file)}
                   onLongPress={() => { setCloudSelMode(true); setCloudSelIds(new Set([file.public_id])); }}
                   activeOpacity={0.85}>
-                  {file.isVideo
+                  {file.isRaw
+                    ? <View style={[s.thumbImg, { backgroundColor: '#20233a', alignItems: 'center', justifyContent: 'center', padding: 6 }]}><Text style={{ color: '#f6c453', fontWeight: '800', fontSize: 18 }}>{(file.format || file.fileName?.split('.').pop() || 'FILE').toUpperCase().slice(0, 5)}</Text><Text style={{ color: '#aaa', fontSize: 9, marginTop: 4 }}>RAW FILE</Text></View>
+                    : file.isVideo
                     ? <View style={[s.thumbImg, s.videoThumb]}><Text style={s.videoPlay}>▶</Text></View>
                     : <Image source={{ uri: file.url }} style={s.thumbImg} resizeMode="cover" />}
                   {isSel && <View style={s.checkOverlay}><Text style={s.checkTxt}>✓</Text></View>}
@@ -1364,7 +1370,9 @@ export default function GalleryScreen() {
             <TouchableOpacity style={s.previewClose} onPress={() => setFullView(null)}>
               <Text style={s.previewCloseTxt}>✕</Text>
             </TouchableOpacity>
-            {fullView.isVideo
+            {fullView.isRaw
+              ? <View style={{ alignItems: 'center', padding: 24 }}><Text style={{ fontSize: 64 }}>📄</Text><Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 14, textAlign: 'center' }}>{fullView.fileName || fullView.public_id.split('/').pop()}</Text><TouchableOpacity style={{ backgroundColor: '#6C63FF', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12, marginTop: 18 }} onPress={() => Linking.openURL(fullView.url).catch(() => Alert.alert('Download error', 'File open ஆகவில்லை'))}><Text style={{ color: '#fff', fontWeight: '700' }}>Open / Download</Text></TouchableOpacity></View>
+              : fullView.isVideo
               ? <View style={s.videoPreview}><Text style={{ fontSize: 64 }}>▶</Text></View>
               : <Image source={{ uri: fullView.url }} style={s.previewImg} resizeMode="contain" />}
           </View>
