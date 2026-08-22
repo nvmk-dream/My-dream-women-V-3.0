@@ -169,7 +169,7 @@ router.get("/cloudinary/list", async (req, res) => {
           secure_url: item.url,
           public_id: item.public_id,
           created_at: item.created_at,
-          resource_type: item.resource_type || "image",
+          resource_type: String(item.url).includes("/raw/upload/") ? "raw" : "image",
         });
       }
 
