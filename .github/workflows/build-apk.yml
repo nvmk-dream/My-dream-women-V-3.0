@@ -240,10 +240,16 @@ jobs:
       - name: Trigger Render Redeploy
         run: |
           echo "Triggering Render API server redeploy..."
-          RESP=$(curl -s -o /tmp/render_resp.json -w "%{http_code}" \
+          set +e
+          RESP=$(curl --silent --show-error --location --retry 2 --retry-delay 5 -o /tmp/render_resp.json -w "%{http_code}" \
             "https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}")
-          echo "Render deploy status: $RESP"
+          CURL_EXIT=$?
+          echo "Render deploy status: $RESP (curl exit: $CURL_EXIT)"
           cat /tmp/render_resp.json || true
+          if [ "$CURL_EXIT" -ne 0 ] || [ "$RESP" -lt 200 ] || [ "$RESP" -ge 300 ]; then
+            echo "Render deploy trigger failed — check GitHub RENDER_KEY secret and Render deploy hook"
+            exit 1
+          fi
           echo "Render redeploy triggered — server will update in ~2 min"
 
       - name: Upload build log on failure
