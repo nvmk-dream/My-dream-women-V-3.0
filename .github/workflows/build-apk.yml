@@ -241,8 +241,13 @@ jobs:
         run: |
           echo "Triggering Render API server redeploy..."
           set +e
+          if [[ "${{ secrets.RENDER_KEY }}" == https://* ]]; then
+            RENDER_HOOK="${{ secrets.RENDER_KEY }}"
+          else
+            RENDER_HOOK="https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}"
+          fi
           RESP=$(curl --silent --show-error --location --retry 2 --retry-delay 5 -o /tmp/render_resp.json -w "%{http_code}" \
-            "https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}")
+            "$RENDER_HOOK")
           CURL_EXIT=$?
           echo "Render deploy status: $RESP (curl exit: $CURL_EXIT)"
           cat /tmp/render_resp.json || true
