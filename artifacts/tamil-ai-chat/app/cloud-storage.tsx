@@ -17,7 +17,8 @@ const THUMB = (width - 6) / 3;
 const LOCAL_KEY = 'my_girls_cloud_images';
 const LOCAL_VIDEO_KEY = 'my_girls_cloud_videos';
 const LOCAL_ZIP_KEY = 'my_girls_cloud_zips';
-const ZIP_FOLDER = 'my-girls/storage/projects/Backup';
+// Search the whole Projects tree so Apk zip and other sub-folders appear.
+const ZIP_FOLDER = 'my-girls/storage/projects';
 
 export interface CloudImage {
   url: string;
@@ -288,7 +289,7 @@ export default function CloudStorageScreen() {
       const updated = [zip, ...zipFiles.filter(z => z.public_id !== zip.public_id)];
       setZipFiles(updated);
       await AsyncStorage.setItem(LOCAL_ZIP_KEY, JSON.stringify(updated));
-      Alert.alert('✅ ZIP Upload ஆச்சு!', 'Backup folder-ல் save ஆனது.\n\n' + zip.fileName);
+      Alert.alert('✅ ZIP Upload ஆச்சு!', 'Projects folder-ல் save ஆனது.\n\n' + zip.fileName);
     } catch (e: any) {
       Alert.alert('ZIP Upload பிழை', e?.message || 'ZIP upload முடியல. மீண்டும் try பண்ணுங்க');
     } finally {
@@ -717,7 +718,7 @@ export default function CloudStorageScreen() {
         ) : activeCategory === 'zips' ? (
           <View style={styles.appIconSection}>
             <View style={styles.appIconHeader}>
-              <View><Text style={styles.appIconTitle}>🗜️ Project ZIP Files</Text><Text style={styles.appIconSub}>Cloudinary: {ZIP_FOLDER}/</Text></View>
+              <View><Text style={styles.appIconTitle}>🗜️ Project ZIP Files</Text><Text style={styles.appIconSub}>Cloudinary: {ZIP_FOLDER}/ (including sub-folders)</Text></View>
               <TouchableOpacity style={[styles.appIconUploadBtn, uploadingZip && { opacity: 0.6 }]} onPress={uploadZip} disabled={uploadingZip}>
                 {uploadingZip ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.appIconUploadTxt}>📤 Upload ZIP</Text>}
               </TouchableOpacity>
