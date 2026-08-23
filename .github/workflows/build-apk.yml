@@ -239,12 +239,13 @@ jobs:
 
       - name: Trigger Render Redeploy
         run: |
-          echo "Triggering Render API server redeploy..."
-          set +e
-          if [[ "${{ secrets.RENDER_KEY }}" == https://* ]]; then
-            RENDER_HOOK="${{ secrets.RENDER_KEY }}"
-          else
+          if [[ -n "${{ secrets.RENDER_HOOK }}" ]]; then
+            RENDER_HOOK="${{ secrets.RENDER_HOOK }}"
+          elif [[ -n "${{ secrets.RENDER_KEY }}" ]]; then
             RENDER_HOOK="https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}"
+          else
+            echo "No Render deploy hook configured"
+            exit 1
           fi
           RESP=$(curl --silent --show-error --location --retry 2 --retry-delay 5 -o /tmp/render_resp.json -w "%{http_code}" \
             "$RENDER_HOOK")
@@ -252,7 +253,7 @@ jobs:
           echo "Render deploy status: $RESP (curl exit: $CURL_EXIT)"
           cat /tmp/render_resp.json || true
           if [ "$CURL_EXIT" -ne 0 ] || [ "$RESP" -lt 200 ] || [ "$RESP" -ge 300 ]; then
-            echo "Render deploy trigger failed — check GitHub RENDER_KEY secret and Render deploy hook"
+            echo "Render deploy trigger failed — check GitHub RENDER_HOOK/RENDER_KEY and Render deploy hook"
             exit 1
           fi
           echo "Render redeploy triggered — server will update in ~2 min"
