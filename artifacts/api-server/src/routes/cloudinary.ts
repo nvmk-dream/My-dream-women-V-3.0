@@ -227,35 +227,43 @@ router.get("/cloudinary/list", async (req, res) => {
 // resource_type=raw query to remain visible after a successful upload.
 router.get("/cloudinary/backups", async (req, res) => {
   try {
-    const folder = (req.query["folder"] as string) || "my-girls/storage/projects/Backup";
+    // Prefix matching is recursive in Cloudinary, so this includes files in
+    // Projects/Apk zip and any other Projects sub-folder.
+    const folder = (req.query["folder"] as string) || "my-girls/storage/projects";
     const prefix = folder.endsWith("/") ? folder : `${folder}/`;
     const cl = cfg();
-    const result = await cl.api.resources({
-      type: "upload",
-      resource_type: "raw",
-      prefix,
-      max_results: 100,
-    });
-    const backups = (result.resources || [])
-      .filter((r: any) => {
-        const format = String(r.format || "").toLowerCase();
-        const id = String(r.public_id || "").toLowerCase();
-        const url = String(r.secure_url || "").toLowerCase();
-        return format === "zip" || id.endsWith(".zip") || url.endsWith(".zip");
-      })
+    const resources: any[] = [];
+    for (const resource_type of ["raw", "image"] as const) {
+      try {
+        const result = await cl.api.resources({
+          type: "upload",
+          resource_type,
+          prefix,
+          max_results: 500,
+        });
+        resources.push(...(result.resources || []));
+      } catch (err) {
+        req.log.warn({ err, resource_type, folder }, "Cloudinary project resource list failed");
+      }
+    }
+    const backups = resources
+      .filter((r: any) => r?.public_id && (r.secure_url || r.url))
       .map((r: any) => ({
         url: r.secure_url || r.url,
         public_id: r.public_id,
-        fileName: String(r.public_id || "").split("/").pop() || "backup.zip",
+        fileName: String(r.public_id).startsWith(prefix)
+          ? String(r.public_id).slice(prefix.length)
+          : String(r.public_id).split("/").pop() || "project-file",
         created_at: r.created_at,
         bytes: r.bytes,
-        format: r.format || "zip",
+        format: r.format || (r.resource_type === "raw" ? "file" : "image"),
+        resource_type: r.resource_type || "image",
       }))
       .sort((a: any, b: any) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
     return res.json({ backups });
   } catch (err: any) {
-    req.log.error({ err }, "Cloudinary backups list failed");
-    return res.status(500).json({ error: err?.message || "Backups list failed" });
+    req.log.error({ err }, "Cloudinary project files list failed");
+    return res.status(500).json({ error: err?.message || "Project files list failed" });
   }
 });
 
