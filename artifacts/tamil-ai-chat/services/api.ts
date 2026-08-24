@@ -462,6 +462,68 @@ export interface CloudinaryBackup {
   format?: string;
 }
 
+export interface GoogleDriveBackup {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  modifiedTime?: string | null;
+  webViewLink: string;
+  webContentLink?: string | null;
+}
+
+export async function listGoogleDriveBackups(): Promise<GoogleDriveBackup[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${REPLIT_API}/api/google-drive/backups`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Google Drive: HTTP ${res.status}`);
+    const data = await res.json() as { files?: GoogleDriveBackup[] };
+    return Array.isArray(data.files) ? data.files : [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function uploadBackupToGoogleDrive(
+  uri: string,
+  fileName: string,
+  onProgress?: (progress: number) => void,
+): Promise<GoogleDriveBackup> {
+  try {
+    const Legacy = await import('expo-file-system/legacy');
+    const task = Legacy.createUploadTask(
+      `${REPLIT_API}/api/google-drive/backups`,
+      uri,
+      {
+        httpMethod: 'POST',
+        uploadType: Legacy.FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType: 'application/zip',
+        parameters: { fileName },
+      },
+      progress => {
+        const expected = progress.totalBytesExpectedToSend;
+        if (expected > 0) {
+          onProgress?.(Math.min(100, Math.round((progress.totalBytesSent / expected) * 100)));
+        }
+      },
+    );
+    const response = await task.uploadAsync();
+    if (!response) throw new Error('Google Drive upload cancelled');
+    if (response.status < 200 || response.status >= 300) {
+      let message = `Google Drive upload: HTTP ${response.status}`;
+      try { message = (JSON.parse(response.body) as { error?: string }).error || message; } catch {}
+      throw new Error(message);
+    }
+    onProgress?.(100);
+    return JSON.parse(response.body) as GoogleDriveBackup;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error('Google Drive upload failed');
+  }
+}
+
 export async function listCloudinaryBackups(
   folder: string = 'my-girls/storage/projects',
 ): Promise<CloudinaryBackup[]> {

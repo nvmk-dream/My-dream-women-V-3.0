@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -92,6 +92,9 @@ export default function GalleryScreen() {
   const [backupZipReady, setBackupZipReady] = useState(false);
   const [backupUploadProgress, setBackupUploadProgress] = useState(0);
   const [backups, setBackups] = useState<CloudinaryBackup[]>([]);
+  const [driveBackups, setDriveBackups] = useState<GoogleDriveBackup[]>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveError, setDriveError] = useState('');
   const pendingBackupRef = React.useRef<PendingBackup | null>(null);
   const lastBackupNoticeRef = React.useRef('');
   const finalizingBackupRef = React.useRef<string | null>(null);
@@ -154,8 +157,18 @@ export default function GalleryScreen() {
 
   const loadProjectBackups = useCallback(async () => {
     if (albumKey !== 'projects' || depth !== 0) return;
-    const listed = await listCloudinaryBackups().catch(() => []);
-    setBackups(listed);
+    setDriveLoading(true);
+    const [cloudinary, drive] = await Promise.all([
+      listCloudinaryBackups().catch(() => []),
+      listGoogleDriveBackups().then(files => ({ files, error: '' })).catch(error => ({
+        files: [] as GoogleDriveBackup[],
+        error: error instanceof Error ? error.message : 'Google Drive load failed',
+      })),
+    ]);
+    setBackups(cloudinary);
+    setDriveBackups(drive.files);
+    setDriveError(drive.error);
+    setDriveLoading(false);
   }, [albumKey, depth]);
 
   useEffect(() => {
@@ -635,13 +648,24 @@ export default function GalleryScreen() {
         { ...record, created_at: String(record.backupDate || new Date().toISOString()), bytes: pending.sizeBytes },
         ...prev.filter(item => item.public_id !== uploaded.public_id),
       ]);
+      let driveSaved = false;
+      try {
+        setBackupStep('Uploading backup to Google Drive...');
+        const driveFile = await uploadBackupToGoogleDrive(pending.zipPath, pending.outputName, setBackupUploadProgress);
+        setDriveBackups(prev => [driveFile, ...prev.filter(file => file.id !== driveFile.id)]);
+        setDriveError('');
+        driveSaved = true;
+      } catch (driveError) {
+        setDriveError(driveError instanceof Error ? driveError.message : 'Google Drive upload failed');
+      }
       await clearBackupUploadState(true);
       pendingBackupRef.current = null;
       lastBackupNoticeRef.current = '';
       setBackupStep('Backup completed');
       Alert.alert(
         '✅ Backup completed',
-        `${pending.outputName}\n\nAPK + Projects data + ${String(pending.backupInfo['mediaCount'] ?? 0)} media file(s) Cloudinary-ல் save ஆச்சு.`,
+        `${pending.outputName}\n\nAPK + Projects data + ${String(pending.backupInfo['mediaCount'] ?? 0)} media file(s) Cloudinary-ல் save ஆச்சு.` +
+        (driveSaved ? '\nGoogle Drive-லும் save ஆச்சு.' : '\nGoogle Drive upload ஆகவில்லை; Cloudinary backup பாதுகாப்பாக உள்ளது.'),
       );
     } catch (error) {
       showBackupFailure(error);
@@ -1142,10 +1166,10 @@ export default function GalleryScreen() {
           </View>
         )}
 
-        {albumKey === 'projects' && depth === 0 && backups.length > 0 && (
+        {albumKey === 'projects' && depth === 0 && (
           <View style={s.backupsSection}>
             <View style={s.backupsHeader}>
-              <Text style={s.backupsTitle}>☁️ Backup files</Text>
+              <Text style={s.backupsTitle}>☁️ Cloudinary backups</Text>
               <Text style={s.backupsCount}>{backups.length}</Text>
             </View>
             {backups.map(backup => {
@@ -1166,6 +1190,42 @@ export default function GalleryScreen() {
                     <Text style={s.backupFileMeta}>{date ? new Date(date).toLocaleString('en-IN') : 'Cloudinary backup'} · {sizeText}</Text>
                   </View>
                   <Text style={s.backupDownload}>↓</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {albumKey === 'projects' && depth === 0 && (
+          <View style={s.driveSection}>
+            <View style={s.backupsHeader}>
+              <Text style={s.backupsTitle}>📁 Google Drive backups</Text>
+              <Text style={s.backupsCount}>{driveBackups.length}</Text>
+            </View>
+            {driveLoading && <ActivityIndicator color="#60a5fa" size="small" />}
+            {!driveLoading && driveBackups.length === 0 && (
+              <Text style={s.driveHint}>
+                {driveError || 'இந்த folder-ல் APK backup files இன்னும் இல்லை.'}
+              </Text>
+            )}
+            {driveBackups.map(file => {
+              const sizeText = file.sizeBytes > 0
+                ? `${(file.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                : 'Drive file';
+              return (
+                <TouchableOpacity
+                  key={file.id}
+                  style={s.backupFileRow}
+                  onPress={() => Linking.openURL(file.webViewLink).catch(() => Alert.alert('Open error', 'Google Drive file திறக்கவில்லை'))}
+                >
+                  <Text style={s.driveFileIcon}>DRIVE</Text>
+                  <View style={s.backupFileInfo}>
+                    <Text style={s.backupFileName} numberOfLines={1}>{file.name}</Text>
+                    <Text style={s.backupFileMeta}>
+                      {file.modifiedTime ? new Date(file.modifiedTime).toLocaleString('en-IN') : 'Google Drive'} · {sizeText}
+                    </Text>
+                  </View>
+                  <Text style={s.backupDownload}>↗</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1443,15 +1503,18 @@ const s = StyleSheet.create({
   backupCancelBtn: { marginTop: 12, backgroundColor: '#7f1d1d', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   backupCancelTxt: { color: '#fecaca', fontSize: 13, fontWeight: '800' },
   backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#1a2340', borderRadius: 14 },
+  driveSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#10243d', borderRadius: 14, borderWidth: 1, borderColor: '#245a91' },
   backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backupsTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   backupsCount: { color: '#FFD700', fontWeight: '800' },
   backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 10, padding: 10, marginTop: 7 },
   backupFileIcon: { color: '#FFD700', fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: '#FFD700', borderRadius: 5, padding: 5, marginRight: 10 },
+  driveFileIcon: { color: '#60a5fa', fontSize: 9, fontWeight: '900', borderWidth: 1, borderColor: '#60a5fa', borderRadius: 5, padding: 5, marginRight: 10 },
   backupFileInfo: { flex: 1 },
   backupFileName: { color: '#fff', fontSize: 13, fontWeight: '700' },
   backupFileMeta: { color: '#9ca3af', fontSize: 10, marginTop: 3 },
   backupDownload: { color: '#60a5fa', fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
+  driveHint: { color: '#9ca3af', fontSize: 12, lineHeight: 18, marginTop: 4 },
   selBar:         { flexDirection: 'row', backgroundColor: '#333', padding: 10, alignItems: 'center', gap: 12 },
   selCount:       { color: '#fff', fontSize: 14, flex: 1 },
   selDelBtn:      { backgroundColor: '#c62828', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },

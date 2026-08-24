@@ -12,6 +12,7 @@ import analyzeFileRouter from "./analyze-file";
 import mediaChatRouter from "./media-chat";
 import appConfigRouter from "./app-config";
 import avatarProfileRouter from "./avatar-profile";
+import googleDriveRouter from "./google-drive";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(analyzeFileRouter);
 router.use(mediaChatRouter);
 router.use(appConfigRouter);
 router.use(avatarProfileRouter);
+router.use(googleDriveRouter);
 
 // Temporary backup download route
 router.get("/download/backup", (_req, res) => {
