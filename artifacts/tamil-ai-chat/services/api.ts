@@ -472,6 +472,9 @@ export interface GoogleDriveBackup {
   webContentLink?: string | null;
 }
 
+export const GOOGLE_DRIVE_BACKUP_FOLDER_URL =
+  'https://drive.google.com/drive/folders/1xAuu-RB1v2fAR9-fCfVRXPikigILXss0';
+
 export async function listGoogleDriveBackups(): Promise<GoogleDriveBackup[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);

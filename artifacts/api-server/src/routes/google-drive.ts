@@ -9,7 +9,7 @@ const upload = multer({
   limits: { fileSize: 250 * 1024 * 1024 },
 });
 
-const DRIVE_FOLDER_ID = "1ikAYcKgLyJlm12EEX-gBg7KqiVsA9kbo";
+const DRIVE_FOLDER_ID = "1xAuu-RB1v2fAR9-fCfVRXPikigILXss0";
 
 function getDrive() {
   const raw = process.env["GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON"];
@@ -58,7 +58,11 @@ router.get("/google-drive/backups", async (_req, res) => {
         webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
         webContentLink: file.webContentLink || null,
       }));
-    return res.json({ files, folderId: DRIVE_FOLDER_ID });
+    return res.json({
+      files,
+      folderId: DRIVE_FOLDER_ID,
+      folderUrl: `https://drive.google.com/drive/folders/${DRIVE_FOLDER_ID}`,
+    });
   } catch (error) {
     return res.status(503).json({ error: safeDriveError(error) });
   }

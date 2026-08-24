@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -1200,8 +1200,11 @@ export default function GalleryScreen() {
           <View style={s.driveSection}>
             <View style={s.backupsHeader}>
               <Text style={s.backupsTitle}>📁 Google Drive backups</Text>
-              <Text style={s.backupsCount}>{driveBackups.length}</Text>
+              <TouchableOpacity onPress={() => Linking.openURL(GOOGLE_DRIVE_BACKUP_FOLDER_URL).catch(() => Alert.alert('Open error', 'Google Drive folder திறக்கவில்லை'))}>
+                <Text style={s.driveFolderLink}>Open folder ↗</Text>
+              </TouchableOpacity>
             </View>
+            <Text style={s.driveFolderPath}>APK backups இந்த Drive folder-ல் save ஆகும்</Text>
             {driveLoading && <ActivityIndicator color="#60a5fa" size="small" />}
             {!driveLoading && driveBackups.length === 0 && (
               <Text style={s.driveHint}>
@@ -1507,6 +1510,8 @@ const s = StyleSheet.create({
   backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backupsTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   backupsCount: { color: '#FFD700', fontWeight: '800' },
+  driveFolderLink: { color: '#60a5fa', fontSize: 12, fontWeight: '700' },
+  driveFolderPath: { color: '#93c5fd', fontSize: 11, marginBottom: 4 },
   backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 10, padding: 10, marginTop: 7 },
   backupFileIcon: { color: '#FFD700', fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: '#FFD700', borderRadius: 5, padding: 5, marginRight: 10 },
   driveFileIcon: { color: '#60a5fa', fontSize: 9, fontWeight: '900', borderWidth: 1, borderColor: '#60a5fa', borderRadius: 5, padding: 5, marginRight: 10 },
