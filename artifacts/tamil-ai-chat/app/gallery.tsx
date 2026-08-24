@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, type CloudinaryBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -47,6 +47,11 @@ const ALBUM_META: Record<string, { label: string; emoji: string; color: string; 
 function foldersKey(album: string)           { return `storage_folders_${album}`; }
 function filesKey(album: string, sub?: string) {
   return sub ? `storage_files_${album}_${sub}` : `storage_files_${album}`;
+}
+const PROJECTS_ROOT = 'my-girls/storage/projects';
+
+function cloudFolderFor(album: string, sub?: string) {
+  return sub ? `my-girls/storage/${album}/${sub}` : `my-girls/storage/${album}`;
 }
 
 export default function GalleryScreen() {
@@ -136,6 +141,13 @@ export default function GalleryScreen() {
     loadFolders();
   }, [albumKey]);
 
+  // Cloudinary does not keep an empty folder visible unless it contains an
+  // asset. Create the real Projects folder when this screen is first opened.
+  useEffect(() => {
+    if (albumKey !== 'projects') return;
+    createCloudinaryFolder(PROJECTS_ROOT).catch(() => {});
+  }, [albumKey]);
+
   useEffect(() => {
     if (depth === 0) loadCloudFiles(undefined);
   }, [depth, albumKey]);
@@ -166,16 +178,16 @@ export default function GalleryScreen() {
       const local: CloudFile[] = cached ? JSON.parse(cached) : [];
       if (local.length > 0) setFiles(local);
       try {
-        const folder = sub
-          ? `my-girls/storage/${albumKey}/${sub.id}`
-          : `my-girls/storage/${albumKey}`;
+        const folder = cloudFolderFor(albumKey, sub?.id);
         const cloud = await listCloudinaryImages(folder);
         if (cloud.length > 0) {
-          const cloudFiles: CloudFile[] = cloud.map((p: any) => ({
+          const cloudFiles: CloudFile[] = cloud
+            .filter((p: any) => !String(p.public_id || '').endsWith('/placeholder'))
+            .map((p: any) => ({
             url: p.url, public_id: p.public_id,
             isRaw: p.resource_type === 'raw', isVideo: p.resource_type === 'video',
             resource_type: p.resource_type, format: p.format, fileName: p.fileName, bytes: p.bytes,
-          }));
+            }));
           const cloudIds = new Set(cloudFiles.map(p => p.public_id));
           const merged = [...cloudFiles, ...local.filter(p => !cloudIds.has(p.public_id))];
           await AsyncStorage.setItem(key, JSON.stringify(merged));
@@ -657,7 +669,7 @@ export default function GalleryScreen() {
       outputName: pending.outputName,
       cloudName: CLOUDINARY_UPLOAD_CLOUD,
       uploadPreset: CLOUDINARY_UPLOAD_PRESET,
-      folder: 'my-girls/storage/projects/Backup',
+      folder: `${PROJECTS_ROOT}/Backup`,
       mimeType: 'application/zip',
       sizeBytes: pending.sizeBytes,
       backupInfoJson: JSON.stringify(pending.backupInfo),
@@ -986,13 +998,20 @@ export default function GalleryScreen() {
     const name = folderName.trim();
     if (!name) { Alert.alert('பிழை', 'Folder பெயர் உள்ளிடுங்க'); return; }
     const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+    const folderPath = cloudFolderFor(albumKey, id);
+    const cloudCreated = await createCloudinaryFolder(folderPath);
     const updated = [...subFolders, { id, label: name }];
     setSubFolders(updated);
     await AsyncStorage.setItem(foldersKey(albumKey), JSON.stringify(updated));
     setCloudinaryMeta(`gallery_folders_${albumKey}`, updated).catch(() => {}); // cloud backup
     setFolderDialog(false);
     setFolderName('');
-    Alert.alert('✅', `"${name}" folder உருவாக்கப்பட்டது!`);
+    Alert.alert(
+      cloudCreated ? '✅' : '⚠️ Folder saved locally',
+      cloudCreated
+        ? `"${name}" folder Cloudinary-ல் உருவாக்கப்பட்டது!`
+        : `"${name}" folder app-ல் save ஆச்சு, ஆனால் Cloudinary folder உருவாகவில்லை. Server credentials check பண்ணுங்க.`,
+    );
   };
 
   // ── Delete selected cloud files ──────────────────────────────────

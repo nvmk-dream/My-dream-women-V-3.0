@@ -463,7 +463,7 @@ export interface CloudinaryBackup {
 }
 
 export async function listCloudinaryBackups(
-  folder: string = 'my-girls/storage/projects/Backup',
+  folder: string = 'my-girls/storage/projects',
 ): Promise<CloudinaryBackup[]> {
   try {
     const controller = new AbortController();

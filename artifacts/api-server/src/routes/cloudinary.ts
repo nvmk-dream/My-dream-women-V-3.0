@@ -10,9 +10,9 @@ const syncedFolders = new Set<string>(); // folders already Admin-API-synced thi
 
 function cfg() {
   cloudinary.config({
-    cloud_name: process.env["CLOUDINARY_CLOUD_NAME"],
-    api_key:    process.env["API_KEY"] || process.env["CLOUDINARY_API_KEY"],
-    api_secret: process.env["API_SECRET"] || process.env["CLOUDINARY_API_SECRET"],
+    cloud_name: process.env["CLOUDINARY_CLOUD_NAME"] || "dazmrxsyc",
+    api_key:    process.env["API_KEY"] || process.env["CLOUDINARY_API_KEY"] || process.env["Cloudinary_abi_key"],
+    api_secret: process.env["API_SECRET"] || process.env["CLOUDINARY_API_SECRET"] || process.env["Cloudinary_secret"],
   });
   return cloudinary;
 }
@@ -247,7 +247,11 @@ router.get("/cloudinary/backups", async (req, res) => {
       }
     }
     const backups = resources
-      .filter((r: any) => r?.public_id && (r.secure_url || r.url))
+      .filter((r: any) =>
+        r?.public_id &&
+        !String(r.public_id).endsWith("/placeholder") &&
+        (r.secure_url || r.url)
+      )
       .map((r: any) => ({
         url: r.secure_url || r.url,
         public_id: r.public_id,
