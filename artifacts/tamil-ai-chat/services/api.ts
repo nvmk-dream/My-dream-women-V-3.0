@@ -488,9 +488,10 @@ export async function listGoogleDriveBackups(): Promise<GoogleDriveBackup[]> {
   }
 }
 
-export async function uploadBackupToGoogleDrive(
+export async function uploadFileToGoogleDrive(
   uri: string,
   fileName: string,
+  mimeType: string = 'application/octet-stream',
   onProgress?: (progress: number) => void,
 ): Promise<GoogleDriveBackup> {
   try {
@@ -502,7 +503,7 @@ export async function uploadBackupToGoogleDrive(
         httpMethod: 'POST',
         uploadType: Legacy.FileSystemUploadType.MULTIPART,
         fieldName: 'file',
-        mimeType: 'application/zip',
+        mimeType,
         parameters: { fileName },
       },
       progress => {
@@ -525,6 +526,14 @@ export async function uploadBackupToGoogleDrive(
     if (error instanceof Error) throw error;
     throw new Error('Google Drive upload failed');
   }
+}
+
+export async function uploadBackupToGoogleDrive(
+  uri: string,
+  fileName: string,
+  onProgress?: (progress: number) => void,
+): Promise<GoogleDriveBackup> {
+  return uploadFileToGoogleDrive(uri, fileName, 'application/zip', onProgress);
 }
 
 export async function listCloudinaryBackups(

@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadFileToGoogleDrive, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -318,20 +318,39 @@ export default function GalleryScreen() {
         const asset = selected[i];
         const mimeType = asset.mimeType || 'application/octet-stream';
         try {
-          const data = await uploadUriToCloudinary(
-            asset.uri,
-            mimeType,
-            folder,
-            isBackupZip ? (progress) => setBackupFileUploadProgress(progress) : undefined,
-          );
-          uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/'), isRaw: !mimeType.startsWith('image/') && !mimeType.startsWith('video/'), format: mimeType.split('/').pop(), fileName: asset.name });
-          trackCloudinaryUpload(folder, data.public_id, data.url).catch(() => {});
+          if (albumKey === 'projects') {
+            const driveFile = await uploadFileToGoogleDrive(
+              asset.uri,
+              asset.name || `project-file-${Date.now()}`,
+              mimeType,
+              isBackupZip ? (progress) => setBackupFileUploadProgress(progress) : undefined,
+            );
+            setDriveBackups(prev => [driveFile, ...prev.filter(file => file.id !== driveFile.id)]);
+            setDriveError('');
+          } else {
+            const data = await uploadUriToCloudinary(
+              asset.uri,
+              mimeType,
+              folder,
+              isBackupZip ? (progress) => setBackupFileUploadProgress(progress) : undefined,
+            );
+            uploaded.push({ url: data.url, public_id: data.public_id, isVideo: mimeType.startsWith('video/'), isRaw: !mimeType.startsWith('image/') && !mimeType.startsWith('video/'), format: mimeType.split('/').pop(), fileName: asset.name });
+            trackCloudinaryUpload(folder, data.public_id, data.url).catch(() => {});
+          }
         } catch (error: any) {
           failures.push(`${asset.name || 'file'}: ${error?.message || 'upload failed'}`);
         }
         setUploadProgress(i + 1);
       }
 
+      if (albumKey === 'projects') {
+        if (failures.length) {
+          Alert.alert('⚠️ Drive Upload', `${selected.length - failures.length}/${selected.length} file(s) Google Drive-ல் save ஆச்சு.\n\n${failures[0]}`);
+        } else {
+          Alert.alert('✅ Drive Upload', `${selected.length} file(s) Google Drive backup folder-ல் save ஆச்சு.`);
+        }
+        return;
+      }
       if (uploaded.length) {
         const key = filesKey(albumKey, currentFolder?.id);
         const existingRaw = await AsyncStorage.getItem(key).catch(() => null);
