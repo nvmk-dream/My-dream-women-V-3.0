@@ -475,14 +475,52 @@ export interface GoogleDriveBackup {
 export const GOOGLE_DRIVE_BACKUP_FOLDER_URL =
   'https://drive.google.com/drive/folders/1xAuu-RB1v2fAR9-fCfVRXPikigILXss0';
 
-export async function listGoogleDriveBackups(): Promise<GoogleDriveBackup[]> {
+export interface GoogleDriveStatus {
+  connected: boolean;
+  authMode?: 'oauth' | 'service-account';
+  accountEmail?: string | null;
+  folderId?: string;
+  folderName?: string;
+  canUpload?: boolean;
+  folderUrl?: string;
+  error?: string;
+}
+
+export async function getGoogleDriveStatus(): Promise<GoogleDriveStatus> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timeoutMs = 45000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${REPLIT_API}/api/google-drive/status`, { signal: controller.signal });
+    let data: GoogleDriveStatus = { connected: false };
+    try { data = await res.json() as GoogleDriveStatus; } catch {}
+    if (!res.ok) throw new Error(data.error || `Google Drive status: HTTP ${res.status}`);
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Render Google Drive status timed out after 45 seconds');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+export async function listGoogleDriveBackups(): Promise<GoogleDriveBackup[]> {
+  // Render may need time to refresh the OAuth token before listing Drive files.
+  const timeoutMs = 45000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${REPLIT_API}/api/google-drive/backups`, { signal: controller.signal });
-    if (!res.ok) throw new Error(`Google Drive: HTTP ${res.status}`);
-    const data = await res.json() as { files?: GoogleDriveBackup[] };
+    let data: { files?: GoogleDriveBackup[]; error?: string } = {};
+    try { data = await res.json() as typeof data; } catch {}
+    if (!res.ok) throw new Error(data.error || `Google Drive: HTTP ${res.status}`);
     return Array.isArray(data.files) ? data.files : [];
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Render Google Drive response timed out after 45 seconds');
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }
