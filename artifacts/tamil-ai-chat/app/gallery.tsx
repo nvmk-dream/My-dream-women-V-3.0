@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadFileToGoogleDrive, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, type CloudinaryBackup, type GoogleDriveBackup } from '../services/api';
+import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadFileToGoogleDrive, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, getGoogleDriveStatus, type CloudinaryBackup, type GoogleDriveBackup, type GoogleDriveStatus } from '../services/api';
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -95,6 +95,7 @@ export default function GalleryScreen() {
   const [driveBackups, setDriveBackups] = useState<GoogleDriveBackup[]>([]);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState('');
+  const [driveStatus, setDriveStatus] = useState<GoogleDriveStatus | null>(null);
   const pendingBackupRef = React.useRef<PendingBackup | null>(null);
   const lastBackupNoticeRef = React.useRef('');
   const finalizingBackupRef = React.useRef<string | null>(null);
@@ -158,16 +159,21 @@ export default function GalleryScreen() {
   const loadProjectBackups = useCallback(async () => {
     if (albumKey !== 'projects' || depth !== 0) return;
     setDriveLoading(true);
-    const [cloudinary, drive] = await Promise.all([
+    const [cloudinary, drive, status] = await Promise.all([
       listCloudinaryBackups().catch(() => []),
       listGoogleDriveBackups().then(files => ({ files, error: '' })).catch(error => ({
         files: [] as GoogleDriveBackup[],
         error: error instanceof Error ? error.message : 'Google Drive load failed',
       })),
+      getGoogleDriveStatus().catch(error => ({
+        connected: false,
+        error: error instanceof Error ? error.message : 'Google Drive status check failed',
+      })),
     ]);
     setBackups(cloudinary);
     setDriveBackups(drive.files);
-    setDriveError(drive.error);
+    setDriveStatus(status.connected ? status : null);
+    setDriveError(drive.error || status.error || '');
     setDriveLoading(false);
   }, [albumKey, depth]);
 
@@ -1224,6 +1230,10 @@ export default function GalleryScreen() {
               </TouchableOpacity>
             </View>
             <Text style={s.driveFolderPath}>APK backups இந்த Drive folder-ல் save ஆகும்</Text>
+            {driveStatus?.connected && (
+              <Text style={s.driveConnection}>✓ {driveStatus.authMode === 'oauth' ? 'OAuth' : 'Service Account'} · {driveStatus.accountEmail}
+                {'\n'}{driveStatus.folderName} · upload access verified</Text>
+            )}
             {driveLoading && <ActivityIndicator color="#60a5fa" size="small" />}
             {!driveLoading && driveBackups.length === 0 && (
               <Text style={s.driveHint}>
@@ -1539,6 +1549,7 @@ const s = StyleSheet.create({
   backupFileMeta: { color: '#9ca3af', fontSize: 10, marginTop: 3 },
   backupDownload: { color: '#60a5fa', fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
   driveHint: { color: '#9ca3af', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  driveConnection: { color: '#86efac', fontSize: 11, lineHeight: 16, marginBottom: 4 },
   selBar:         { flexDirection: 'row', backgroundColor: '#333', padding: 10, alignItems: 'center', gap: 12 },
   selCount:       { color: '#fff', fontSize: 14, flex: 1 },
   selDelBtn:      { backgroundColor: '#c62828', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
