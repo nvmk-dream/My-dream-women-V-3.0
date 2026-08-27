@@ -473,7 +473,7 @@ export interface GoogleDriveBackup {
 }
 
 export const GOOGLE_DRIVE_BACKUP_FOLDER_URL =
-  'https://drive.google.com/drive/folders/1xAuu-RB1v2fAR9-fCfVRXPikigILXss0';
+  'https://drive.google.com/drive/folders/1ikAYcKgLyJlm12EEX-gBg7KqiVsA9kbo';
 
 export interface GoogleDriveStatus {
   connected: boolean;
