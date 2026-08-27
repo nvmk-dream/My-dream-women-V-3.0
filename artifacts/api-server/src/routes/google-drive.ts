@@ -9,7 +9,7 @@ const upload = multer({
   limits: { fileSize: 250 * 1024 * 1024 },
 });
 
-const DEFAULT_DRIVE_FOLDER_ID = "1xAuu-RB1v2fAR9-fCfVRXPikigILXss0";
+const DEFAULT_DRIVE_FOLDER_ID = "1ikAYcKgLyJlm12EEX-gBg7KqiVsA9kbo";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const DEFAULT_OAUTH_REDIRECT_URI =
   "https://my-dream-women-v-3-0.onrender.com/api/google-drive/oauth/callback";
