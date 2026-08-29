@@ -49,8 +49,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
 
-      - name: Validate API server before APK build
-        run: pnpm --filter @workspace/api-server run typecheck
+      - name: Validate API server build before APK build
+        run: pnpm --filter @workspace/api-server run build
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
@@ -243,16 +243,15 @@ jobs:
 
       - name: Trigger Render Redeploy
         env:
-          RENDER_KEY: ${{ secrets.RENDER_KEY }}
+          RENDER_HOOK: ${{ secrets.RENDER_HOOK }}
         run: |
           set -euo pipefail
-          if [[ -z "$RENDER_KEY" ]]; then
-            echo "RENDER_KEY GitHub Actions secret is missing"
+          if [[ -z "$RENDER_HOOK" ]]; then
+            echo "RENDER_HOOK GitHub Actions secret is missing"
             exit 1
           fi
-          DEPLOY_HOOK="https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=$RENDER_KEY"
-          HTTP_STATUS=$(curl --silent --show-error --location --retry 2 --retry-delay 5 \
-            -o /tmp/render_resp.json -w "%{http_code}" "$DEPLOY_HOOK")
+          HTTP_STATUS=$(curl --silent --show-error --location --request POST --retry 2 --retry-delay 5 \
+            -o /tmp/render_resp.json -w "%{http_code}" "$RENDER_HOOK")
           echo "Render deploy hook response: HTTP $HTTP_STATUS"
           cat /tmp/render_resp.json || true
           if [[ "$HTTP_STATUS" -lt 200 || "$HTTP_STATUS" -ge 300 ]]; then
