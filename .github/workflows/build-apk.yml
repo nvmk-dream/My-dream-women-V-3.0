@@ -2,6 +2,8 @@ name: Build APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
@@ -47,6 +49,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
 
+      - name: Validate API server before APK build
+        run: pnpm --filter @workspace/api-server run typecheck
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
@@ -238,26 +242,24 @@ jobs:
           echo "https://github.com/${{ github.repository }}/releases/download/$TAG/$APK_NAME"
 
       - name: Trigger Render Redeploy
+        env:
+          RENDER_KEY: ${{ secrets.RENDER_KEY }}
         run: |
-          if [[ -n "${{ secrets.RENDER_HOOK }}" ]]; then
-            RENDER_HOOK="${{ secrets.RENDER_HOOK }}"
-          elif [[ -n "${{ secrets.RENDER_KEY }}" ]]; then
-            RENDER_HOOK="https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=${{ secrets.RENDER_KEY }}"
-          else
-            echo "No Render deploy hook configured"
+          set -euo pipefail
+          if [[ -z "$RENDER_KEY" ]]; then
+            echo "RENDER_KEY GitHub Actions secret is missing"
             exit 1
           fi
-          RESP=$(curl --silent --show-error --location --retry 2 --retry-delay 5 -o /tmp/render_resp.json -w "%{http_code}" \
-            "$RENDER_HOOK")
-          CURL_EXIT=$?
-          echo "Render deploy status: $RESP (curl exit: $CURL_EXIT)"
+          DEPLOY_HOOK="https://api.render.com/deploy/srv-d97687e8bjmc73b8dsvg?key=$RENDER_KEY"
+          HTTP_STATUS=$(curl --silent --show-error --location --retry 2 --retry-delay 5 \
+            -o /tmp/render_resp.json -w "%{http_code}" "$DEPLOY_HOOK")
+          echo "Render deploy hook response: HTTP $HTTP_STATUS"
           cat /tmp/render_resp.json || true
-          if [ "$CURL_EXIT" -ne 0 ] || [ "$RESP" -lt 200 ] || [ "$RESP" -ge 300 ]; then
-            echo "Render deploy trigger failed — check GitHub RENDER_HOOK/RENDER_KEY and Render deploy hook"
+          if [[ "$HTTP_STATUS" -lt 200 || "$HTTP_STATUS" -ge 300 ]]; then
+            echo "Render deploy trigger failed"
             exit 1
           fi
-          echo "Render redeploy triggered — server will update in ~2 min"
-
+          echo "Render redeploy triggered successfully"
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
