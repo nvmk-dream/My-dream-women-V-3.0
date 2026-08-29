@@ -17,7 +17,7 @@ function getServerKeys(): string[] {
   return Array.from(new Set(keys.map((k) => k.trim())));
 }
 
-function getOpenRouterKeys(): string[] {
+export function getOpenRouterKeys(): string[] {
   const candidates: (string | undefined)[] = [
     process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"],
     process.env["OPENROUTER_API_KEY"],
@@ -28,7 +28,7 @@ function getOpenRouterKeys(): string[] {
   return Array.from(new Set(keys.map((k) => k.trim())));
 }
 
-function getOpenAIKeys(): string[] {
+export function getOpenAIKeys(): string[] {
   const candidates: (string | undefined)[] = [
     process.env["OPENAI_API_KEY"],
     process.env["OPENAI_API_KEY_2"],
@@ -40,7 +40,7 @@ function getOpenAIKeys(): string[] {
 
 // Multimedia/Story mode keys — GEMINI_API_KEY_1..5 only (Multimedia Render group)
 // Same keys used by video/image/document analysis (media-chat.ts, analyze-file.ts)
-function getMultimediaKeys(): string[] {
+export function getMultimediaKeys(): string[] {
   const candidates: (string | undefined)[] = [
     process.env["GEMINI_API_KEY"],
     process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
@@ -52,7 +52,7 @@ function getMultimediaKeys(): string[] {
   return Array.from(new Set(keys.map((k) => k.trim())));
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       const err: any = new Error(`${label} timeout after ${ms}ms`);
@@ -72,7 +72,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-async function tryOpenAICompatible(
+export async function tryOpenAICompatible(
   baseUrl: string,
   apiKey: string,
   model: string,
@@ -114,9 +114,9 @@ async function tryOpenAICompatible(
   return oaTxt;
 }
 
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+export const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
-function isQuotaError(err: any): boolean {
+export function isQuotaError(err: any): boolean {
   const msg = String(err?.message ?? err ?? "").toLowerCase();
   const status = err?.status ?? err?.statusCode ?? err?.code;
   return (
@@ -129,7 +129,7 @@ function isQuotaError(err: any): boolean {
   );
 }
 
-function isKeyError(err: any): boolean {
+export function isKeyError(err: any): boolean {
   const msg = String(err?.message ?? err ?? "").toLowerCase();
   const status = err?.status ?? err?.statusCode ?? err?.code;
   if (status === 401 || status === 403) return true;

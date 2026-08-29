@@ -13,7 +13,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { RichEditor } from 'react-native-pell-rich-editor';
-import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage } from '../services/api';
+import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage, saveKallaatamStory } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import {
   kallaatamErrorCategory,
@@ -190,6 +190,7 @@ export default function EditCharacterScreen() {
   const [kOutline, setKOutline] = useState('');
   const [kAiFill, setKAiFill] = useState(false);
   const [kExtracting, setKExtracting] = useState(false);
+  const storySaveInFlightRef = useRef(false);
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -404,13 +405,34 @@ export default function EditCharacterScreen() {
 
   const handleStorySave = async () => {
     if (!persona || persona.id !== 'kallaatam') return;
+    if (storySaveInFlightRef.current) return;
+    const story = todayStory.trim();
+    if (!story) {
+      Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதலில் கதை type பண்ணுங்க');
+      return;
+    }
+    storySaveInFlightRef.current = true;
     setStorySaving(true);
     try {
+      const result = await saveKallaatamStory(story);
+      const extractedCharacters = result.characters.map(character => ({
+        name: character.name,
+        role: character.description,
+      }));
+      const arr = mergeKallaatamCharacters(kChars, extractedCharacters);
+      const nextOutline = result.outline || kOutline;
+      setKChars(arr);
+      setKOutline(nextOutline);
       const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
       const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory }));
-      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ kTaskContinue, kTaskOutline, kChars, kAllAI, kOutline })).catch(() => {});
-      // Navigate to chat — auto-send "கதையில் உள்ள கதாபாத்திரம் என்ன?" and save reply to kChars
+      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory: story }));
+      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+        kTaskContinue,
+        kTaskOutline,
+        kChars: arr,
+        kAllAI,
+        kOutline: nextOutline,
+      }));
       ParamsStore.setAutoStoryQuery(true);
       ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
       router.push('/chat');
@@ -426,6 +448,7 @@ export default function EditCharacterScreen() {
         kallaatamFriendlyError('auto', category, e),
       );
     } finally {
+      storySaveInFlightRef.current = false;
       setStorySaving(false);
     }
   };

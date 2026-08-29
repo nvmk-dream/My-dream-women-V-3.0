@@ -54,7 +54,11 @@ function normalizeCharacters(value: unknown): KallaatamExtractedCharacter[] {
         ? record.name
         : '';
     const name = cleanName(rawName);
-    const role = typeof record?.role === 'string' ? record.role.trim() : '';
+    const role = typeof record?.role === 'string'
+      ? record.role.trim()
+      : typeof record?.description === 'string'
+        ? record.description.trim()
+        : '';
     const key = normalizeName(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);

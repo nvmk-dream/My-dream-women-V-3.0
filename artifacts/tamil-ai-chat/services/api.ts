@@ -216,6 +216,65 @@ export async function sendMessage(
   throw lastError || new Error('பதில் வரல. மீண்டும் try பண்ணுங்க.');
 }
 
+export type KallaatamStorySaveResponse = {
+  storySaved: true;
+  extracted: true;
+  reused: boolean;
+  outline: string;
+  characters: Array<{ name: string; description: string }>;
+};
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export async function saveKallaatamStory(story: string): Promise<KallaatamStorySaveResponse> {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let lastError: Error = new Error('Story save failed');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    try {
+      const res = await fetch(`${REPLIT_API}/api/story/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': requestId,
+        },
+        body: JSON.stringify({ story, personaId: 'kallaatam', requestId }),
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => ({})) as Partial<KallaatamStorySaveResponse> & { error?: string };
+      if (!res.ok) {
+        const error = new Error(data.error || `Story save failed (HTTP ${res.status})`);
+        lastError = error;
+        const transient = res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500;
+        if (!transient || attempt === 2) throw error;
+        await wait(750 * (attempt + 1));
+        continue;
+      }
+      if (
+        data.storySaved !== true ||
+        data.extracted !== true ||
+        typeof data.outline !== 'string' ||
+        !Array.isArray(data.characters)
+      ) {
+        throw new Error('Story save returned an invalid extraction response');
+      }
+      return data as KallaatamStorySaveResponse;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const timedOut = error?.name === 'AbortError';
+      const transient = timedOut || /network|fetch|timeout|temporar|busy|HTTP 5|HTTP 429/i.test(lastError.message);
+      if (!transient || attempt === 2) throw lastError;
+      await wait(750 * (attempt + 1));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw lastError;
+}
+
 export async function pingServer(): Promise<void> {
   try {
     const ctrl = new AbortController();
