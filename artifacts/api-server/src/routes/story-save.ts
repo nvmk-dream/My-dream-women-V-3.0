@@ -40,9 +40,17 @@ function storyHash(personaId: string, story: string): string {
   return createHash("sha256").update(`${personaId}\u0000${story}`).digest("hex");
 }
 
+function requireDatabase() {
+  if (!db) {
+    throw Object.assign(new Error("Database is not configured"), { status: 503 });
+  }
+  return db;
+}
+
 function ensureDatabaseSchema(): Promise<void> {
+  const database = requireDatabase();
   if (!schemaReady) {
-    schemaReady = db.execute(sql`
+    schemaReady = database.execute(sql`
       CREATE TABLE IF NOT EXISTS kallaatam_stories (
         id SERIAL PRIMARY KEY,
         persona_id TEXT NOT NULL,
@@ -236,8 +244,9 @@ Include every meaningful character found in the story, with an empty description
 }
 
 async function saveStory(story: string, log: LogLike, hash: string): Promise<StorySaveResult> {
+  const database = requireDatabase();
   await ensureDatabaseSchema();
-  const existingRows = await db
+  const existingRows = await database
     .select()
     .from(kallaatamStoriesTable)
     .where(sql`${kallaatamStoriesTable.personaId} = ${PERSONA_ID} AND ${kallaatamStoriesTable.storyHash} = ${hash}`)
@@ -253,7 +262,7 @@ async function saveStory(story: string, log: LogLike, hash: string): Promise<Sto
     };
   }
 
-  const [draft] = await db
+  const [draft] = await database
     .insert(kallaatamStoriesTable)
     .values({
       personaId: PERSONA_ID,
@@ -270,7 +279,7 @@ async function saveStory(story: string, log: LogLike, hash: string): Promise<Sto
   if (!draft) throw new Error("Story could not be saved");
 
   const extraction = await generateExtraction(story, log);
-  const [saved] = await db
+  const [saved] = await database
     .update(kallaatamStoriesTable)
     .set({
       outline: extraction.outline,
