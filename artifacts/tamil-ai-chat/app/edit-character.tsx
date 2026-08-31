@@ -433,7 +433,9 @@ export default function EditCharacterScreen() {
         kAllAI,
         kOutline: nextOutline,
       }));
-      ParamsStore.setAutoStoryQuery(true);
+      // Backend already extracted and persisted the outline and characters.
+      // Do not ask Chat to extract the same story again.
+      ParamsStore.clearAutoStoryQuery();
       ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
       router.push('/chat');
     } catch (e: any) {
