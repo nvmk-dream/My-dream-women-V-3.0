@@ -192,6 +192,8 @@ export function kallaatamErrorCategory(error: unknown): string {
   const code = String((error as { code?: unknown })?.code ?? '').toUpperCase();
   if (code === 'DATABASE_NOT_CONFIGURED' || code === 'DATABASE_UNAVAILABLE') return 'database';
   if (code === 'AI_NOT_CONFIGURED') return 'ai_not_configured';
+  if (code === 'AI_PROVIDER_FAILED') return 'server';
+  if (code === 'AI_QUOTA') return 'quota';
   if (code === 'EXTRACTION_TIMEOUT') return 'timeout';
   if (code === 'INVALID_EXTRACTION_RESPONSE') return 'parse';
   if (code === 'STORY_SAVE_FAILED') return 'story_save';
@@ -240,7 +242,7 @@ export function kallaatamFriendlyError(
         : category === 'quota'
           ? 'AI limit முடிந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
     : category === 'timeout'
-      ? 'AI பதில் வர நேரம் எடுத்துக்கொள்கிறது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+      ? 'Story extraction timed out. Please try again.'
       : category === 'server' || category === 'network'
         ? 'AI server-ஐ இப்போது அணுக முடியவில்லை. Connection-ஐ சரிபார்த்து மீண்டும் முயற்சி செய்யுங்கள்.'
         : category === 'parse'
