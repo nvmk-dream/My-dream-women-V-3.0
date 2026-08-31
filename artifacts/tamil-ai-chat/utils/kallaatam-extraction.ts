@@ -189,6 +189,12 @@ export function mergeKallaatamCharacters(
 }
 
 export function kallaatamErrorCategory(error: unknown): string {
+  const code = String((error as { code?: unknown })?.code ?? '').toUpperCase();
+  if (code === 'DATABASE_NOT_CONFIGURED' || code === 'DATABASE_UNAVAILABLE') return 'database';
+  if (code === 'AI_NOT_CONFIGURED') return 'ai_not_configured';
+  if (code === 'EXTRACTION_TIMEOUT') return 'timeout';
+  if (code === 'INVALID_EXTRACTION_RESPONSE') return 'parse';
+  if (code === 'STORY_SAVE_FAILED') return 'story_save';
   const message = String((error as { message?: unknown })?.message ?? error).toLowerCase();
   if (message.includes('abort') || message.includes('timeout') || message.includes('timed out')) return 'timeout';
   if (message.includes('quota') || message.includes('429') || message.includes('resource_exhausted') || message.includes('rate limit')) return 'quota';
@@ -225,8 +231,14 @@ export function kallaatamFriendlyError(
   category: string,
   error?: unknown,
 ): string {
-  const base = category === 'quota'
-    ? 'AI limit முடிந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
+  const base = category === 'database'
+    ? 'Story database இப்போது கிடைக்கவில்லை. Render-ல் DATABASE_URL சரியாக அமைக்கப்பட்டுள்ளதா என்று பார்க்கவும்.'
+    : category === 'ai_not_configured'
+      ? 'Story AI service is not configured right now.'
+      : category === 'story_save'
+        ? 'Story save செய்ய முடியவில்லை. மீண்டும் முயற்சி செய்யுங்கள்.'
+        : category === 'quota'
+          ? 'AI limit முடிந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
     : category === 'timeout'
       ? 'AI பதில் வர நேரம் எடுத்துக்கொள்கிறது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
       : category === 'server' || category === 'network'
