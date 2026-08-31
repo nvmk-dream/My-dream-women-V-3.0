@@ -71,12 +71,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
-import {
-  kallaatamErrorCategory,
-  kallaatamFriendlyError,
-  mergeKallaatamCharacters,
-  parseKallaatamExtraction,
-} from '../utils/kallaatam-extraction';
 
 const { width, height } = Dimensions.get('window');
 
@@ -290,7 +284,6 @@ export default function ChatScreen() {
   const [kTaskOutline, setKTaskOutline] = useState(true);
   const [kAllAI, setKAllAI] = useState(true);
   const [personaDataLoaded, setPersonaDataLoaded] = useState(false);
-  const autoStoryRequestRef = useRef<string | null>(null);
 
   const reloadPersona = useCallback(async () => {
     setPersonaDataLoaded(false);
@@ -781,99 +774,8 @@ export default function ChatScreen() {
     }
   }, [persona?.id]);
 
-  // ── கல்லாட்டம்: auto story query — triggered when Story Save navigates here ──
-  useEffect(() => {
-    if (!historyLoaded || !personaDataLoaded || persona?.id !== 'kallaatam') return;
-    if (!ParamsStore.getAutoStoryQuery()) return;
-    if (autoStoryRequestRef.current) return;
-    const requestKey = `${personaId}:${todayStory.trim()}`;
-    autoStoryRequestRef.current = requestKey;
-    ParamsStore.clearAutoStoryQuery();
-
-    const queryText = 'கதையில் உள்ள கதாபாத்திரம் என்ன?';
-    const ts = new Date();
-    setMessages(prev => [...prev, {
-      id: `auto-sq-u-${Date.now()}`,
-      role: 'user' as const,
-      content: queryText,
-      timestamp: ts,
-    }]);
-
-    void (async () => {
-      setLoading(true);
-      try {
-        // Re-read the persisted values so the request never uses an older render.
-        const [personaRaw, engineRaw] = await Promise.all([
-          AsyncStorage.getItem(`persona_edit_${personaId}`),
-          AsyncStorage.getItem('kallaatam_engine'),
-        ]);
-        const personaData = personaRaw ? JSON.parse(personaRaw) : {};
-        const engine = engineRaw ? JSON.parse(engineRaw) : {};
-        const readyStory = String(personaData.todayStory ?? todayStory).trim();
-        const readyChars = Array.isArray(engine.kChars) ? engine.kChars : kChars;
-        setTodayStory(readyStory);
-        if (Array.isArray(engine.kChars)) setKChars(engine.kChars);
-        if (typeof engine.kOutline === 'string') setKOutline(engine.kOutline);
-
-        const storyCtx = readyStory
-          ? `
-
-கதை:
-${readyStory}
-
-இந்த கதைக்கான outline-ஐ சுருக்கமாக கொடுத்து, கதையில் உள்ள கதாபாத்திரங்களை name மற்றும் role உடன் கண்டுபிடி.`
-          : '';
-        const introHistory = [{ role: 'user' as const, content: queryText }];
-        const existingCharacterContext = JSON.stringify(
-          readyChars
-            .filter((character: any) => String(character?.name ?? '').trim())
-            .map((character: any) => ({ name: character.name, role: character.role ?? '' })),
-        );
-        const introPrompt = `${(persona as any).prompt ?? ''}
-${storyCtx}
-
-Return JSON only in this exact shape:
-{"outline":"","characters":[{"name":"","role":""}]}
-Do not invent characters. Existing Kallaatam character context:
-${existingCharacterContext}`;
-        const reply = await sendMessage(introHistory, provider, introPrompt, 'story');
-        setMessages(prev => [...prev, {
-          id: `auto-sq-a-${Date.now()}`,
-          role: 'assistant' as const,
-          content: reply,
-          timestamp: new Date(),
-        }]);
-        const extraction = parseKallaatamExtraction(reply);
-        const mergedChars = mergeKallaatamCharacters(readyChars, extraction.characters);
-        console.log('[STORY-AUTO]', {
-          responseLength: reply.length,
-          parsedJson: extraction.parsedJson,
-          characterCount: extraction.characters.length,
-        });
-        setKChars(mergedChars);
-        const currentEngineRaw = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
-        const currentEngine = currentEngineRaw ? JSON.parse(currentEngineRaw) : {};
-        await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
-          ...currentEngine,
-          kChars: mergedChars,
-        }));
-      } catch (e: any) {
-        const category = kallaatamErrorCategory(e);
-        console.log('[STORY-AUTO]', {
-          category,
-          stage: 'automatic-extraction',
-          error: e?.message ?? String(e),
-        });
-        setMessages(prev => [...prev, {
-          id: `auto-sq-err-${Date.now()}`,
-          role: 'assistant' as const,
-          content: kallaatamFriendlyError('auto', category, e),
-          timestamp: new Date(),
-        }]);
-      } finally { setLoading(false); }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoaded, persona?.id, personaDataLoaded]);
+  // Kallaatam Story Save already extracts and persists outline/characters
+  // before navigation, so Chat must not trigger a second extraction.
 
   const toggleDialect = async () => {
     const next = !dialectMode;
