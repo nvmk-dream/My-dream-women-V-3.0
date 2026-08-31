@@ -15,11 +15,13 @@ import {
 import { GoogleGenAI } from "@google/genai";
 
 const router = Router();
-const ATTEMPT_TIMEOUT_MS = 25_000;
+const ATTEMPT_TIMEOUT_MS = 15_000;
+const EXTRACTION_TOTAL_TIMEOUT_MS = 70_000;
 const MAX_STORY_LENGTH = 20_000;
 const PERSONA_ID = "kallaatam";
 
 type StorySaveResult = {
+  success: true;
   storySaved: true;
   extracted: true;
   reused: boolean;
@@ -40,11 +42,37 @@ function storyHash(personaId: string, story: string): string {
   return createHash("sha256").update(`${personaId}\u0000${story}`).digest("hex");
 }
 
+function storyError(code: string, message: string, status: number, cause?: unknown): Error & { code: string; status: number } {
+  const error = Object.assign(new Error(message), { code, status });
+  if (cause) Object.assign(error, { cause });
+  return error;
+}
+
 function requireDatabase() {
   if (!db) {
-    throw Object.assign(new Error("Database is not configured"), { status: 503 });
+    throw storyError("DATABASE_NOT_CONFIGURED", "Story database is not configured right now.", 503);
   }
   return db;
+}
+
+function databaseUnavailable(error: unknown): Error & { code: string; status: number } {
+  if ((error as any)?.code === "DATABASE_NOT_CONFIGURED") return error as any;
+  return storyError("DATABASE_UNAVAILABLE", "Story database is unavailable right now.", 503, error);
+}
+
+function storySaveFailed(error: unknown): Error & { code: string; status: number } {
+  if ((error as any)?.code === "DATABASE_NOT_CONFIGURED") return error as any;
+  return storyError("STORY_SAVE_FAILED", "Story could not be saved right now.", 500, error);
+}
+
+function extractionTimeout(): Error & { code: string; status: number } {
+  return storyError("EXTRACTION_TIMEOUT", "Story extraction timed out. Please try again.", 504);
+}
+
+function assertExtractionTime(deadline: number): number {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw extractionTimeout();
+  return Math.min(ATTEMPT_TIMEOUT_MS, remaining);
 }
 
 function ensureDatabaseSchema(): Promise<void> {
@@ -64,7 +92,7 @@ function ensureDatabaseSchema(): Promise<void> {
       )
     `).then(() => undefined).catch((error) => {
       schemaReady = null;
-      throw error;
+      throw databaseUnavailable(error);
     });
   }
   return schemaReady;
@@ -117,17 +145,38 @@ function parseExtraction(raw: string): {
 }
 
 function errorStatus(error: any): number {
-  if (error?.status === 429) return 429;
-  if (error?.status === 401) return 401;
-  if (error?.status === 504) return 504;
-  if (error?.status === 503) return 503;
-  if (error?.code === "PARSE_ERROR") return 502;
-  if (isQuotaError(error)) return 429;
-  if (isKeyError(error)) return 401;
+  const code = String(error?.code ?? "");
+  if (code === "DATABASE_NOT_CONFIGURED" || code === "DATABASE_UNAVAILABLE") return 503;
+  if (code === "STORY_SAVE_FAILED") return 500;
+  if (code === "AI_NOT_CONFIGURED") return 503;
+  if (code === "EXTRACTION_TIMEOUT") return 504;
+  if (code === "INVALID_EXTRACTION_RESPONSE") return 502;
+  if (code === "AI_QUOTA" || isQuotaError(error)) return 429;
+  if (code === "AI_PROVIDER_FAILED" || isKeyError(error)) return 502;
   if (error?.code === "TIMEOUT" || error?.name === "AbortError") return 504;
   return 502;
 }
 
+function errorResponse(error: any) {
+  const code = String(error?.code ?? "STORY_SAVE_FAILED");
+  const known = new Set([
+    "DATABASE_NOT_CONFIGURED", "DATABASE_UNAVAILABLE", "STORY_SAVE_FAILED",
+    "AI_NOT_CONFIGURED", "EXTRACTION_TIMEOUT", "INVALID_EXTRACTION_RESPONSE",
+    "AI_QUOTA", "AI_PROVIDER_FAILED",
+  ]);
+  const normalizedCode = known.has(code) ? code : isQuotaError(error) ? "AI_QUOTA" : "STORY_SAVE_FAILED";
+  const messages: Record<string, string> = {
+    DATABASE_NOT_CONFIGURED: "Story database is not configured right now.",
+    DATABASE_UNAVAILABLE: "Story database is unavailable right now.",
+    STORY_SAVE_FAILED: "Story could not be saved right now.",
+    AI_NOT_CONFIGURED: "Story AI service is not configured right now.",
+    EXTRACTION_TIMEOUT: "Story extraction timed out. Please try again.",
+    INVALID_EXTRACTION_RESPONSE: "Story extraction returned an invalid response. Please try again.",
+    AI_QUOTA: "Story AI quota is busy. Please try again later.",
+    AI_PROVIDER_FAILED: "Story AI provider failed. Please try again.",
+  };
+  return { success: false, error: normalizedCode, message: messages[normalizedCode] };
+}
 async function generateExtraction(story: string, log: LogLike): Promise<{
   outline: string;
   characters: KallaatamStoryCharacter[];
@@ -139,7 +188,14 @@ Include every meaningful character found in the story, with an empty description
   const prompt = `Read this story and extract its outline and meaningful characters:\n\n${story}`;
   const messages = [{ role: "user", content: prompt }];
   const multimediaKeys = getMultimediaKeys();
+  const openRouterKeys = getOpenRouterKeys();
+  const openAIKeys = getOpenAIKeys();
+  if (multimediaKeys.length + openRouterKeys.length + openAIKeys.length === 0) {
+    throw storyError("AI_NOT_CONFIGURED", "Story AI service is not configured right now.", 503);
+  }
+  const deadline = Date.now() + EXTRACTION_TOTAL_TIMEOUT_MS;
   let lastError: any = null;
+  let parseErrorSeen = false;
   let quotaCount = 0;
 
   for (const [keyIndex, key] of multimediaKeys.entries()) {
@@ -150,6 +206,7 @@ Include every meaningful character found in the story, with an empty description
         : {}),
     });
     for (const model of MODELS) {
+      const attemptTimeout = assertExtractionTime(deadline);
       try {
         const result = await withTimeout(
           ai.models.generateContent({
@@ -167,17 +224,20 @@ Include every meaningful character found in the story, with an empty description
               systemInstruction: systemPrompt,
             },
           }),
-          ATTEMPT_TIMEOUT_MS,
+          attemptTimeout,
           `story extraction ${model}`,
         );
         const content = result.text?.trim() ?? "";
         if (!content) throw new Error("empty story extraction response");
+        const parsed = parseExtraction(content);
         log.info?.({ provider: "gemini", keyIndex, model }, "Story extraction succeeded");
-        return parseExtraction(content);
+        return parsed;
       } catch (error: any) {
         lastError = error;
         if (isQuotaError(error)) quotaCount++;
+        if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
         log.warn?.({ provider: "gemini", keyIndex, model, message: String(error?.message ?? error).slice(0, 200) }, "Story extraction attempt failed");
+        if (Date.now() >= deadline) throw extractionTimeout();
         if (isKeyError(error)) break;
       }
     }
@@ -188,10 +248,11 @@ Include every meaningful character found in the story, with an empty description
     "google/gemma-2-9b-it:free",
     "mistralai/mistral-7b-instruct:free",
   ];
-  for (const key of getOpenRouterKeys()) {
+  for (const key of openRouterKeys) {
     for (const model of fallbackModels) {
+      const attemptTimeout = assertExtractionTime(deadline);
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), attemptTimeout);
       try {
         const content = await tryOpenAICompatible(
           "https://openrouter.ai/api/v1",
@@ -201,21 +262,25 @@ Include every meaningful character found in the story, with an empty description
           messages,
           controller.signal,
         );
+        const parsed = parseExtraction(content);
         log.info?.({ provider: "openrouter", model }, "Story extraction succeeded");
-        return parseExtraction(content);
+        return parsed;
       } catch (error: any) {
         lastError = error;
         if (isQuotaError(error)) quotaCount++;
+        if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
         log.warn?.({ provider: "openrouter", model, message: String(error?.message ?? error).slice(0, 200) }, "Story extraction fallback failed");
+        if (Date.now() >= deadline) throw extractionTimeout();
       } finally {
         clearTimeout(timer);
       }
     }
   }
 
-  for (const key of getOpenAIKeys()) {
+  for (const key of openAIKeys) {
+    const attemptTimeout = assertExtractionTime(deadline);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), attemptTimeout);
     try {
       const content = await tryOpenAICompatible(
         "https://api.openai.com/v1",
@@ -225,72 +290,95 @@ Include every meaningful character found in the story, with an empty description
         messages,
         controller.signal,
       );
+      const parsed = parseExtraction(content);
       log.info?.({ provider: "openai", model: "gpt-4o-mini" }, "Story extraction succeeded");
-      return parseExtraction(content);
+      return parsed;
     } catch (error: any) {
       lastError = error;
       if (isQuotaError(error)) quotaCount++;
+      if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
       log.warn?.({ provider: "openai", message: String(error?.message ?? error).slice(0, 200) }, "Story extraction final fallback failed");
+      if (Date.now() >= deadline) throw extractionTimeout();
     } finally {
       clearTimeout(timer);
     }
   }
 
-  if (!lastError) {
-    throw Object.assign(new Error("No AI provider is configured"), { status: 503 });
+  if (Date.now() >= deadline || lastError?.code === "TIMEOUT" || lastError?.name === "AbortError") {
+    throw extractionTimeout();
   }
-  if (quotaCount > 0) throw Object.assign(lastError, { status: 429 });
-  throw lastError;
+  if (parseErrorSeen && lastError?.code === "PARSE_ERROR") {
+    throw storyError("INVALID_EXTRACTION_RESPONSE", "Story extraction returned an invalid response. Please try again.", 502, lastError);
+  }
+  if (quotaCount > 0) {
+    throw storyError("AI_QUOTA", "Story AI quota is busy. Please try again later.", 429, lastError);
+  }
+  throw storyError("AI_PROVIDER_FAILED", "Story AI provider failed. Please try again.", 502, lastError);
 }
 
 async function saveStory(story: string, log: LogLike, hash: string): Promise<StorySaveResult> {
   const database = requireDatabase();
-  await ensureDatabaseSchema();
-  const existingRows = await database
-    .select()
-    .from(kallaatamStoriesTable)
-    .where(sql`${kallaatamStoriesTable.personaId} = ${PERSONA_ID} AND ${kallaatamStoriesTable.storyHash} = ${hash}`)
-    .limit(1);
-  const existing = existingRows[0];
-  if (existing?.outline?.trim() && Array.isArray(existing.characters) && existing.characters.length > 0) {
-    return {
-      storySaved: true,
-      extracted: true,
-      reused: true,
-      outline: existing.outline,
-      characters: existing.characters,
-    };
+  try {
+    await ensureDatabaseSchema();
+    const existingRows = await database
+      .select()
+      .from(kallaatamStoriesTable)
+      .where(sql`${kallaatamStoriesTable.personaId} = ${PERSONA_ID} AND ${kallaatamStoriesTable.storyHash} = ${hash}`)
+      .limit(1);
+    const existing = existingRows[0];
+    if (existing?.outline?.trim() && Array.isArray(existing.characters) && existing.characters.length > 0) {
+      return {
+        storySaved: true,
+        extracted: true,
+        reused: true,
+        outline: existing.outline,
+        characters: existing.characters,
+      };
+    }
+  } catch (error) {
+    throw databaseUnavailable(error);
   }
 
-  const [draft] = await database
-    .insert(kallaatamStoriesTable)
-    .values({
-      personaId: PERSONA_ID,
-      storyHash: hash,
-      story,
-      outline: "",
-      characters: [],
-    })
-    .onConflictDoUpdate({
-      target: [kallaatamStoriesTable.personaId, kallaatamStoriesTable.storyHash],
-      set: { story, updatedAt: new Date() },
-    })
-    .returning();
-  if (!draft) throw new Error("Story could not be saved");
+  let draft: any;
+  try {
+    [draft] = await database
+      .insert(kallaatamStoriesTable)
+      .values({
+        personaId: PERSONA_ID,
+        storyHash: hash,
+        story,
+        outline: "",
+        characters: [],
+      })
+      .onConflictDoUpdate({
+        target: [kallaatamStoriesTable.personaId, kallaatamStoriesTable.storyHash],
+        set: { story, updatedAt: new Date() },
+      })
+      .returning();
+    if (!draft) throw new Error("Story could not be saved");
+  } catch (error) {
+    throw storySaveFailed(error);
+  }
 
   const extraction = await generateExtraction(story, log);
-  const [saved] = await database
-    .update(kallaatamStoriesTable)
-    .set({
-      outline: extraction.outline,
-      characters: extraction.characters,
-      updatedAt: new Date(),
-    })
-    .where(sql`${kallaatamStoriesTable.id} = ${draft.id}`)
-    .returning();
-  if (!saved) throw new Error("Story extraction could not be saved");
+  let saved: any;
+  try {
+    [saved] = await database
+      .update(kallaatamStoriesTable)
+      .set({
+        outline: extraction.outline,
+        characters: extraction.characters,
+        updatedAt: new Date(),
+      })
+      .where(sql`${kallaatamStoriesTable.id} = ${draft.id}`)
+      .returning();
+    if (!saved) throw new Error("Story extraction could not be saved");
+  } catch (error) {
+    throw storySaveFailed(error);
+  }
 
   return {
+    success: true,
     storySaved: true,
     extracted: true,
     reused: false,
@@ -298,16 +386,15 @@ async function saveStory(story: string, log: LogLike, hash: string): Promise<Sto
     characters: extraction.characters,
   };
 }
-
 router.post("/story/save", async (req: Request, res) => {
   const rawStory = req.body?.story;
   if (typeof rawStory !== "string" || !rawStory.trim()) {
-    res.status(400).json({ error: "Story content is required" });
+    res.status(400).json({ success: false, error: "STORY_REQUIRED", message: "Story content is required." });
     return;
   }
   const story = rawStory.trim();
   if (story.length > MAX_STORY_LENGTH) {
-    res.status(413).json({ error: `Story must be ${MAX_STORY_LENGTH} characters or less` });
+    res.status(413).json({ success: false, error: "STORY_TOO_LONG", message: `Story must be ${MAX_STORY_LENGTH} characters or less.` });
     return;
   }
 
@@ -317,7 +404,8 @@ router.post("/story/save", async (req: Request, res) => {
     try {
       res.json(await active);
     } catch (error: any) {
-      res.status(errorStatus(error)).json({ error: "Story save or extraction failed. Please try again." });
+      const status = errorStatus(error);
+      res.status(status).json(errorResponse(error));
     }
     return;
   }
@@ -328,18 +416,9 @@ router.post("/story/save", async (req: Request, res) => {
   try {
     res.json(await operation);
   } catch (error: any) {
-    log.error?.({ message: String(error?.message ?? error).slice(0, 500) }, "Story save failed");
-    const status = error?.status ?? errorStatus(error);
-    res.status(status).json({
-      error:
-        status === 429
-          ? "AI quota busy. Please try again later."
-          : status === 504
-            ? "Story extraction timed out. Please try again."
-            : status === 503
-              ? "Story AI service is not configured right now."
-              : "Story save or extraction failed. Please try again.",
-    });
+    const status = errorStatus(error);
+    log.error?.({ code: String(error?.code ?? "STORY_SAVE_FAILED"), message: String(error?.message ?? error).slice(0, 300) }, "Story save failed");
+    res.status(status).json(errorResponse(error));
   } finally {
     inFlight.delete(hash);
   }
