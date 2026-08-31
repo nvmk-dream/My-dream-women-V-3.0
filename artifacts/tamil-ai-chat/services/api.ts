@@ -217,6 +217,7 @@ export async function sendMessage(
 }
 
 export type KallaatamStorySaveResponse = {
+  success?: true;
   storySaved: true;
   extracted: true;
   reused: boolean;
@@ -224,15 +225,31 @@ export type KallaatamStorySaveResponse = {
   characters: Array<{ name: string; description: string }>;
 };
 
+type KallaatamStorySaveError = Error & { code?: string; status?: number };
+
+const STORY_REQUEST_TIMEOUT_MS = 85_000;
+const MAX_STORY_REQUEST_ATTEMPTS = 2;
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function makeStorySaveError(message: string, code?: string, status?: number): KallaatamStorySaveError {
+  return Object.assign(new Error(message), { code, status });
+}
+
+function isTerminalStoryError(error: KallaatamStorySaveError): boolean {
+  return [
+    'DATABASE_NOT_CONFIGURED', 'DATABASE_UNAVAILABLE', 'STORY_SAVE_FAILED',
+    'AI_NOT_CONFIGURED', 'EXTRACTION_TIMEOUT', 'INVALID_EXTRACTION_RESPONSE',
+    'AI_QUOTA', 'AI_PROVIDER_FAILED',
+  ].includes(String(error.code ?? ''));
+}
 
 export async function saveKallaatamStory(story: string): Promise<KallaatamStorySaveResponse> {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  let lastError: Error = new Error('Story save failed');
+  let lastError: KallaatamStorySaveError = makeStorySaveError('Story save failed');
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_STORY_REQUEST_ATTEMPTS; attempt += 1) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 120000);
+    const timer = setTimeout(() => controller.abort(), STORY_REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(`${REPLIT_API}/api/story/save`, {
         method: 'POST',
@@ -243,29 +260,31 @@ export async function saveKallaatamStory(story: string): Promise<KallaatamStoryS
         body: JSON.stringify({ story, personaId: 'kallaatam', requestId }),
         signal: controller.signal,
       });
-      const data = await res.json().catch(() => ({})) as Partial<KallaatamStorySaveResponse> & { error?: string };
+      const data = await res.json().catch(() => ({})) as Partial<KallaatamStorySaveResponse> & { error?: string; message?: string };
       if (!res.ok) {
-        const error = new Error(data.error || `Story save failed (HTTP ${res.status})`);
+        const error = makeStorySaveError(data.message || data.error || `Story save failed (HTTP ${res.status})`, data.error, res.status);
         lastError = error;
-        const transient = res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500;
-        if (!transient || attempt === 2) throw error;
+        if (isTerminalStoryError(error) || attempt === MAX_STORY_REQUEST_ATTEMPTS - 1) throw error;
         await wait(750 * (attempt + 1));
         continue;
       }
       if (
-        data.storySaved !== true ||
-        data.extracted !== true ||
-        typeof data.outline !== 'string' ||
+        data.storySaved !== true,
+        data.extracted !== true,
+        typeof data.outline !== 'string',
         !Array.isArray(data.characters)
       ) {
-        throw new Error('Story save returned an invalid extraction response');
+        throw makeStorySaveError('Story save returned an invalid extraction response', 'INVALID_EXTRACTION_RESPONSE', 502);
       }
       return data as KallaatamStorySaveResponse;
     } catch (error: any) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const timedOut = error?.name === 'AbortError';
-      const transient = timedOut || /network|fetch|timeout|temporar|busy|HTTP 5|HTTP 429/i.test(lastError.message);
-      if (!transient || attempt === 2) throw lastError;
+      const normalized = error instanceof Error
+        ? makeStorySaveError(error.message, error.code, error.status)
+        : makeStorySaveError(String(error));
+      if (error?.name === 'AbortError') normalized.code = 'EXTRACTION_TIMEOUT';
+      lastError = normalized;
+      const retryableNetwork = !isTerminalStoryError(normalized) && /network|fetch|temporar|HTTP 5/i.test(normalized.message);
+      if (!retryableNetwork || attempt === MAX_STORY_REQUEST_ATTEMPTS - 1) throw lastError;
       await wait(750 * (attempt + 1));
     } finally {
       clearTimeout(timer);
@@ -274,7 +293,6 @@ export async function saveKallaatamStory(story: string): Promise<KallaatamStoryS
 
   throw lastError;
 }
-
 export async function pingServer(): Promise<void> {
   try {
     const ctrl = new AbortController();
