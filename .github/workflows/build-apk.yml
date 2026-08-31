@@ -241,38 +241,38 @@ jobs:
             --repo ${{ github.repository }}
           echo "https://github.com/${{ github.repository }}/releases/download/$TAG/$APK_NAME"
 
-      - name: Trigger Render Redeploy
+      - name: Trigger Render Redeploy (best effort)
         env:
           RENDER_HOOK: ${{ secrets.RENDER_HOOK }}
           RENDER_KEY: ${{ secrets.RENDER_KEY }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [[ -n "$RENDER_HOOK" ]]; then
             echo "Trying Render deploy hook..."
             HOOK_STATUS=$(curl -sS -L -X POST --retry 2 --retry-delay 5 -o /tmp/render_hook.json -w "%{http_code}" "$RENDER_HOOK" || true)
             echo "Render hook response: HTTP ${HOOK_STATUS:-curl-error}"
             cat /tmp/render_hook.json 2>/dev/null || true
-            if [[ -n "$HOOK_STATUS" && "$HOOK_STATUS" -ge 200 && "$HOOK_STATUS" -lt 300 ]]; then
+            if [[ "$HOOK_STATUS" =~ ^2[0-9][0-9]$ ]]; then
               echo "Render redeploy triggered through deploy hook"
               exit 0
             fi
             echo "Deploy hook unavailable; falling back to Render API"
           fi
           if [[ -z "$RENDER_KEY" ]]; then
-            echo "RENDER_KEY GitHub Actions secret is missing"
-            exit 1
+            echo "::warning::RENDER_KEY GitHub Actions secret is missing; skipping Render redeploy"
+            exit 0
           fi
           API_STATUS=$(curl -sS -X POST --max-time 60 -o /tmp/render_api.json -w "%{http_code}" \
             -H "Authorization: Bearer $RENDER_KEY" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             -d '{}' \
-            "https://api.render.com/v1/services/srv-d97687e8bjmc73b8dsvg/deploys")
+            "https://api.render.com/v1/services/srv-d97687e8bjmc73b8dsvg/deploys") || API_STATUS=""
           echo "Render API deploy response: HTTP $API_STATUS"
           cat /tmp/render_api.json 2>/dev/null || true
-          if [[ "$API_STATUS" -lt 200 || "$API_STATUS" -ge 300 ]]; then
-            echo "Render API deploy trigger failed"
-            exit 1
+          if [[ ! "$API_STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            echo "::warning::Render API deploy trigger failed (HTTP ${API_STATUS:-curl-error}); APK build remains successful"
+            exit 0
           fi
           echo "Render redeploy triggered through Render API"
       - name: Upload build log on failure
