@@ -13,14 +13,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { RichEditor } from 'react-native-pell-rich-editor';
-import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile, sendMessage, saveKallaatamStory } from '../services/api';
+import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
-import {
-  kallaatamErrorCategory,
-  kallaatamFriendlyError,
-  mergeKallaatamCharacters,
-  parseKallaatamExtraction,
-} from '../utils/kallaatam-extraction';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -122,20 +116,6 @@ function Field({ label, hint, value, onChange, minH = 60, wordInputs, onSetWordI
   );
 }
 
-const KALLAATAM_EXTRACTION_SYSTEM_PROMPT = `You extract structured story data for the Kallaatam character engine.
-Return JSON only in this exact shape:
-{"outline":"short story outline","characters":[{"name":"character name","role":"role in story"}]}
-Include every meaningful character found in the story, with an empty role when unknown. Do not invent characters.`;
-
-async function requestKallaatamExtraction(content: string): Promise<string> {
-  return sendMessage(
-    [{ role: 'user', content }],
-    'gemini',
-    KALLAATAM_EXTRACTION_SYSTEM_PROMPT,
-    'story',
-  );
-}
-
 export default function EditCharacterScreen() {
   const router = useRouter();
   const personaId = ParamsStore.getEditPersonaId() ?? '';
@@ -188,8 +168,6 @@ export default function EditCharacterScreen() {
   const [kChars, setKChars] = useState<Array<{name:string;role:string;aiPlay:boolean;color:string}>>(DEFAULT_K_CHARS);
   const [kAllAI, setKAllAI] = useState(true);
   const [kOutline, setKOutline] = useState('');
-  const [kAiFill, setKAiFill] = useState(false);
-  const [kExtracting, setKExtracting] = useState(false);
   const storySaveInFlightRef = useRef(false);
 
   // Collapsible section state — each section toggles independently, multiple can stay open at once
@@ -345,64 +323,6 @@ export default function EditCharacterScreen() {
 
   const [storySaving, setStorySaving] = useState(false);
 
-  const handleKAiFill = async () => {
-    if (!todayStory.trim()) {
-      Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணி 💾 Save பண்ணுங்க');
-      setKAiFill(false);
-      return;
-    }
-    const story = todayStory.trim();
-    setKExtracting(true);
-    try {
-      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory outline மற்றும் கதையில் உள்ள முக்கிய கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
-      const extraction = parseKallaatamExtraction(reply);
-      console.log('[EXTRACT]', {
-        responseLength: reply.length,
-        parsedJson: extraction.parsedJson,
-        characterCount: extraction.characters.length,
-      });
-      const names = extraction.characters.map(character => character.name).slice(0, 6);
-      await new Promise<void>(resolve => {
-        Alert.alert(
-          '👥 கதாபாத்திரங்கள் பெயர்கள்',
-          `கதையில் இந்த பெயர்கள் கிடைச்சது:\n\n${names.map((n: string, i: number) => `${i + 1}. ${n}`).join('\n')}\n\nCharacter name-ஆக fill செய்யவா?`,
-          [
-            { text: '✅ Yes, Fill பண்ணு', onPress: () => {
-              const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
-              setKChars(arr);
-              AsyncStorage.getItem('kallaatam_engine')
-                .then(raw => {
-                  const engine = raw ? JSON.parse(raw) : {};
-                  return AsyncStorage.setItem('kallaatam_engine', JSON.stringify({ ...engine, kChars: arr }));
-                })
-                .catch(error => {
-                  console.log('[EXTRACT]', { category: kallaatamErrorCategory(error), stage: 'persist-ai-fill' });
-                });
-              resolve();
-            }},
-            { text: '❌ No, நான் edit பண்றேன்', onPress: () => resolve() },
-          ]
-        );
-      });
-    } catch (e: any) {
-      const category = kallaatamErrorCategory(e);
-        console.log('[EXTRACT]', {
-          category,
-          stage: 'ai-fill',
-          error: e?.message ?? String(e),
-        });
-      Alert.alert(
-        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : 'Error',
-        category === 'quota'
-          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
-          : kallaatamFriendlyError('extract', category, e),
-      );
-    } finally {
-      setKExtracting(false);
-      setKAiFill(false);
-    }
-  };
-
   const handleStorySave = async () => {
     if (!persona || persona.id !== 'kallaatam') return;
     if (storySaveInFlightRef.current) return;
@@ -414,41 +334,26 @@ export default function EditCharacterScreen() {
     storySaveInFlightRef.current = true;
     setStorySaving(true);
     try {
-      const result = await saveKallaatamStory(story);
-      const extractedCharacters = result.characters.map(character => ({
-        name: character.name,
-        role: character.description,
-      }));
-      const arr = mergeKallaatamCharacters(kChars, extractedCharacters);
-      const nextOutline = result.outline || kOutline;
-      setKChars(arr);
-      setKOutline(nextOutline);
       const existingRaw = await AsyncStorage.getItem(`persona_edit_${persona.id}`);
       const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify({ ...existing, todayStory: story }));
-      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
+      const personaData = { ...existing, todayStory: story };
+      const engineData = {
         kTaskContinue,
         kTaskOutline,
-        kChars: arr,
+        kChars,
         kAllAI,
-        kOutline: nextOutline,
-      }));
-      // Backend already extracted and persisted the outline and characters.
-      // Do not ask Chat to extract the same story again.
+        kOutline,
+      };
+      await AsyncStorage.setItem(`persona_edit_${persona.id}`, JSON.stringify(personaData));
+      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify(engineData));
+      // Cloud backup contains only the manually entered values; no AI extraction runs.
+      setCloudinaryMeta(`persona_edit_${persona.id}`, personaData).catch(() => {});
+      setCloudinaryMeta('kallaatam_engine', engineData).catch(() => {});
       ParamsStore.clearAutoStoryQuery();
       ParamsStore.setChatParams({ personaId: 'kallaatam', provider: 'gemini', providerLabel: 'Gemini' });
       router.push('/chat');
-    } catch (e: any) {
-      const category = kallaatamErrorCategory(e);
-      console.log('[STORY-SAVE]', {
-        category,
-        stage: 'persist-and-navigate',
-        error: e?.message ?? String(e),
-      });
-      Alert.alert(
-        'Story Save Error',
-        kallaatamFriendlyError('auto', category, e),
-      );
+    } catch {
+      Alert.alert('Error', 'Story save failed. Try again.');
     } finally {
       storySaveInFlightRef.current = false;
       setStorySaving(false);
@@ -830,18 +735,7 @@ export default function EditCharacterScreen() {
         {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
         {persona?.id === 'kallaatam' && (
           <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}
-            headerExtra={
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }} pointerEvents="box-none">
-                <Text style={{ fontSize: 11, color: '#fff', marginRight: 4, fontWeight: '700' }}>{kExtracting ? '⏳' : '🤖 AI Fill'}</Text>
-                <Switch
-                  value={kAiFill}
-                  onValueChange={(v) => { if (!kExtracting) { setKAiFill(v); if (v) handleKAiFill(); } }}
-                  trackColor={{ true: '#81C784', false: '#888' }}
-                  thumbColor="#fff"
-                  style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
-                />
-              </View>
-            }>
+>
 
             {/* Tasks */}
             <View style={{ backgroundColor: '#f1f8e9', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#c8e6c9' }}>
@@ -863,53 +757,7 @@ export default function EditCharacterScreen() {
             <View style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#4a148c' }}>📋 Story Outline</Text>
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (!todayStory.trim()) { Alert.alert('கதை இல்ல', '"இன்றைய கதை" section-ல் முதல்ல கதை type பண்ணுங்க'); return; }
-                    setKExtracting(true);
-                      try {
-                      const story = todayStory.trim();
-                      const reply = await requestKallaatamExtraction(`இந்த கதையை படி:\n\n${story}\n\nStory Outline மற்றும் கதாபாத்திரங்கள் இரண்டையும் கண்டுபிடித்து JSON-ஆக மட்டும் பதில் கொடு.`);
-                      const extraction = parseKallaatamExtraction(reply);
-                      console.log('[EXTRACT]', {
-                        responseLength: reply.length,
-                        parsedJson: extraction.parsedJson,
-                        characterCount: extraction.characters.length,
-                      });
-                      const arr = mergeKallaatamCharacters(kChars, extraction.characters.slice(0, 6));
-                      const nextOutline = extraction.outline || kOutline;
-                      setKChars(arr);
-                      setKOutline(nextOutline);
-                      const rawEngine = await AsyncStorage.getItem('kallaatam_engine').catch(() => null);
-                      const engine = rawEngine ? JSON.parse(rawEngine) : {};
-                      await AsyncStorage.setItem('kallaatam_engine', JSON.stringify({
-                        ...engine,
-                        kChars: arr,
-                        kOutline: nextOutline,
-                      }));
-                      Alert.alert('✅ Extract முடிந்தது!', `${extraction.characters.length} கதாபாத்திரங்கள் மற்றும் Story Outline update ஆச்சு.`);
-                    } catch (e: any) {
-                      const category = kallaatamErrorCategory(e);
-                      console.log('[EXTRACT]', {
-                        category,
-                        stage: 'outline-extract',
-                        error: e?.message ?? String(e),
-                      });
-                      Alert.alert(
-                        category === 'quota' ? '⏳ API Quota தீர்ந்தது' : '⚠️ Extract Error',
-                        category === 'quota'
-                          ? 'இன்றைய Gemini API limit தீர்ந்துவிட்டது. சிறிது நேரம் கழித்து மீண்டும் முயற்சி செய்யுங்கள்.'
-                          : kallaatamFriendlyError('extract', category, e));
-                    } finally { setKExtracting(false); }
-                  }}
-                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: kExtracting ? '#ccc' : '#6a1b9a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
-                  disabled={kExtracting}
-                >
-                  {kExtracting ? <ActivityIndicator size="small" color="#fff" /> : null}
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600', marginLeft: kExtracting ? 6 : 0 }}>
-                    {kExtracting ? 'Extracting...' : '✨ Extract'}
-                  </Text>
-                </TouchableOpacity>
+
               </View>
               <TextInput
                 style={[styles.fieldInput, { minHeight: 120, fontSize: 13 }]}
@@ -917,7 +765,7 @@ export default function EditCharacterScreen() {
                 onChangeText={setKOutline}
                 multiline
                 textAlignVertical="top"
-                placeholder="கதையிலிருந்து outline இங்க auto-fill ஆகும்... (edit பண்ணலாம்)"
+                placeholder="Story outline-ஐ manual-ஆக இங்கே எழுதுங்கள்..."
                 placeholderTextColor="#bbb"
               />
             </View>
