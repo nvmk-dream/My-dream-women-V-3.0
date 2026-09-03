@@ -558,6 +558,7 @@ export default function ChatScreen() {
   // ── Message long-press action ──
   const [selectedMsg, setSelectedMsg] = useState<Message | null>(null);
   const [showSelectText, setShowSelectText] = useState(false);
+  const [selectionText, setSelectionText] = useState('');
 
   // ── Image → Prompt ──
   const [promptLoading, setPromptLoading] = useState(false);
@@ -2591,7 +2592,12 @@ export default function ChatScreen() {
               </TouchableOpacity>
             )}
             {!selectedMsg?.imageUrl && (
-              <TouchableOpacity style={styles.msgActionBtn} onPress={() => { setShowSelectText(true); }}>
+              <TouchableOpacity style={styles.msgActionBtn} onPress={() => {
+                // Preserve the message before closing the action modal; otherwise selectedMsg becomes null.
+                setSelectionText(selectedMsg?.content ?? '');
+                setSelectedMsg(null);
+                setShowSelectText(true);
+              }}>
                 <Text style={styles.msgActionIcon}>✏️</Text>
                 <Text style={styles.msgActionTxt}>Select & Copy Text</Text>
               </TouchableOpacity>
@@ -2614,27 +2620,42 @@ export default function ChatScreen() {
       </Modal>
 
       {/* ── Select Text Modal ── */}
-      <Modal visible={showSelectText} transparent animationType="fade" onRequestClose={() => setShowSelectText(false)}>
-        <TouchableOpacity style={styles.selectTextOverlay} activeOpacity={1} onPress={() => setShowSelectText(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.selectTextBox}>
+      <Modal
+        visible={showSelectText}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowSelectText(false); setSelectionText(''); }}
+      >
+        <View style={styles.selectTextOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => { setShowSelectText(false); setSelectionText(''); }}
+          />
+          <View style={styles.selectTextBox}>
             <Text style={styles.selectTextTitle}>✏️ Select & Copy Text</Text>
             <Text style={styles.selectTextHint}>Text-ஐ press பண்ணி drag செய்து select பண்ணுங்க</Text>
-            <ScrollView style={styles.selectTextScroll}>
-              <Text selectable style={styles.selectTextContent} selectionColor={"#E91E8C44"}>
-                {selectedMsg?.content ?? ''}
+            <ScrollView style={styles.selectTextScroll} keyboardShouldPersistTaps="handled">
+              <Text selectable style={styles.selectTextContent} selectionColor="#E91E8C44">
+                {selectionText}
               </Text>
             </ScrollView>
             <View style={styles.selectTextActions}>
-              <TouchableOpacity style={styles.selectTextCopyAll}
-                onPress={() => { copyText(selectedMsg?.content ?? ''); setShowSelectText(false); setSelectedMsg(null); }}>
+              <TouchableOpacity
+                style={styles.selectTextCopyAll}
+                onPress={() => { copyText(selectionText); setShowSelectText(false); setSelectionText(''); }}
+              >
                 <Text style={styles.selectTextCopyAllTxt}>📋 Copy All</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.selectTextClose} onPress={() => setShowSelectText(false)}>
+              <TouchableOpacity
+                style={styles.selectTextClose}
+                onPress={() => { setShowSelectText(false); setSelectionText(''); }}
+              >
                 <Text style={styles.selectTextCloseTxt}>Close</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* ── Chat Style Sheet (Wallpaper + Bubble + Birthday) ── */}
