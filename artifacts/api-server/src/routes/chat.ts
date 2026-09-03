@@ -1,146 +1,12 @@
 import { Router } from "express";
-import { GoogleGenAI } from "@google/genai";
+import {
+  generateServerAiResponse,
+  isKeyError,
+  isQuotaError,
+  ServerAiProviderError,
+} from "./ai-provider";
 
 const router = Router();
-
-const ATTEMPT_TIMEOUT_MS = 25_000;
-
-function getServerKeys(): string[] {
-  const candidates: (string | undefined)[] = [
-    process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
-    process.env["GEMINI_API_KEY"],
-  ];
-  for (let i = 1; i <= 20; i++) {
-    candidates.push(process.env[`GEMINI_API_KEY_${i}`]);
-  }
-  const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-  return Array.from(new Set(keys.map((k) => k.trim())));
-}
-
-export function getOpenRouterKeys(): string[] {
-  const candidates: (string | undefined)[] = [
-    process.env["AI_INTEGRATIONS_OPENROUTER_API_KEY"],
-    process.env["OPENROUTER_API_KEY"],
-    process.env["OPENROUTER_API_KEY_2"],
-    process.env["OPENROUTER_API_KEY_3"],
-  ];
-  const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-  return Array.from(new Set(keys.map((k) => k.trim())));
-}
-
-export function getOpenAIKeys(): string[] {
-  const candidates: (string | undefined)[] = [
-    process.env["OPENAI_API_KEY"],
-    process.env["OPENAI_API_KEY_2"],
-    process.env["OPENAI_API_KEY_3"],
-  ];
-  const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-  return Array.from(new Set(keys.map((k) => k.trim())));
-}
-
-// Multimedia/Story mode keys — GEMINI_API_KEY_1..5 only (Multimedia Render group)
-// Same keys used by video/image/document analysis (media-chat.ts, analyze-file.ts)
-export function getMultimediaKeys(): string[] {
-  const candidates: (string | undefined)[] = [
-    process.env["GEMINI_API_KEY"],
-    process.env["AI_INTEGRATIONS_GEMINI_API_KEY"],
-  ];
-  for (let i = 1; i <= 5; i++) {
-    candidates.push(process.env[`GEMINI_API_KEY_${i}`]);
-  }
-  const keys = candidates.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-  return Array.from(new Set(keys.map((k) => k.trim())));
-}
-
-export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => {
-      const err: any = new Error(`${label} timeout after ${ms}ms`);
-      err.code = "TIMEOUT";
-      reject(err);
-    }, ms);
-    promise.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
-}
-
-export async function tryOpenAICompatible(
-  baseUrl: string,
-  apiKey: string,
-  model: string,
-  systemPrompt: string | undefined,
-  messages: { role: string; content: string }[],
-  signal: AbortSignal,
-): Promise<string> {
-  const body = {
-    model,
-    messages: [
-      ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-      ...messages.map((m) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-      })),
-    ],
-    max_tokens: 2048,
-  };
-  const r = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://my-dream-women-v2.onrender.com",
-      "X-Title": "My Dream Women Tamil AI Chat",
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!r.ok) {
-    const txt = await r.text();
-    const err: any = new Error(`${r.status} ${txt.slice(0, 200)}`);
-    err.status = r.status;
-    throw err;
-  }
-  const json: any = await r.json();
-  const oaTxt = json?.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!oaTxt) throw new Error('empty_openai_response');
-  return oaTxt;
-}
-
-export const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-
-export function isQuotaError(err: any): boolean {
-  const msg = String(err?.message ?? err ?? "").toLowerCase();
-  const status = err?.status ?? err?.statusCode ?? err?.code;
-  return (
-    status === 429 ||
-    msg.includes("429") ||
-    msg.includes("quota") ||
-    msg.includes("exceeded") ||
-    msg.includes("resource_exhausted") ||
-    msg.includes("rate limit")
-  );
-}
-
-export function isKeyError(err: any): boolean {
-  const msg = String(err?.message ?? err ?? "").toLowerCase();
-  const status = err?.status ?? err?.statusCode ?? err?.code;
-  if (status === 401 || status === 403) return true;
-  return (
-    msg.includes("api key not valid") ||
-    msg.includes("api_key_invalid") ||
-    msg.includes("permission_denied") ||
-    msg.includes("unauthenticated") ||
-    msg.includes("invalid api key")
-  );
-}
 
 router.post("/chat", async (req, res) => {
   try {
@@ -156,171 +22,42 @@ router.post("/chat", async (req, res) => {
       return;
     }
 
-    // Story mode → use multimedia key pool; other modes → use chat key pool
-    const serverKeys = mode === 'story' ? getMultimediaKeys() : getServerKeys();
-    const tryKeys: string[] = [];
-    if (clientApiKey?.trim()) tryKeys.push(clientApiKey.trim());
-    for (const k of serverKeys) if (!tryKeys.includes(k)) tryKeys.push(k);
-
-    // When client sends their own key → bypass Replit proxy → call Google directly
-    // When no client key → use Replit AI Integration proxy as fallback
-    const baseUrl = clientApiKey?.trim()
-      ? undefined
-      : process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
-
-    const contents = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-
-    let lastErr: any = null;
-    let quotaErrCount = 0;
-    let geminiAttempts = 0;
-
-    for (let ki = 0; ki < tryKeys.length; ki++) {
-      const key = tryKeys[ki];
-      const ai = new GoogleGenAI({
-        apiKey: key,
-        ...(baseUrl ? { httpOptions: { apiVersion: "", baseUrl } } : {}),
-      });
-
-      for (const model of MODELS) {
-        geminiAttempts++;
-        try {
-          const result = await withTimeout(
-            ai.models.generateContent({
-              model,
-              contents,
-              config: {
-                maxOutputTokens: 8192,
-                safetySettings: [
-                  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                ],
-                ...(systemPrompt ? { systemInstruction: systemPrompt } : {}),
-              },
-            }),
-            ATTEMPT_TIMEOUT_MS,
-            `gemini ${model}`,
-          );
-          const blockReason = (result as any)?.candidates?.[0]?.finishReason;
-          const textContent = result.text?.trim() ?? '';
-          if (!textContent) {
-            // Empty/null/blocked for ANY reason — try next model/key
-            lastErr = new Error(`empty_response: ${blockReason ?? 'unknown'}`);
-            req.log.warn({ keyIdx: ki, model, blockReason }, "Empty response — trying next model/key");
-            continue;
-          }
-          req.log.info({ keyIdx: ki, model, blockReason }, "Chat success");
-          res.json({ content: textContent });
-          return;
-        } catch (err: any) {
-          lastErr = err;
-          const quota = isQuotaError(err);
-          const keyBad = isKeyError(err);
-          req.log.warn(
-            { keyIdx: ki, model, quota, keyBad, msg: err?.message?.slice(0, 200) },
-            "Chat attempt failed",
-          );
-          if (quota) {
-            quotaErrCount++;
-            continue;
-          }
-          if (keyBad) {
-            break;
-          }
-          continue;
-        }
-      }
-    }
-
-    const orKeys = getOpenRouterKeys();
-    const orModels = [
-      "meta-llama/llama-3.1-8b-instruct:free",
-      "google/gemma-2-9b-it:free",
-      "mistralai/mistral-7b-instruct:free",
-    ];
-    for (const orKey of orKeys) {
-      for (const orModel of orModels) {
-        const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), ATTEMPT_TIMEOUT_MS);
-        try {
-          const content = await tryOpenAICompatible(
-            "https://openrouter.ai/api/v1",
-            orKey,
-            orModel,
-            systemPrompt,
-            messages,
-            ctrl.signal,
-          );
-          clearTimeout(to);
-          req.log.info({ provider: "openrouter", model: orModel }, "Chat success via fallback");
-          res.json({ content });
-          return;
-        } catch (err: any) {
-          clearTimeout(to);
-          lastErr = err;
-          if (isQuotaError(err)) quotaErrCount++;
-          req.log.warn(
-            { provider: "openrouter", model: orModel, msg: err?.message?.slice(0, 200) },
-            "OpenRouter attempt failed",
-          );
-        }
-      }
-    }
-
-    const oaKeys = getOpenAIKeys();
-    for (const oaKey of oaKeys) {
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), ATTEMPT_TIMEOUT_MS);
-      try {
-        const content = await tryOpenAICompatible(
-          "https://api.openai.com/v1",
-          oaKey,
-          "gpt-4o-mini",
-          systemPrompt,
-          messages,
-          ctrl.signal,
-        );
-        clearTimeout(to);
-        req.log.info({ provider: "openai", model: "gpt-4o-mini" }, "Chat success via final fallback");
-        res.json({ content });
-        return;
-      } catch (err: any) {
-        clearTimeout(to);
-        lastErr = err;
-        if (isQuotaError(err)) quotaErrCount++;
-        req.log.warn({ provider: "openai", msg: err?.message?.slice(0, 200) }, "OpenAI attempt failed");
-      }
-    }
-
-    const noKeysAtAll = geminiAttempts === 0 && orKeys.length === 0 && oaKeys.length === 0;
-    req.log.error(
-      { lastErrMsg: lastErr?.message?.slice(0, 500), quotaErrCount, geminiAttempts, orKeys: orKeys.length, oaKeys: oaKeys.length },
-      "All chat providers exhausted",
-    );
-
+    const content = await generateServerAiResponse({
+      messages,
+      systemPrompt,
+      clientApiKey,
+      mode,
+      log: req.log,
+    });
+    res.json({ content });
+  } catch (err: any) {
+    const providerError = err instanceof ServerAiProviderError ? err : null;
+    const stats = providerError?.stats;
+    const lastError = stats?.lastError ?? err;
+    const quotaErrCount = stats?.quotaErrorCount ?? (isQuotaError(lastError) ? 1 : 0);
+    const noKeysAtAll = stats?.noKeysAtAll ?? false;
     let friendly: string;
     let status: number;
+
     if (noKeysAtAll) {
       friendly = "⚙️ Server பிழை. சற்று நேரம் கழித்து மீண்டும் try பண்ணுங்க.";
       status = 503;
     } else if (quotaErrCount > 0) {
       friendly = "⏳ இன்னைக்கு server busy. நாளைக்கு மீண்டும் try பண்ணுங்க.";
       status = 429;
-    } else if (isKeyError(lastErr)) {
+    } else if (isKeyError(lastError)) {
       friendly = "🔑 API key valid இல்ல. Keys screen-ல check பண்ணுங்க.";
       status = 401;
     } else {
       friendly = "⚠️ பதில் வரல. கொஞ்ச நேரம் கழிச்சு try பண்ணுங்க.";
       status = 502;
     }
+    if (!providerError) {
+      req.log.error({ err: err?.message?.slice(0, 500), stack: err?.stack?.slice(0, 500) }, "Chat handler crashed");
+      res.status(500).json({ error: "⚠️ Server error ஆச்சு. கொஞ்ச நேரம் கழிச்சு try பண்ணுங்க." });
+      return;
+    }
     res.status(status).json({ error: friendly });
-  } catch (err: any) {
-    req.log.error({ err: err?.message?.slice(0, 500), stack: err?.stack?.slice(0, 500) }, "Chat handler crashed");
-    res.status(500).json({ error: "⚠️ Server error ஆச்சு. கொஞ்ச நேரம் கழிச்சு try பண்ணுங்க." });
   }
 });
 

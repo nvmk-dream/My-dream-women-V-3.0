@@ -269,9 +269,9 @@ export async function saveKallaatamStory(story: string): Promise<KallaatamStoryS
         continue;
       }
       if (
-        data.storySaved !== true,
-        data.extracted !== true,
-        typeof data.outline !== 'string',
+        data.storySaved !== true ||
+        data.extracted !== true ||
+        typeof data.outline !== 'string' ||
         !Array.isArray(data.characters)
       ) {
         throw makeStorySaveError('Story save returned an invalid extraction response', 'INVALID_EXTRACTION_RESPONSE', 502);

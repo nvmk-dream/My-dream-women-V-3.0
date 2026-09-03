@@ -3,19 +3,14 @@ import { Router, type Request } from "express";
 import { sql } from "drizzle-orm";
 import { db, kallaatamStoriesTable, type KallaatamStoryCharacter } from "@workspace/db";
 import {
-  getMultimediaKeys,
-  getOpenAIKeys,
-  getOpenRouterKeys,
+  generateServerAiResponse,
   isKeyError,
   isQuotaError,
-  MODELS,
-  tryOpenAICompatible,
-  withTimeout,
-} from "./chat";
-import { GoogleGenAI } from "@google/genai";
+  ServerAiProviderError,
+  type ServerAiLog,
+} from "./ai-provider";
 
 const router = Router();
-const ATTEMPT_TIMEOUT_MS = 15_000;
 const EXTRACTION_TOTAL_TIMEOUT_MS = 70_000;
 const MAX_STORY_LENGTH = 20_000;
 const PERSONA_ID = "kallaatam";
@@ -29,11 +24,7 @@ type StorySaveResult = {
   characters: KallaatamStoryCharacter[];
 };
 
-type LogLike = {
-  info?: (data: unknown, message?: string) => void;
-  warn?: (data: unknown, message?: string) => void;
-  error?: (data: unknown, message?: string) => void;
-};
+type LogLike = ServerAiLog;
 
 const inFlight = new Map<string, Promise<StorySaveResult>>();
 let schemaReady: Promise<void> | null = null;
@@ -69,16 +60,10 @@ function extractionTimeout(): Error & { code: string; status: number } {
   return storyError("EXTRACTION_TIMEOUT", "Story extraction timed out. Please try again.", 504);
 }
 
-function assertExtractionTime(deadline: number): number {
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) throw extractionTimeout();
-  return Math.min(ATTEMPT_TIMEOUT_MS, remaining);
-}
-
 function ensureDatabaseSchema(): Promise<void> {
   const database = requireDatabase();
   if (!schemaReady) {
-    schemaReady = database.execute(sql`
+    const ready: Promise<void> = database.execute(sql`
       CREATE TABLE IF NOT EXISTS kallaatam_stories (
         id SERIAL PRIMARY KEY,
         persona_id TEXT NOT NULL,
@@ -90,10 +75,12 @@ function ensureDatabaseSchema(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         CONSTRAINT kallaatam_stories_persona_story_hash_key UNIQUE (persona_id, story_hash)
       )
-    `).then(() => undefined).catch((error) => {
+    `).then((): void => undefined).catch((error: unknown): never => {
       schemaReady = null;
       throw databaseUnavailable(error);
     });
+    schemaReady = ready;
+    return ready;
   }
   return schemaReady;
 }
@@ -186,134 +173,43 @@ Return JSON only in this exact shape:
 {"outline":"short story outline","characters":[{"name":"character name","description":"character role or description in the story"}]}
 Include every meaningful character found in the story, with an empty description when unknown. Do not invent characters.`;
   const prompt = `Read this story and extract its outline and meaningful characters:\n\n${story}`;
-  const messages = [{ role: "user", content: prompt }];
-  const multimediaKeys = getMultimediaKeys();
-  const openRouterKeys = getOpenRouterKeys();
-  const openAIKeys = getOpenAIKeys();
-  if (multimediaKeys.length + openRouterKeys.length + openAIKeys.length === 0) {
-    throw storyError("AI_NOT_CONFIGURED", "Story AI service is not configured right now.", 503);
-  }
-  const deadline = Date.now() + EXTRACTION_TOTAL_TIMEOUT_MS;
-  let lastError: any = null;
-  let parseErrorSeen = false;
-  let quotaCount = 0;
-
-  for (const [keyIndex, key] of multimediaKeys.entries()) {
-    const ai = new GoogleGenAI({
-      apiKey: key,
-      ...(process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"]
-        ? { httpOptions: { apiVersion: "", baseUrl: process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"] } }
-        : {}),
+  let content: string;
+  try {
+    content = await generateServerAiResponse({
+      messages: [{ role: "user", content: prompt }],
+      systemPrompt,
+      mode: "story",
+      log,
+      deadline: Date.now() + EXTRACTION_TOTAL_TIMEOUT_MS,
     });
-    for (const model of MODELS) {
-      const attemptTimeout = assertExtractionTime(deadline);
-      try {
-        const result = await withTimeout(
-          ai.models.generateContent({
-            model,
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            config: {
-              maxOutputTokens: 4096,
-              responseMimeType: "application/json",
-              safetySettings: [
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-              ],
-              systemInstruction: systemPrompt,
-            },
-          }),
-          attemptTimeout,
-          `story extraction ${model}`,
-        );
-        const content = result.text?.trim() ?? "";
-        if (!content) throw new Error("empty story extraction response");
-        const parsed = parseExtraction(content);
-        log.info?.({ provider: "gemini", keyIndex, model }, "Story extraction succeeded");
-        return parsed;
-      } catch (error: any) {
-        lastError = error;
-        if (isQuotaError(error)) quotaCount++;
-        if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
-        log.warn?.({ provider: "gemini", keyIndex, model, message: String(error?.message ?? error).slice(0, 200) }, "Story extraction attempt failed");
-        if (Date.now() >= deadline) throw extractionTimeout();
-        if (isKeyError(error)) break;
+  } catch (error: any) {
+    if (error instanceof ServerAiProviderError) {
+      const { stats } = error;
+      const lastError = stats.lastError as any;
+      if (stats.noKeysAtAll) {
+        throw storyError("AI_NOT_CONFIGURED", "Story AI service is not configured right now.", 503, error);
+      }
+      if (stats.timedOut || lastError?.code === "TIMEOUT" || lastError?.name === "AbortError") {
+        throw extractionTimeout();
+      }
+      if (stats.quotaErrorCount > 0 || isQuotaError(lastError)) {
+        throw storyError("AI_QUOTA", "Story AI quota is busy. Please try again later.", 429, error);
+      }
+      if (isKeyError(lastError)) {
+        throw storyError("AI_PROVIDER_FAILED", "Story AI provider failed. Please try again.", 502, error);
       }
     }
+    throw error;
   }
 
-  const fallbackModels = [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free",
-  ];
-  for (const key of openRouterKeys) {
-    for (const model of fallbackModels) {
-      const attemptTimeout = assertExtractionTime(deadline);
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), attemptTimeout);
-      try {
-        const content = await tryOpenAICompatible(
-          "https://openrouter.ai/api/v1",
-          key,
-          model,
-          systemPrompt,
-          messages,
-          controller.signal,
-        );
-        const parsed = parseExtraction(content);
-        log.info?.({ provider: "openrouter", model }, "Story extraction succeeded");
-        return parsed;
-      } catch (error: any) {
-        lastError = error;
-        if (isQuotaError(error)) quotaCount++;
-        if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
-        log.warn?.({ provider: "openrouter", model, message: String(error?.message ?? error).slice(0, 200) }, "Story extraction fallback failed");
-        if (Date.now() >= deadline) throw extractionTimeout();
-      } finally {
-        clearTimeout(timer);
-      }
+  try {
+    return parseExtraction(content);
+  } catch (error: any) {
+    if (error?.code === "PARSE_ERROR") {
+      throw storyError("INVALID_EXTRACTION_RESPONSE", "Story extraction returned an invalid response. Please try again.", 502, error);
     }
+    throw error;
   }
-
-  for (const key of openAIKeys) {
-    const attemptTimeout = assertExtractionTime(deadline);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), attemptTimeout);
-    try {
-      const content = await tryOpenAICompatible(
-        "https://api.openai.com/v1",
-        key,
-        "gpt-4o-mini",
-        systemPrompt,
-        messages,
-        controller.signal,
-      );
-      const parsed = parseExtraction(content);
-      log.info?.({ provider: "openai", model: "gpt-4o-mini" }, "Story extraction succeeded");
-      return parsed;
-    } catch (error: any) {
-      lastError = error;
-      if (isQuotaError(error)) quotaCount++;
-      if (error?.code === "PARSE_ERROR") parseErrorSeen = true;
-      log.warn?.({ provider: "openai", message: String(error?.message ?? error).slice(0, 200) }, "Story extraction final fallback failed");
-      if (Date.now() >= deadline) throw extractionTimeout();
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  if (Date.now() >= deadline || lastError?.code === "TIMEOUT" || lastError?.name === "AbortError") {
-    throw extractionTimeout();
-  }
-  if (parseErrorSeen && lastError?.code === "PARSE_ERROR") {
-    throw storyError("INVALID_EXTRACTION_RESPONSE", "Story extraction returned an invalid response. Please try again.", 502, lastError);
-  }
-  if (quotaCount > 0) {
-    throw storyError("AI_QUOTA", "Story AI quota is busy. Please try again later.", 429, lastError);
-  }
-  throw storyError("AI_PROVIDER_FAILED", "Story AI provider failed. Please try again.", 502, lastError);
 }
 
 async function saveStory(story: string, log: LogLike, hash: string): Promise<StorySaveResult> {
@@ -328,6 +224,7 @@ async function saveStory(story: string, log: LogLike, hash: string): Promise<Sto
     const existing = existingRows[0];
     if (existing?.outline?.trim() && Array.isArray(existing.characters) && existing.characters.length > 0) {
       return {
+        success: true,
         storySaved: true,
         extracted: true,
         reused: true,
