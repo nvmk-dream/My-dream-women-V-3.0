@@ -208,6 +208,23 @@ export default function SettingsScreen() {
     }
   };
 
+  const clearPhotoStyleCaches = async (styleId: string) => {
+    const femaleIds = ALL_PERSONAS.filter(p => p.gender === 'female').map(p => p.id);
+    await Promise.all(
+      femaleIds.map(id => AsyncStorage.removeItem(`cloud_photos_${id}_${styleId}`).catch(() => {})),
+    );
+    for (const key of ['custom_photo_styles_v1', 'cloud_custom_styles']) {
+      try {
+        const raw = await AsyncStorage.getItem(key);
+        if (!raw) continue;
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          await AsyncStorage.setItem(key, JSON.stringify(list.filter((s: any) => s?.id !== styleId)));
+        }
+      } catch {}
+    }
+  };
+
   const toggleHideBuiltinStyle = async (styleId: string) => {
     const current = { ...globalStyles };
     const isHidden = current.hidden.includes(styleId);
@@ -229,6 +246,7 @@ export default function SettingsScreen() {
         : [...current.hidden, styleId];
       const updated: GlobalPhotoStyles = { ...current, hidden: newHidden };
       await saveGlobalPhotoStyles(updated);
+      await clearPhotoStyleCaches(styleId);
       setGlobalStyles(updated);
     } catch {
       Alert.alert('பிழை', 'Style folder update ஆகல. மீண்டும் try பண்ணுங்க.');
@@ -265,6 +283,16 @@ export default function SettingsScreen() {
         ...globalStyles,
         custom: [...globalStyles.custom, newEntry],
       };
+      // Create every folder first. Do not publish the master entry when folder setup fails.
+      const folderResults = await Promise.all([
+        createCloudinaryFolder(`my-girls/global_styles/${newEntry.id}`),
+        ...ALL_PERSONAS
+          .filter(p => p.gender === 'female')
+          .map(p => createCloudinaryFolder(`my-girls/${p.id}/${newEntry.id}`)),
+      ]);
+      if (folderResults.some(ok => !ok)) {
+        throw new Error('Cloudinary folder creation failed');
+      }
       await saveGlobalPhotoStyles(updated);
       // Save to AsyncStorage immediately — Cloud Storage + Chat screens work offline/instantly
       try {
@@ -282,12 +310,6 @@ export default function SettingsScreen() {
           await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, styleEntry]));
         }
       } catch {}
-      // Force Cloudinary folder creation — global reference folder
-      createCloudinaryFolder('my-girls/global_styles/' + newEntry.id).catch(() => {});
-      // Create per-character folders so the style appears in Cloud Storage for every AI girl
-      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
-        createCloudinaryFolder(`my-girls/${p.id}/${newEntry.id}`).catch(() => {});
-      });
       setGlobalStyles(updated);
       setShowAddStyleModal(false);
       setNewStyleLabel('');
@@ -324,6 +346,7 @@ export default function SettingsScreen() {
                 : { ...globalStyles, custom: globalStyles.custom.filter(s => s.id !== styleId) };
 
               await saveGlobalPhotoStyles(updated);
+              await clearPhotoStyleCaches(styleId);
               setGlobalStyles(updated);
             } catch {
               Alert.alert('பிழை', 'Delete ஆகல. மீண்டும் try பண்ணுங்க.');
