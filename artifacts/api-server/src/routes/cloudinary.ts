@@ -544,11 +544,22 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
         const r = await (cl.api as any).delete_resources_by_prefix(`${folder}/`);
         assetsDeleted = Object.keys(r?.deleted ?? {}).length;
       }
+      // Clear the raw track store as well, otherwise deleted assets can
+      // reappear through /cloudinary/list even after the Cloudinary delete.
+      try { await saveTracked(folder, [], cl); } catch {}
       trackCache.delete(folder);
+      syncedFolders.delete(folder);
       try {
         await (cl.api as any).delete_folder(folder);
         folderDeleted = true;
-      } catch {}
+      } catch (folderErr: any) {
+        // A folder may already be absent after prefix deletion; report the
+        // failure only when assets were present and the folder still remains.
+        if (assetsDeleted > 0) {
+          results.push({ folder, assetsDeleted, folderDeleted, error: String(folderErr?.message ?? folderErr) });
+          continue;
+        }
+      }
     } catch (err: any) {
       results.push({ folder, assetsDeleted, folderDeleted, error: String(err?.message ?? err) });
       continue;
@@ -556,6 +567,10 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
     results.push({ folder, assetsDeleted, folderDeleted });
   }
 
+  const failed = results.filter(r => r.error);
+  if (failed.length > 0) {
+    return res.status(500).json({ ok: false, styleId, charCount: charIds.length, results });
+  }
   return res.json({ ok: true, styleId, charCount: charIds.length, results });
 });
 
