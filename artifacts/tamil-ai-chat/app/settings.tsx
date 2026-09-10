@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, createCloudinaryFolder, deleteCustomStyleFolder, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
+import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, createCloudinaryFolder, deleteStyleFolderGlobally, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
 
 const APP_VERSION = '1.2.0';
@@ -211,15 +211,27 @@ export default function SettingsScreen() {
   const toggleHideBuiltinStyle = async (styleId: string) => {
     const current = { ...globalStyles };
     const isHidden = current.hidden.includes(styleId);
-    const newHidden = isHidden
-      ? current.hidden.filter(id => id !== styleId)
-      : [...current.hidden, styleId];
-    const updated: GlobalPhotoStyles = { ...current, hidden: newHidden };
-    setGlobalStyles(updated);
     try {
+      if (isHidden) {
+        // Restore = add the same style folders back for every female character.
+        const results = await Promise.all(
+          ALL_PERSONAS.filter(p => p.gender === 'female').map(p =>
+            createCloudinaryFolder(`my-girls/${p.id}/${styleId}`)
+          )
+        );
+        if (results.some(ok => !ok)) throw new Error('folder create failed');
+      } else {
+        const result = await deleteStyleFolderGlobally(styleId);
+        if (!result.ok) throw new Error('folder delete failed');
+      }
+      const newHidden = isHidden
+        ? current.hidden.filter(id => id !== styleId)
+        : [...current.hidden, styleId];
+      const updated: GlobalPhotoStyles = { ...current, hidden: newHidden };
       await saveGlobalPhotoStyles(updated);
+      setGlobalStyles(updated);
     } catch {
-      Alert.alert('பிழை', 'Style update save ஆகல. மீண்டும் try பண்ணுங்க.');
+      Alert.alert('பிழை', 'Style folder update ஆகல. மீண்டும் try பண்ணுங்க.');
       setGlobalStyles(current);
     }
   };
@@ -229,8 +241,23 @@ export default function SettingsScreen() {
     if (!label) { Alert.alert('பிழை', 'Style name உள்ளிடுங்க'); return; }
     setSavingStyle(true);
     try {
+      // The folder ID is derived from the master style name so the same name
+      // is used by the Photo Style list and Cloudinary folders.
+      const baseId = label
+        .normalize('NFKD')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase() || 'style';
+      const usedIds = new Set([
+        ...BUILTIN_PHOTO_STYLES.map(s => s.id),
+        ...globalStyles.custom.map(s => s.id),
+      ]);
+      let styleId = baseId;
+      let suffix = 2;
+      while (usedIds.has(styleId)) styleId = `${baseId}_${suffix++}`;
+
       const newEntry: GlobalStyleEntry = {
-        id: 'custom_' + Date.now().toString(36),
+        id: styleId,
         label,
         prompt: newStylePrompt.trim() || label.toLowerCase(),
       };
@@ -277,8 +304,8 @@ export default function SettingsScreen() {
     Alert.alert(
       '🗑️ Style Delete',
       isBuiltin
-        ? 'இந்த built-in style-ஐ globally hide பண்ணணுமா? (Photos delete ஆகாது)'
-        : 'இந்த custom style-ஐ permanently delete பண்ணணுமா? Cloudinary folder + உள்ளே உள்ள photos யாவும் delete ஆகும்.',
+        ? 'இந்த style-ஐ globally delete பண்ணணுமா? இந்த style folders + photos delete ஆகும்.'
+        : 'இந்த custom style-ஐ permanently delete பண்ணணுமா? Cloudinary folders + photos யாவும் delete ஆகும்.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -287,16 +314,17 @@ export default function SettingsScreen() {
           onPress: async () => {
             setDeletingStyleId(styleId);
             try {
-              if (isBuiltin) {
-                // Built-in styles: add to hidden list (no Cloudinary deletion)
-                const updated: GlobalPhotoStyles = { ...globalStyles, hidden: [...globalStyles.hidden, styleId] };
-                await saveGlobalPhotoStyles(updated);
-                setGlobalStyles(updated);
-              } else {
-                // Custom styles: real delete — backend removes Cloudinary folder + meta entry atomically
-                await deleteCustomStyleFolder(styleId);
-                setGlobalStyles(prev => ({ ...prev, custom: prev.custom.filter(s => s.id !== styleId) }));
-              }
+              // Delete the same-named style folder from every female character.
+              // Custom styles also have a global reference folder.
+              const cloudResult = await deleteStyleFolderGlobally(styleId);
+              if (!cloudResult.ok) throw new Error('Cloudinary folder delete failed');
+
+              const updated: GlobalPhotoStyles = isBuiltin
+                ? { ...globalStyles, hidden: Array.from(new Set([...globalStyles.hidden, styleId])) }
+                : { ...globalStyles, custom: globalStyles.custom.filter(s => s.id !== styleId) };
+
+              await saveGlobalPhotoStyles(updated);
+              setGlobalStyles(updated);
             } catch {
               Alert.alert('பிழை', 'Delete ஆகல. மீண்டும் try பண்ணுங்க.');
             } finally {
@@ -905,7 +933,7 @@ export default function SettingsScreen() {
             <Text style={s.cardTitle}>Photo Styles</Text>
           </View>
           <Text style={s.cardDesc}>
-            Chat மற்றும் AI Girls-ல் காண்பிக்கும் Photo Style list-ஐ globally manage பண்ணலாம். 🗑️ = hide/delete • 👁️ = மீண்டும் show
+            Chat மற்றும் AI Girls-ல் காண்பிக்கும் Photo Style list-ஐ globally manage பண்ணலாம். 🗑️ = delete folder + remove • 👁️ = restore
           </Text>
           {stylesLoading ? (
             <ActivityIndicator color="#6C63FF" style={{ marginVertical: 10 }} />

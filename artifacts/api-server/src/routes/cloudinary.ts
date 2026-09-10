@@ -491,8 +491,9 @@ router.get("/cloudinary/characters", async (_req, res) => {
 });
 
 // ── DELETE /api/cloudinary/delete-style-folder ─────────────────────────────
-// Deletes a photo style folder across ALL character folders:
-//   my-girls/{charId}/{styleId}/ → delete all assets + the empty folder itself
+// Permanently deletes a photo-style folder from every female character and,
+// when present, the global reference folder. Assets are removed by prefix so
+// placeholder files are deleted too.
 router.delete("/cloudinary/delete-style-folder", async (req, res) => {
   const { styleId } = req.body as { styleId?: string };
   if (!styleId || typeof styleId !== 'string') {
@@ -500,11 +501,13 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
   }
   const cl = cfg();
 
-  // Collect all character IDs from Cloudinary sub-folders
+  // Collect character IDs from my-girls/*.
   let charIds: string[] = [];
   try {
     const result = await (cl.api as any).sub_folders('my-girls');
-    charIds = (result?.folders ?? []).map((f: any) => f.name as string);
+    charIds = (result?.folders ?? [])
+      .map((f: any) => f.name as string)
+      .filter((id: string) => id && id !== 'global_styles' && id !== 'meta');
   } catch {
     try {
       const r = await cl.api.resources({
@@ -514,118 +517,73 @@ router.delete("/cloudinary/delete-style-folder", async (req, res) => {
       charIds = [...new Set(
         (r?.resources ?? [])
           .map((x: any) => (x.public_id as string).split('/')[1])
-          .filter(Boolean),
+          .filter((id: string) => id && id !== 'global_styles' && id !== 'meta'),
       )] as string[];
-    } catch { /* no chars found */ }
+    } catch {}
   }
 
-  const results: { charId: string; deleted: number; folderDeleted: boolean; error?: string }[] = [];
+  const folders = [
+    ...charIds.map(id => `my-girls/${id}/${styleId}`),
+    `my-girls/global_styles/${styleId}`,
+  ];
 
-  for (const charId of charIds) {
-    const folder = `my-girls/${charId}/${styleId}`;
-    let deleted = 0;
+  const results: { folder: string; assetsDeleted: number; folderDeleted: boolean; error?: string }[] = [];
+
+  for (const folder of folders) {
+    let assetsDeleted = 0;
     let folderDeleted = false;
     try {
-      // Collect assets: from track cache first, then Admin API prefix scan
-      let publicIds: string[] = [];
+      // Prefix deletion removes all images/videos, including placeholders.
       try {
-        const tracked = await getTracked(folder, cl);
-        publicIds = tracked.map(t => t.public_id);
-      } catch {}
-      if (publicIds.length === 0) {
-        try {
-          const r = await cl.api.resources({
-            type: 'upload', resource_type: 'image',
-            prefix: folder + '/', max_results: 500,
-          });
-          publicIds = (r?.resources ?? []).map((x: any) => x.public_id as string);
-        } catch {}
+        const r = await (cl.api as any).delete_resources_by_prefix(`${folder}/`, {
+          invalidate: true,
+        });
+        assetsDeleted = Object.keys(r?.deleted ?? {}).length;
+      } catch {
+        // Fallback for accounts/API versions that do not accept the options arg.
+        const r = await (cl.api as any).delete_resources_by_prefix(`${folder}/`);
+        assetsDeleted = Object.keys(r?.deleted ?? {}).length;
       }
-      // Delete each asset (try image, fallback to video)
-      for (const pid of publicIds) {
-        try {
-          const r: any = await cl.uploader.destroy(pid, { resource_type: 'image', invalidate: true });
-          if (r?.result !== 'ok') {
-            await cl.uploader.destroy(pid, { resource_type: 'video', invalidate: true });
-          }
-          deleted++;
-        } catch {}
-      }
-      // Clear track cache for this folder
       trackCache.delete(folder);
-      // Delete _keep placeholder if it exists
-      try {
-        await cl.uploader.destroy(`${folder}/_keep`, { resource_type: 'image', invalidate: true });
-      } catch {}
-      // Delete the now-empty folder via Admin API
       try {
         await (cl.api as any).delete_folder(folder);
         folderDeleted = true;
       } catch {}
-      results.push({ charId, deleted, folderDeleted });
     } catch (err: any) {
-      results.push({ charId, deleted, folderDeleted, error: String(err?.message ?? err) });
+      results.push({ folder, assetsDeleted, folderDeleted, error: String(err?.message ?? err) });
+      continue;
     }
+    results.push({ folder, assetsDeleted, folderDeleted });
   }
 
   return res.json({ ok: true, styleId, charCount: charIds.length, results });
 });
 
 // ── DELETE /api/cloudinary/delete-folder ───────────────────────────────────
-// Permanently deletes a custom photo-style global folder from Cloudinary and
-// removes the style entry from the meta store.
-// Cloudinary path: my-girls/global_styles/{styleId}/
+// Backward-compatible alias for custom-style deletion.
 router.delete("/cloudinary/delete-folder", async (req, res) => {
-  const { styleId } = req.body as { styleId?: string };
+  req.body = { ...(req.body ?? {}), styleId: req.body?.styleId };
+  const styleId = req.body?.styleId;
   if (!styleId || typeof styleId !== 'string') {
     return res.status(400).json({ error: 'styleId required' });
   }
   const cl = cfg();
-  const folderPath = `my-girls/global_styles/${styleId}`;
-
-  let assetsDeleted = 0;
-  let folderDeleted = false;
-
-  // Step a: Delete all assets inside the style folder using Admin API prefix delete
+  // Keep this endpoint compatible with older app builds by deleting the
+  // custom global folder and all character folders through the same prefix API.
+  let charIds: string[] = [];
   try {
-    const r = await (cl.api as any).delete_resources_by_prefix(`${folderPath}/`);
-    assetsDeleted = Object.keys(r?.deleted ?? {}).length;
-  } catch (err: any) {
-    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_resources_by_prefix failed');
-  }
-  // Clear any in-memory track cache for this folder
-  trackCache.delete(folderPath);
-
-  // Step b: Delete the now-empty Cloudinary folder itself
-  try {
-    await (cl.api as any).delete_folder(folderPath);
-    folderDeleted = true;
-  } catch (err: any) {
-    req.log.warn({ err: String(err?.message ?? err), styleId }, 'delete_folder failed');
+    const result = await (cl.api as any).sub_folders('my-girls');
+    charIds = (result?.folders ?? []).map((f: any) => f.name as string)
+      .filter((id: string) => id && id !== 'global_styles' && id !== 'meta');
+  } catch {}
+  const folders = [...charIds.map(id => `my-girls/${id}/${styleId}`), `my-girls/global_styles/${styleId}`];
+  for (const folder of folders) {
+    try { await (cl.api as any).delete_resources_by_prefix(`${folder}/`); } catch {}
+    trackCache.delete(folder);
+    try { await (cl.api as any).delete_folder(folder); } catch {}
   }
 
-  // Step c: Remove the style entry from the global_photo_styles meta store permanently
-  try {
-    const metaKey = 'global_photo_styles';
-    const info = await cl.api.resource(`my-girls/meta/${metaKey}`, { resource_type: 'raw' });
-    const resp = await fetch(info.secure_url + `?_t=${Date.now()}`);
-    const raw = await resp.json() as { hidden?: string[]; custom?: { id: string }[] };
-    const updated = {
-      hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
-      custom: Array.isArray(raw.custom) ? raw.custom.filter((s: any) => s.id !== styleId) : [],
-    };
-    const b64 = Buffer.from(JSON.stringify(updated)).toString('base64');
-    await cl.uploader.upload(`data:application/json;base64,${b64}`, {
-      public_id: `my-girls/meta/${metaKey}`,
-      resource_type: 'raw',
-      overwrite: true,
-      invalidate: true,
-    } as any);
-  } catch (err: any) {
-    req.log.warn({ err: String(err?.message ?? err), styleId }, 'meta update failed — style entry may remain');
-  }
-
-  return res.json({ ok: true, styleId, assetsDeleted, folderDeleted });
+  return res.json({ ok: true, styleId });
 });
 
 export default router;

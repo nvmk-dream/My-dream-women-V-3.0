@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, createCloudinaryFolder, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -572,9 +572,6 @@ export default function ChatScreen() {
 
   // ── Custom Photo Styles (shared with Notes) ──
   const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
-  const [showAddStyleModal, setShowAddStyleModal] = useState(false);
-  const [newStyleName, setNewStyleName] = useState('');
-  const [newStylePrompt, setNewStylePrompt] = useState('');
   const [hiddenBuiltinIds, setHiddenBuiltinIds] = useState<string[]>([]);
 
   const HIDDEN_BUILTIN_KEY = 'hidden_builtin_styles_v1';
@@ -623,78 +620,6 @@ export default function ChatScreen() {
   useEffect(() => {
     if (showGenModal) loadCustomStyles();
   }, [showGenModal, loadCustomStyles]);
-
-  // Race-safe: re-read AsyncStorage before merge (Notes screen may have added styles meanwhile)
-  const addCustomStyle = async () => {
-    const name = newStyleName.trim();
-    if (!name) return;
-    const newStyle: CustomStyle = {
-      id: `custom_${Date.now().toString(36)}`,
-      label: name,
-      prompt: newStylePrompt.trim() || name.toLowerCase(),
-    };
-    try {
-      const raw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const current: CustomStyle[] = Array.isArray(parsed) ? parsed : [];
-      const merged = [...current, newStyle];
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(merged));
-      setCustomStyles(merged);
-    } catch {
-      const updated = [...customStyles, newStyle];
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-    }
-    // Sync to cloud_custom_styles key (used by Cloud Storage screen)
-    try {
-      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
-      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
-      if (!cloudList.some(s => s.id === newStyle.id)) {
-        await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, newStyle]));
-      }
-    } catch {}
-    // Auto-create Cloudinary folder for ALL female personas (global style)
-    ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
-      createCloudinaryFolder(`my-girls/${p.id}/${newStyle.id}`).catch(() => {});
-    });
-    setNewStyleName('');
-    setNewStylePrompt('');
-    setShowAddStyleModal(false);
-  };
-
-  const removeCustomStyle = async (id: string) => {
-    try {
-      const raw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const current: CustomStyle[] = Array.isArray(parsed) ? parsed : [];
-      const updated = current.filter(s => s.id !== id);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCustomStyles(updated);
-    } catch {
-      const updated = customStyles.filter(s => s.id !== id);
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-    }
-    // Sync removal to cloud_custom_styles (used by Cloud Storage screen)
-    try {
-      const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles');
-      const cloudList: CustomStyle[] = cloudRaw ? JSON.parse(cloudRaw) : [];
-      const cloudUpdated = cloudList.filter(s => s.id !== id);
-      await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify(cloudUpdated));
-    } catch {}
-  };
-
-  const removeBuiltinStyle = async (id: string) => {
-    try {
-      const raw = await AsyncStorage.getItem(HIDDEN_BUILTIN_KEY);
-      const current: string[] = raw ? JSON.parse(raw) : [];
-      const updated = [...new Set([...current, id])];
-      await AsyncStorage.setItem(HIDDEN_BUILTIN_KEY, JSON.stringify(updated));
-      setHiddenBuiltinIds(updated);
-    } catch {
-      setHiddenBuiltinIds(prev => [...new Set([...prev, id])]);
-    }
-  };
 
   useEffect(() => {
     if (!personaId) return;
@@ -2304,54 +2229,30 @@ export default function ChatScreen() {
 
               {/* ── Full-width style list ── */}
               <ScrollView style={styles.styleListFull} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {/* + Add Custom Style row (at top) */}
-                <TouchableOpacity
-                  style={[styles.styleRowFull, { borderColor: '#6C5CE7', borderWidth: 1, borderStyle: 'dashed' }]}
-                  onPress={() => { setShowGenModal(false); setTimeout(() => setShowAddStyleModal(true), 250); }}
-                >
-                  <Text style={{ fontSize: 22, width: 24, textAlign: 'center', color: '#6C5CE7' }}>+</Text>
-                  <Text style={[styles.styleRowFullLabel, { color: '#6C5CE7', fontWeight: '600' }]} numberOfLines={1}>
-                    Add Custom Style
-                  </Text>
-                  <Text style={styles.styleRowArrow}>›</Text>
-                </TouchableOpacity>
+                <Text style={{ color: '#777', fontSize: 12, marginBottom: 8 }}>
+                  Master list: Settings → Photo Styles
+                </Text>
                 {PHOTO_STYLES.map((style) => {
                   const isSelected = style.id === selectedStyleId;
-                  const isCustom = style.id.startsWith('custom_');
+                  const isCustom = !BUILTIN_PHOTO_STYLES.some(builtin => builtin.id === style.id);
                   return (
-                    <View key={style.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TouchableOpacity
-                        style={[styles.styleRowFull, isSelected && styles.styleRowSelected, { flex: 1 }]}
-                        onPress={() => {
-                          setSelectedStyleId(style.id);
-                          setShowGeneratePanel(false);
-                          handleShowGalleryInChat(style.id);
-                        }}
-                      >
-                        <View style={[styles.styleRadio, isSelected && styles.styleRadioSelected]}>
-                          {isSelected && <View style={styles.styleRadioDot} />}
-                        </View>
-                        <Text style={[styles.styleRowFullLabel, isSelected && styles.styleLabelSelected]} numberOfLines={1}>
-                          {isCustom ? '★ ' : ''}{style.label}
-                        </Text>
-                        <Text style={styles.styleRowArrow}>›</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => Alert.alert(
-                          `🗑 "${style.label}" Delete?`,
-                          'இந்த style-ஐ list-ல் இருந்து நீக்கணுமா?',
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Delete ✓', style: 'destructive', onPress: () =>
-                              isCustom ? removeCustomStyle(style.id) : removeBuiltinStyle(style.id)
-                            },
-                          ]
-                        )}
-                        style={{ paddingHorizontal: 12, paddingVertical: 14 }}
-                      >
-                        <Text style={{ fontSize: 18, color: '#e53935' }}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                      key={style.id}
+                      style={[styles.styleRowFull, isSelected && styles.styleRowSelected]}
+                      onPress={() => {
+                        setSelectedStyleId(style.id);
+                        setShowGeneratePanel(false);
+                        handleShowGalleryInChat(style.id);
+                      }}
+                    >
+                      <View style={[styles.styleRadio, isSelected && styles.styleRadioSelected]}>
+                        {isSelected && <View style={styles.styleRadioDot} />}
+                      </View>
+                      <Text style={[styles.styleRowFullLabel, isSelected && styles.styleLabelSelected]} numberOfLines={1}>
+                        {isCustom ? '★ ' : ''}{style.label}
+                      </Text>
+                      <Text style={styles.styleRowArrow}>›</Text>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>
@@ -2360,48 +2261,6 @@ export default function ChatScreen() {
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
-      </Modal>
-
-      {/* ── Add Custom Style modal (shared with Notes via AsyncStorage) ── */}
-      <Modal visible={showAddStyleModal} transparent animationType="slide" onRequestClose={() => setShowAddStyleModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 12, color: '#222' }}>+ Custom Style சேர்க்க</Text>
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>Style Name (Notes & Chat-ல் தோன்றும்)</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 12, color: '#222' }}
-              value={newStyleName}
-              onChangeText={setNewStyleName}
-              placeholder="e.g. Beach Pose"
-              placeholderTextColor="#999"
-              autoFocus
-            />
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>AI Prompt (optional — photo generation-க்கு)</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 16, color: '#222', height: 60, textAlignVertical: 'top' }}
-              value={newStylePrompt}
-              onChangeText={setNewStylePrompt}
-              placeholder="e.g. sitting on beach, bikini, sunset"
-              placeholderTextColor="#999"
-              multiline
-            />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity
-                style={{ flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center' }}
-                onPress={() => { setShowAddStyleModal(false); setNewStyleName(''); setNewStylePrompt(''); }}
-              >
-                <Text style={{ color: '#666', fontWeight: '600' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#6C5CE7', alignItems: 'center', opacity: newStyleName.trim() ? 1 : 0.4 }}
-                onPress={addCustomStyle}
-                disabled={!newStyleName.trim()}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Cloud Photo Browser Modal ── */}
