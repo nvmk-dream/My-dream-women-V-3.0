@@ -19,6 +19,7 @@ import {
   deleteFromCloudinary,
   createCloudinaryFolder,
   getCloudinaryMeta,
+  getGlobalPhotoStyles,
   setCloudinaryMeta,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -283,6 +284,7 @@ export default function AIGirlsCloudScreen() {
   const [deleteTarget, setDeleteTarget] = useState<CloudPhoto | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: string; name: string; type: 'char' | 'style' } | null>(null);
   const [hiddenStyles, setHiddenStyles] = useState<Set<string>>(new Set()); // built-in styles hidden per char
+  const [globalHiddenStyles, setGlobalHiddenStyles] = useState<Set<string>>(new Set());
 
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -302,10 +304,7 @@ export default function AIGirlsCloudScreen() {
 
       // Step 2: Fetch from Cloudinary meta in background and merge (restores after reinstall)
       try {
-        const [cloudChars, cloudStyles] = await Promise.all([
-          getCloudinaryMeta('custom_chars'),
-          getCloudinaryMeta('custom_styles'),
-        ]);
+        const cloudChars = await getCloudinaryMeta('custom_chars');
         if (Array.isArray(cloudChars) && cloudChars.length > 0) {
           // Merge: add cloud-only entries that are missing locally
           const merged = [...localChars];
@@ -315,20 +314,17 @@ export default function AIGirlsCloudScreen() {
           setCustomChars(merged);
           await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(merged)).catch(() => {});
         }
-        // Load global photo styles from Settings screen (overrides local custom styles)
-        const globalStyles = await getGlobalPhotoStyles().catch(() => null);
-        if (globalStyles && globalStyles.custom.length > 0) {
-          setCustomStyles(globalStyles.custom);
-          await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(globalStyles.custom)).catch(() => {});
-        } else if (Array.isArray(cloudStyles) && cloudStyles.length > 0) {
-          // Fallback: old custom_styles Cloudinary meta key
-          const merged = [...localStyles];
-          for (const cs of cloudStyles) {
-            if (!merged.some((s: any) => s.id === cs.id)) merged.push(cs);
-          }
-          setCustomStyles(merged);
-          await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(merged)).catch(() => {});
-        }
+        // Settings → Photo Styles is the only master source. A successful
+        // empty master list must clear stale local/legacy style metadata too.
+        const globalStyles = await getGlobalPhotoStyles();
+        setGlobalHiddenStyles(new Set(globalStyles.hidden));
+        setCustomStyles(globalStyles.custom);
+        const serialized = JSON.stringify(globalStyles.custom);
+        await Promise.all([
+          AsyncStorage.setItem(CUSTOM_STYLES_KEY, serialized),
+          AsyncStorage.setItem('cloud_custom_styles', serialized),
+          AsyncStorage.setItem('custom_photo_styles_v1', serialized),
+        ]);
       } catch { /* cloud fetch failed — local data still shown */ }
     };
     loadFolders();
@@ -343,7 +339,9 @@ export default function AIGirlsCloudScreen() {
   }));
 
   const personas = [...basePersonas, ...customChars];
-  const photoStyles = [...PHOTO_STYLES, ...customStyles].filter(s => !hiddenStyles.has(s.id));
+  const photoStyles = [...PHOTO_STYLES, ...customStyles].filter(
+    s => !hiddenStyles.has(s.id) && !globalHiddenStyles.has(s.id),
+  );
 
   const handleNewFolder = () => {
     setFolderName('');
