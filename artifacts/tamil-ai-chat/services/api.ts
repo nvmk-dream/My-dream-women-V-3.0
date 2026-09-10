@@ -1165,16 +1165,16 @@ export type GlobalStyleEntry = { id: string; label: string; prompt?: string };
 export type GlobalPhotoStyles = { hidden: string[]; custom: GlobalStyleEntry[] };
 
 export async function getGlobalPhotoStyles(): Promise<GlobalPhotoStyles> {
-  try {
-    const raw = await getCloudinaryMeta('global_photo_styles') as any;
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      return {
-        hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
-        custom: Array.isArray(raw.custom) ? raw.custom : [],
-      };
-    }
-  } catch {}
-  return { hidden: [], custom: [] };
+  const raw = await getCloudinaryMeta('global_photo_styles') as any;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return {
+      hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
+      custom: Array.isArray(raw.custom) ? raw.custom : [],
+    };
+  }
+  // Keep callers' local-cache fallback working when Cloudinary is unreachable.
+  // An empty master document is valid, but a null response means it was not read.
+  throw new Error('Global photo styles unavailable');
 }
 
 export async function saveGlobalPhotoStyles(data: GlobalPhotoStyles): Promise<void> {
@@ -1196,7 +1196,13 @@ export async function deleteStyleFolderGlobally(
       return { ok: false };
     }
     const json = await res.json();
-    return { ok: true, results: json.results };
+    const results = Array.isArray(json.results) ? json.results : [];
+    const failed = results.filter((r: any) => r && r.error);
+    if (failed.length > 0) {
+      console.warn('[deleteStyleFolderGlobally] folder failures:', failed);
+      return { ok: false, results };
+    }
+    return { ok: true, results };
   } catch (e) {
     console.warn('[deleteStyleFolderGlobally] failed:', styleId, e);
     return { ok: false };
