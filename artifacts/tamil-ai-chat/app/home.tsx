@@ -16,6 +16,8 @@ const TILE = (width - 32 - (COLS - 1) * 12) / COLS;
 const COVER_H = 150;
 
 const DEFAULT_COVER = require('../assets/images/icon.png');
+const CLOUDINARY_ICON = require('../assets/images/cloudinary-icon.png');
+const CLOUD_TILE_BG = '#dff8fa';
 const COVER_KEY = 'home_cover_image';
 const CUSTOM_SERVER_KEY = 'custom_server_url';
 const DEFAULT_RENDER_URL = 'https://my-dream-women-v2.onrender.com';
@@ -242,7 +244,7 @@ export default function HomeScreen() {
           <View style={s.coverOverlay} />
           <View style={[s.coverBar, { paddingTop: insets.top + 14 }]}>
             <View style={s.headerLeft}>
-              <Text style={s.headerCloud}>☁️</Text>
+              <Image source={CLOUDINARY_ICON} style={s.headerCloud} resizeMode="contain" />
               <Text style={s.headerTitle}>My Dream Women</Text>
             </View>
             <View style={s.coverActions}>
@@ -258,7 +260,7 @@ export default function HomeScreen() {
       ) : (
         <View style={[s.compactBar, { paddingTop: insets.top + 12 }]}>
           <View style={s.headerLeft}>
-            <Text style={s.headerCloud}>☁️</Text>
+            <Image source={CLOUDINARY_ICON} style={s.headerCloud} resizeMode="contain" />
             <Text style={s.headerTitle}>My Dream Women</Text>
           </View>
           <View style={s.coverActions}>
@@ -299,8 +301,16 @@ export default function HomeScreen() {
                   onPress={() => { if (cat.route) router.push(cat.route as any); }}
                   activeOpacity={0.7}
                 >
-                  <View style={[s.tileIcon, { backgroundColor: cat.bg }]}>
-                    <Text style={s.tileEmoji}>{cat.emoji}</Text>
+                  <View
+                    style={[
+                      s.tileIcon,
+                      cat.key === 'cloud' && s.cloudTileIcon,
+                      { backgroundColor: cat.key === 'cloud' ? CLOUD_TILE_BG : cat.bg },
+                    ]}
+                  >
+                    {cat.key === 'cloud'
+                      ? <Image source={CLOUDINARY_ICON} style={s.cloudTileImage} resizeMode="contain" />
+                      : <Text style={s.tileEmoji}>{cat.emoji}</Text>}
                   </View>
                   {/* ☁️ cloud badge — only for CLOUD_ENABLED categories */}
                   {hasCloud && (
@@ -490,7 +500,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerCloud: { fontSize: 26 },
+  headerCloud: { width: 32, height: 32 },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', textShadowColor: '#000', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   coverActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   editBtn: {
@@ -519,6 +529,14 @@ const s = StyleSheet.create({
     shadowOpacity: 0.12, shadowRadius: 4,
   },
   tileEmoji: { fontSize: 28 },
+  cloudTileIcon: {
+    borderRadius: 22,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)',
+    overflow: 'hidden',
+    shadowColor: '#72cdd5', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
+  },
+  cloudTileImage: { width: '88%', height: '88%' },
   tileLabel: { fontSize: 11, color: '#333', fontWeight: '600', textAlign: 'center' },
 
   // ☁️ cloud badge button
