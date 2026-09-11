@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadUriToCloudinary } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const COLS = 4;
@@ -16,27 +18,28 @@ const TILE = (width - 32 - (COLS - 1) * 12) / COLS;
 const COVER_H = 150;
 
 const DEFAULT_COVER = require('../assets/images/icon.png');
-const CLOUDINARY_ICON = require('../assets/images/cloudinary-icon.png');
-const CLOUD_TILE_BG = '#dff8fa';
 const COVER_KEY = 'home_cover_image';
 const CUSTOM_SERVER_KEY = 'custom_server_url';
 const DEFAULT_RENDER_URL = 'https://my-dream-women-v2.onrender.com';
 
-const CATEGORIES = [
-  { key: 'pictures',    label: 'Pictures',    emoji: '🖼️',  bg: '#4A90D9', route: '/gallery?album=pictures' },
-  { key: 'camera',      label: 'Camera',      emoji: '📷',  bg: '#E8821A', route: '/gallery?album=camera' },
-  { key: 'movies',      label: 'Movies',      emoji: '🎬',  bg: '#C0392B', route: '/gallery?album=movies' },
-  { key: 'screenshots', label: 'Screenshots', emoji: '📱',  bg: '#27AE60', route: '/gallery?album=screenshots' },
-  { key: 'downloads',   label: 'Downloads',   emoji: '⬇️',  bg: '#8E6BBE', route: '/gallery?album=downloads' },
-  { key: 'documents',   label: 'Documents',   emoji: '📄',  bg: '#3498DB', route: '/gallery?album=documents' },
-  { key: 'music',       label: 'Music',       emoji: '🎵',  bg: '#9B59B6', route: '/gallery?album=music' },
-  { key: 'icons',       label: 'Icons',       emoji: '🎨',  bg: '#FF6B35', route: '/gallery?album=icons' },
-  { key: 'ai-girls',    label: 'My AI Girls', emoji: '💕',  bg: '#E91E8C', route: '/ai-girls-cloud' },
-  { key: 'projects',    label: 'Projects',    emoji: '💼',  bg: '#8E44AD', route: '/gallery?album=projects' },
-  { key: 'notes',       label: 'Notes',       emoji: '📝',  bg: '#E67E22', route: '/notes' },
-  { key: 'keys',        label: 'Keys',        emoji: '🔑',  bg: '#F0C040', route: '/keys' },
-  { key: 'cloud',       label: 'Cloud',       emoji: '☁️',  bg: '#1ABC9C', route: '/cloud-storage' },
-  { key: 'videos',      label: 'Videos',      emoji: '🎬',  bg: '#1565C0', route: '/videos' },
+type CategoryIconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+type Category = { key: string; label: string; emoji: string; icon: CategoryIconName; bg: string; route: string };
+
+const CATEGORIES: Category[] = [
+  { key: 'pictures',    label: 'Pictures',    emoji: '🖼️',  icon: 'image-multiple-outline', bg: '#4A90D9', route: '/gallery?album=pictures' },
+  { key: 'camera',      label: 'Camera',      emoji: '📷',  icon: 'camera-outline', bg: '#E8821A', route: '/gallery?album=camera' },
+  { key: 'movies',      label: 'Movies',      emoji: '🎬',  icon: 'movie-outline', bg: '#C0392B', route: '/gallery?album=movies' },
+  { key: 'screenshots', label: 'Screenshots', emoji: '📱',  icon: 'cell-phone', bg: '#27AE60', route: '/gallery?album=screenshots' },
+  { key: 'downloads',   label: 'Downloads',   emoji: '⬇️',  icon: 'download-outline', bg: '#8E6BBE', route: '/gallery?album=downloads' },
+  { key: 'documents',   label: 'Documents',   emoji: '📄',  icon: 'file-document-outline', bg: '#3498DB', route: '/gallery?album=documents' },
+  { key: 'music',       label: 'Music',       emoji: '🎵',  icon: 'music-note-outline', bg: '#9B59B6', route: '/gallery?album=music' },
+  { key: 'icons',       label: 'Icons',       emoji: '🎨',  icon: 'palette-outline', bg: '#FF6B35', route: '/gallery?album=icons' },
+  { key: 'ai-girls',    label: 'My AI Girls', emoji: '💕',  icon: 'heart-multiple-outline', bg: '#E91E8C', route: '/ai-girls-cloud' },
+  { key: 'projects',    label: 'Projects',    emoji: '💼',  icon: 'briefcase-outline', bg: '#8E44AD', route: '/gallery?album=projects' },
+  { key: 'notes',       label: 'Notes',       emoji: '📝',  icon: 'note-edit-outline', bg: '#E67E22', route: '/notes' },
+  { key: 'keys',        label: 'Keys',        emoji: '🔑',  icon: 'key-outline', bg: '#F0C040', route: '/keys' },
+  { key: 'cloud',       label: 'Cloud',       emoji: '☁️',  icon: 'cloud-outline', bg: '#1ABC9C', route: '/cloud-storage' },
+  { key: 'videos',      label: 'Videos',      emoji: '🎬',  icon: 'video-outline', bg: '#1565C0', route: '/videos' },
 ];
 
 // Tiles that get a ☁️ cloud button (keys, cloud, projects, notes excluded)
@@ -51,6 +54,23 @@ const GALLERY_CATS = new Set([
 ]);
 
 type CloudPhoto = { uri: string };
+
+function GlossyCategoryIcon({ name, color, size = TILE - 8 }: { name: CategoryIconName; color: string; size?: number }) {
+  const radius = Math.max(12, Math.round(size * 0.28));
+  return (
+    <View style={[s.glossyIcon, { width: size, height: size, borderRadius: radius }]}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.62)', color, 'rgba(0,0,0,0.16)']}
+        start={{ x: 0.12, y: 0 }}
+        end={{ x: 0.88, y: 1 }}
+        style={[s.glossyGradient, { borderRadius: radius }]}
+      >
+        <View pointerEvents="none" style={s.glossyHighlight} />
+        <MaterialCommunityIcons name={name} size={Math.round(size * 0.42)} color="#fff" />
+      </LinearGradient>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -244,7 +264,7 @@ export default function HomeScreen() {
           <View style={s.coverOverlay} />
           <View style={[s.coverBar, { paddingTop: insets.top + 14 }]}>
             <View style={s.headerLeft}>
-              <Image source={CLOUDINARY_ICON} style={s.headerCloud} resizeMode="contain" />
+              <GlossyCategoryIcon name="cloud-outline" color="#1ABC9C" size={32} />
               <Text style={s.headerTitle}>My Dream Women</Text>
             </View>
             <View style={s.coverActions}>
@@ -260,7 +280,7 @@ export default function HomeScreen() {
       ) : (
         <View style={[s.compactBar, { paddingTop: insets.top + 12 }]}>
           <View style={s.headerLeft}>
-            <Image source={CLOUDINARY_ICON} style={s.headerCloud} resizeMode="contain" />
+            <GlossyCategoryIcon name="cloud-outline" color="#1ABC9C" size={32} />
             <Text style={s.headerTitle}>My Dream Women</Text>
           </View>
           <View style={s.coverActions}>
@@ -301,17 +321,7 @@ export default function HomeScreen() {
                   onPress={() => { if (cat.route) router.push(cat.route as any); }}
                   activeOpacity={0.7}
                 >
-                  <View
-                    style={[
-                      s.tileIcon,
-                      cat.key === 'cloud' && s.cloudTileIcon,
-                      { backgroundColor: cat.key === 'cloud' ? CLOUD_TILE_BG : cat.bg },
-                    ]}
-                  >
-                    {cat.key === 'cloud'
-                      ? <Image source={CLOUDINARY_ICON} style={s.cloudTileImage} resizeMode="contain" />
-                      : <Text style={s.tileEmoji}>{cat.emoji}</Text>}
-                  </View>
+                  <GlossyCategoryIcon name={cat.icon} color={cat.bg} />
                   {/* ☁️ cloud badge — only for CLOUD_ENABLED categories */}
                   {hasCloud && (
                     <TouchableOpacity
@@ -500,7 +510,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerCloud: { width: 32, height: 32 },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', textShadowColor: '#000', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   coverActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   editBtn: {
@@ -520,23 +529,20 @@ const s = StyleSheet.create({
   // Tile — now wraps both icon and cloud badge
   tile: { width: TILE, alignItems: 'center' },
   tileIconWrap: { width: TILE - 8, position: 'relative', marginBottom: 6 },
-  tileIcon: {
-    width: TILE - 8, height: TILE - 8,
-    borderRadius: (TILE - 8) / 2,
-    justifyContent: 'center', alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12, shadowRadius: 4,
+  glossyIcon: {
+    elevation: 4,
+    shadowColor: '#152238', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18, shadowRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)',
+    overflow: 'hidden',
+  },
+  glossyGradient: { flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  glossyHighlight: {
+    position: 'absolute', top: -10, left: -8, width: '78%', height: '42%',
+    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.28)',
+    transform: [{ rotate: '-18deg' }],
   },
   tileEmoji: { fontSize: 28 },
-  cloudTileIcon: {
-    borderRadius: 22,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)',
-    overflow: 'hidden',
-    shadowColor: '#72cdd5', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
-  },
-  cloudTileImage: { width: '88%', height: '88%' },
   tileLabel: { fontSize: 11, color: '#333', fontWeight: '600', textAlign: 'center' },
 
   // ☁️ cloud badge button
