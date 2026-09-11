@@ -38,6 +38,41 @@ function formatDate(ts: number) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+type NotesBottomNavProps = {
+  onBack: () => void;
+  onMiddle: () => void;
+  middleIcon: string;
+  onRight?: () => void;
+  rightIcon: string;
+  middleIsFab?: boolean;
+};
+
+function NotesBottomNav({
+  onBack, onMiddle, middleIcon, onRight, rightIcon, middleIsFab = false,
+}: NotesBottomNavProps) {
+  return (
+    <SafeAreaView style={s.bottomNavSafe} edges={['bottom']}>
+      <View style={s.notesBottomBar}>
+        <TouchableOpacity testID="notes-nav-back" style={s.notesNavSlot} onPress={onBack}>
+          <Text style={s.notesBottomIcon}>←</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID={middleIsFab ? 'notes-nav-add' : 'notes-nav-home'}
+          style={s.notesNavSlot}
+          onPress={onMiddle}
+        >
+          <View style={middleIsFab ? s.notesAddFab : s.notesHomeBtn}>
+            <Text style={middleIsFab ? s.notesAddFabTxt : s.notesHomeIcon}>{middleIcon}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity testID="notes-nav-right" style={s.notesNavSlot} onPress={onRight}>
+          <Text style={s.notesBottomIcon}>{rightIcon}</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function NotesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -452,7 +487,7 @@ export default function NotesScreen() {
   // ── PAGES LIST ──
   if (view === 'pages' && activeChar) {
     return (
-      <SafeAreaView style={s.safe} edges={['bottom']}>
+      <SafeAreaView style={s.safe} edges={['left', 'right']}>
         <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
         <Stack.Screen options={{ headerShown: false }} />
 
@@ -486,6 +521,7 @@ export default function NotesScreen() {
           <Text style={s.breadcrumbCount}>{filteredPages.length} notes</Text>
         </View>
 
+        <View style={s.notesContent}>
         {filteredPages.length === 0 ? (
           <View style={s.emptyPages}>
             <Text style={s.emptyPagesIcon}>📋</Text>
@@ -496,7 +532,8 @@ export default function NotesScreen() {
           <FlatList
             data={filteredPages}
             keyExtractor={p => p.id}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            style={s.notesList}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={s.noteCard}
@@ -522,17 +559,16 @@ export default function NotesScreen() {
           />
         )}
 
-        <View style={s.notesBottomBar}>
-          <TouchableOpacity style={s.notesBottomBtn} onPress={() => { setView('chars'); setActiveChar(null); }}>
-            <Text style={s.notesBottomIcon}>⊙</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.notesAddFab} onPress={() => setAddPageModal(true)}>
-            <Text style={s.notesAddFabTxt}>+</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.notesBottomBtn} onPress={() => router.replace('/')}>
-            <Text style={s.notesBottomIcon}>🏠</Text>
-          </TouchableOpacity>
         </View>
+
+        <NotesBottomNav
+          onBack={() => { setView('chars'); setActiveChar(null); }}
+          onMiddle={() => setAddPageModal(true)}
+          middleIcon="+"
+          middleIsFab
+          onRight={() => router.replace('/')}
+          rightIcon="🏠"
+        />
 
         {/* ── Add Custom Style modal (shared with Chat) ── */}
         <Modal visible={showAddStyleModal} transparent animationType="slide" onRequestClose={() => setShowAddStyleModal(false)}>
@@ -652,7 +688,7 @@ export default function NotesScreen() {
 
   // ── CHARACTER LIST ──
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
+    <SafeAreaView style={s.safe} edges={['left', 'right']}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
@@ -674,10 +710,12 @@ export default function NotesScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={s.notesContent}>
       <FlatList
         data={filteredChars}
         keyExtractor={p => p.id}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        style={s.notesList}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
         renderItem={({ item, index }) => {
           const charPages = allNotes[item.id] ?? [];
           const lastPage = charPages.sort((a, b) => b.updatedAt - a.updatedAt)[0];
@@ -703,17 +741,15 @@ export default function NotesScreen() {
         }}
       />
 
-      <View style={s.notesBottomBar}>
-        <TouchableOpacity style={s.notesBottomBtn} onPress={() => router.back()}>
-          <Text style={s.notesBottomIcon}>←</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.notesAddFab} onPress={() => router.replace('/')}>
-          <Text style={{ fontSize: 22 }}>🏠</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.notesBottomBtn}>
-          <Text style={s.notesBottomIcon}>→</Text>
-        </TouchableOpacity>
       </View>
+
+      <NotesBottomNav
+        onBack={() => router.back()}
+        onMiddle={() => router.replace('/')}
+        middleIcon="🏠"
+        onRight={() => {}}
+        rightIcon="→"
+      />
 
       <SharedModals />
     </SafeAreaView>
@@ -760,14 +796,25 @@ const s = StyleSheet.create({
   emptyPagesTxt: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 },
   emptyPagesSub: { fontSize: 13, color: '#999', textAlign: 'center', lineHeight: 20 },
 
+  notesContent: { flex: 1, minHeight: 0 },
+  notesList: { flex: 1 },
+  bottomNavSafe: { backgroundColor: '#fff' },
   notesBottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingVertical: 12, paddingHorizontal: 20, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    minHeight: 68, flexDirection: 'row', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: '#f0f0f0', backgroundColor: '#fff',
+    paddingHorizontal: 8, paddingVertical: 8,
   },
-  notesBottomBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  notesNavSlot: {
+    flex: 1, minWidth: 0, minHeight: 52,
+    justifyContent: 'center', alignItems: 'center',
+  },
   notesBottomIcon: { fontSize: 22, color: '#888' },
+  notesHomeBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff7eb',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: '#F5A623',
+  },
+  notesHomeIcon: { fontSize: 21 },
   notesAddFab: {
     width: 52, height: 52, borderRadius: 26, backgroundColor: '#F5A623',
     justifyContent: 'center', alignItems: 'center',
