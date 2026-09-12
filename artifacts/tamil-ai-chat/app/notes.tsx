@@ -7,25 +7,18 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_PERSONAS } from '../constants/personas';
-import { getCloudinaryMeta, setCloudinaryMeta } from '../services/api';
+import { getCloudinaryMeta, setCloudinaryMeta, getPhotoStyles, type PhotoStyleRecord } from '../services/api';
 
-const BUILTIN_PHOTO_STYLES = [
-  'Breast Show', 'Buttocks', 'Cleavage', 'Half Breast',
-  'High Slit', 'Legs Spread', 'Lingerie', 'Low Neckline',
-  'Nude', 'Seductive', 'Wet Clothes', 'Sleeping',
-  'General Notes', 'Chat Ideas', 'Prompts', 'Story Ideas',
-];
+const NOTE_CATEGORIES = ['General Notes', 'Chat Ideas', 'Prompts', 'Story Ideas'];
 
 const ACCENT_COLORS = ['#F5A623', '#E91E8C', '#4A90D9', '#27AE60', '#9B59B6', '#E53935', '#FF7043', '#00ACC1', '#8D6E63', '#558B2F'];
 
 type Page = { id: string; title: string; content: string; updatedAt: number; accent?: string };
 type CharNotes = Record<string, Page[]>;
-type CustomStyle = { id: string; label: string; prompt?: string };
 type PersonaMerged = (typeof ALL_PERSONAS)[0] & { avatarPhotoUri?: string };
 type NotesOwner = { id: string; name: string; emoji?: string };
 
 const STORAGE_KEY = 'character_notes_v2';
-const CUSTOM_STYLES_KEY = 'custom_photo_styles_v1';
 const USER_NOTES_ID = 'user_notes';
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
@@ -79,10 +72,7 @@ export default function NotesScreen() {
   const [view, setView] = useState<'chars' | 'pages' | 'editor'>('chars');
   const [allNotes, setAllNotes] = useState<CharNotes>({});
   const [personas, setPersonas] = useState<PersonaMerged[]>(ALL_PERSONAS as PersonaMerged[]);
-  const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
-  const [showAddStyleModal, setShowAddStyleModal] = useState(false);
-  const [newStyleName, setNewStyleName] = useState('');
-  const [newStylePrompt, setNewStylePrompt] = useState('');
+  const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
   const [activeChar, setActiveChar] = useState<NotesOwner | null>(null);
   const [userNotesName, setUserNotesName] = useState('User');
   const [activePage, setActivePage] = useState<Page | null>(null);
@@ -142,8 +132,7 @@ export default function NotesScreen() {
         }
       }));
       setPersonas(merged);
-      const stylesRaw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY);
-      if (stylesRaw) setCustomStyles(JSON.parse(stylesRaw));
+      setPhotoStyles(await getPhotoStyles());
     } catch {}
   }, []);
 
@@ -152,52 +141,8 @@ export default function NotesScreen() {
     if (view === 'chars' || view === 'pages') reloadShared();
   }, [view, reloadShared]);
 
-  // Race-safe: always re-read storage before merge & write (Chat may have added styles meanwhile)
-  const addCustomStyle = async () => {
-    const name = newStyleName.trim();
-    if (!name) return;
-    const newStyle: CustomStyle = {
-      id: `custom_${Date.now().toString(36)}`,
-      label: name,
-      prompt: newStylePrompt.trim() || name.toLowerCase(),
-    };
-    try {
-      const raw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY);
-      const current: CustomStyle[] = Array.isArray(raw ? JSON.parse(raw) : null) ? JSON.parse(raw!) : [];
-      const merged = [...current, newStyle];
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(merged));
-      setCustomStyles(merged);
-      setCloudinaryMeta('custom_photo_styles_v1', merged).catch(() => {}); // cloud backup
-    } catch {
-      const updated = [...customStyles, newStyle];
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
-    }
-    setNewStyleName('');
-    setNewStylePrompt('');
-    setShowAddStyleModal(false);
-    showToast(`✅ "${name}" style சேர்க்கப்பட்டது`);
-  };
-
-  const removeCustomStyle = async (id: string) => {
-    try {
-      const raw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY);
-      const current: CustomStyle[] = Array.isArray(raw ? JSON.parse(raw) : null) ? JSON.parse(raw!) : [];
-      const updated = current.filter(s => s.id !== id);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCustomStyles(updated);
-      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
-    } catch {
-      const updated = customStyles.filter(s => s.id !== id);
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_photo_styles_v1', updated).catch(() => {}); // cloud backup
-    }
-  };
-
-  // Combined list for display: built-in + custom
-  const ALL_STYLES = [...BUILTIN_PHOTO_STYLES, ...customStyles.map(s => s.label)];
+  // Notes can use styles, but Settings is the only place that manages them.
+  const ALL_STYLES = [...NOTE_CATEGORIES, ...photoStyles.map(s => s.name)];
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -570,45 +515,6 @@ export default function NotesScreen() {
           rightIcon="🏠"
         />
 
-        {/* ── Add Custom Style modal (shared with Chat) ── */}
-        <Modal visible={showAddStyleModal} transparent animationType="slide" onRequestClose={() => setShowAddStyleModal(false)}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
-            <View style={s.modalBox}>
-              <Text style={s.modalTitle}>+ Custom Style சேர்க்க</Text>
-              <Text style={s.modalSubLabel}>Style Name (Notes & Chat-ல் தோன்றும்)</Text>
-              <TextInput
-                style={s.modalInput}
-                value={newStyleName}
-                onChangeText={setNewStyleName}
-                placeholder="e.g. Beach Pose"
-                placeholderTextColor="#999"
-                autoFocus
-              />
-              <Text style={s.modalSubLabel}>AI Prompt (optional — chat photo generation-க்கு)</Text>
-              <TextInput
-                style={[s.modalInput, { height: 60 }]}
-                value={newStylePrompt}
-                onChangeText={setNewStylePrompt}
-                placeholder="e.g. sitting on beach, bikini, sunset"
-                placeholderTextColor="#999"
-                multiline
-              />
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowAddStyleModal(false); setNewStyleName(''); setNewStylePrompt(''); }}>
-                  <Text style={s.cancelBtnTxt}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.createBtn, !newStyleName.trim() && { opacity: 0.4 }]}
-                  onPress={addCustomStyle}
-                  disabled={!newStyleName.trim()}
-                >
-                  <Text style={s.createBtnTxt}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-
         <Modal visible={addPageModal} transparent animationType="slide" onRequestClose={() => setAddPageModal(false)}>
           <View style={s.modalOverlay}>
             <View style={s.modalBox}>
@@ -624,30 +530,7 @@ export default function NotesScreen() {
               <Text style={s.modalSubLabel}>Quick photo styles:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                 {ALL_STYLES.map((st, i) => {
-                  const isCustom = i >= BUILTIN_PHOTO_STYLES.length;
-                  const customId = isCustom ? customStyles[i - BUILTIN_PHOTO_STYLES.length]?.id : null;
                   const accent = ACCENT_COLORS[i % ACCENT_COLORS.length];
-                  if (isCustom && customId) {
-                    return (
-                      <View key={st + i} style={{ flexDirection: 'column', alignItems: 'center', marginRight: 4 }}>
-                        <TouchableOpacity
-                          style={[s.styleChip, { borderColor: accent }]}
-                          onPress={() => addPage(st, accent)}
-                        >
-                          <Text style={[s.styleChipTxt, { color: accent }]}>{'★ ' + st}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => Alert.alert('Style நீக்கு', '"' + st + '" delete பண்ணணுமா?', [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Delete', style: 'destructive', onPress: () => { removeCustomStyle(customId); showToast('"' + st + '" நீக்கப்பட்டது'); } },
-                          ])}
-                          style={{ paddingHorizontal: 6, paddingVertical: 2 }}
-                        >
-                          <Text style={{ fontSize: 14, color: '#e53935' }}>{'🗑️'}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  }
                   return (
                     <TouchableOpacity
                       key={st + i}
@@ -658,12 +541,6 @@ export default function NotesScreen() {
                     </TouchableOpacity>
                   );
                 })}
-                <TouchableOpacity
-                  style={[s.styleChip, { borderColor: '#6C5CE7', borderStyle: 'dashed' }]}
-                  onPress={() => { setAddPageModal(false); setTimeout(() => setShowAddStyleModal(true), 250); }}
-                >
-                  <Text style={[s.styleChipTxt, { color: '#6C5CE7' }]}>+ Add Style</Text>
-                </TouchableOpacity>
               </ScrollView>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity style={s.cancelBtn} onPress={() => { setAddPageModal(false); setNewPageTitle(''); }}>

@@ -12,7 +12,6 @@ import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
-import { PHOTO_STYLES } from '../constants/photo-styles';
 import { ParamsStore } from '../context/params-store';
 import { isModelCached, isWebGPUSupported } from '../services/webllm';
 import {
@@ -25,12 +24,10 @@ import {
   setupNotificationChannel,
   requestNativeNotificationPermission,
 } from '../services/native-notifications';
-import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, getGlobalPhotoStyles, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked } from '../services/api';
+import { uploadToCloudinary, imageToPrompt, createCloudinaryFolder, getCloudinaryMeta, getPhotoStyles, setCloudinaryMeta, flushPendingTracks, flushPendingMeta, wasCloudRestoreChecked, markCloudRestoreChecked, type PhotoStyleRecord } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-
-const PHOTO_FOLDERS = PHOTO_STYLES;
 
 const STYLE_TO_PROMPT: Record<string, string> = {
   breast: 'topless, showing breasts, bare chest',
@@ -119,6 +116,7 @@ export default function AIGirlsScreen() {
   const insets = useSafeAreaInsets();
   const [personas, setPersonas] = useState<PersonaWithExtra[]>([]);
   const [loading, setLoading] = useState(true);
+  const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
 
   // Photo folder selection
   const [showFolderModal, setShowFolderModal] = useState(false);
@@ -181,6 +179,9 @@ export default function AIGirlsScreen() {
   const [pinInput, setPinInput] = useState('');
   const [pinMsg, setPinMsg] = useState('');
   const [existingPin, setExistingPin] = useState<string | null>(null);
+  const loadPhotoStyles = useCallback(async () => {
+    try { setPhotoStyles(await getPhotoStyles()); } catch { setPhotoStyles([]); }
+  }, []);
 
   const loadPersonas = useCallback(async () => {
     setLoading(true);
@@ -263,11 +264,8 @@ export default function AIGirlsScreen() {
     // The persona ID is the canonical character folder key used by the camera
     // requests. Keep this aligned with ai-girls-cloud.tsx so uploads and reads
     // always use the same Cloudinary path.
-    const globalStyles = await getGlobalPhotoStyles().catch(() => ({ hidden: [], custom: [] }));
-    const STYLE_IDS = [
-      ...PHOTO_STYLES.map(style => style.id),
-      ...globalStyles.custom.map(style => style.id),
-    ].filter((styleId, index, all) => Boolean(styleId) && all.indexOf(styleId) === index);
+    const styles = await getPhotoStyles();
+    const STYLE_FOLDERS = styles.map(style => style.folderName).filter((folder, index, all) => Boolean(folder) && all.indexOf(folder) === index);
     const charFolder   = `my-girls/${id}`;
     const videosFolder = `my-girls/videos/${folderName}`;
 
@@ -275,7 +273,7 @@ export default function AIGirlsScreen() {
       `✅ "${name}" add ஆச்சு!`,
       `📁 Cloudinary folders creating...
 ${charFolder}/
-└── ${STYLE_IDS.join(', ')}
+└── ${STYLE_FOLDERS.join(', ')}
 
 AsyncStorage-ல் save ஆச்சு!`
     );
@@ -297,7 +295,7 @@ AsyncStorage-ல் save ஆச்சு!`
         // Step 2 — sub-folders in parallel (style list + videos)
         const subFolders = [
           videosFolder,
-          ...STYLE_IDS.map(styleId => `${charFolder}/${styleId}`),
+          ...STYLE_FOLDERS.map(styleFolder => `${charFolder}/${styleFolder}`),
         ];
         const results = await Promise.allSettled(
           subFolders.map(f => createCloudinaryFolder(f))
@@ -478,7 +476,8 @@ AsyncStorage-ல் save ஆச்சு!`
   useFocusEffect(useCallback(() => {
     loadPersonas();
     loadSettingsAndCheck();
-  }, [loadPersonas, loadSettingsAndCheck]));
+    loadPhotoStyles();
+  }, [loadPersonas, loadSettingsAndCheck, loadPhotoStyles]));
 
   // ── Background auto-message timer (runs every 30s) ────────────
   const autoMsgEnabledRef = useRef(autoMsgEnabled);
@@ -1515,10 +1514,10 @@ Then write these prompts:
           <View style={s.sheet}>
             <Text style={s.sheetTitle}>📸 Photo Style தேர்வு</Text>
             <ScrollView style={{ maxHeight: 420 }}>
-              {PHOTO_FOLDERS.map(f => (
+              {photoStyles.map(f => (
                 <TouchableOpacity key={f.id} style={s.folderRow} onPress={() => handleFolderSelect(f.id)}>
-                  <View style={[s.folderDot, { backgroundColor: f.color }]} />
-                  <Text style={[s.folderLabel, { color: f.color }]}>{f.label}</Text>
+                  <View style={[s.folderDot, { backgroundColor: '#6C63FF' }]} />
+                  <Text style={[s.folderLabel, { color: '#6C63FF' }]}>{f.name}</Text>
                   <Text style={s.folderArrow}>›</Text>
                 </TouchableOpacity>
               ))}
@@ -1536,7 +1535,7 @@ Then write these prompts:
         <View style={s.overlay}>
           <View style={s.sheet}>
             <Text style={s.sheetTitle}>Character தேர்வு</Text>
-            <Text style={s.sheetSub}>யாரோட {PHOTO_FOLDERS.find(f => f.id === pendingFolderId)?.label} photo வேணும்?</Text>
+            <Text style={s.sheetSub}>யாரோட {photoStyles.find(f => f.id === pendingFolderId)?.name} photo வேணும்?</Text>
             <ScrollView style={{ maxHeight: 380 }}>
               {personas.map(p => (
                 <TouchableOpacity key={p.id} style={s.sheetRow} onPress={() => handleCharForPhoto(p)}>
@@ -1637,7 +1636,7 @@ Then write these prompts:
                 placeholderTextColor="#aaa" textAlignVertical="top" />
 
               <Text style={{ fontSize: 10, color: '#888', marginTop: 8, marginBottom: 12, lineHeight: 15 }}>
-                {'📁 Cloudinary: character ID folder + '}{PHOTO_FOLDERS.length}{' built-in style folders auto-create ஆகும்'}{' | 💾 AsyncStorage-ல் save ஆகும்'}
+                {'📁 Cloudinary: character ID folder + '}{photoStyles.length}{' master style folders auto-create ஆகும்'}{' | 💾 AsyncStorage-ல் save ஆகும்'}
               </Text>
 
               <View style={{ flexDirection: 'row', gap: 10 }}>

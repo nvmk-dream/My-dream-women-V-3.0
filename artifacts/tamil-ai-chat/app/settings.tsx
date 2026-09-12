@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { uploadUriToCloudinary, getGlobalPhotoStyles, saveGlobalPhotoStyles, createCloudinaryFolder, deleteStyleFolderGlobally, type GlobalPhotoStyles, type GlobalStyleEntry } from '../services/api';
+import { uploadUriToCloudinary, getPhotoStyles, createPhotoStyle, deletePhotoStyle, restorePhotoStyle, type PhotoStyleRecord, type GlobalStyleEntry } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
 
 const APP_VERSION = '1.2.0';
@@ -67,7 +67,7 @@ export default function SettingsScreen() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Photo Styles Global Management ──────────────────────────────────────
-  const [globalStyles, setGlobalStyles] = useState<GlobalPhotoStyles>({ hidden: [], custom: [] });
+  const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
   const [stylesLoading, setStylesLoading] = useState(false);
   const [showAddStyleModal, setShowAddStyleModal] = useState(false);
   const [newStyleLabel, setNewStyleLabel] = useState('');
@@ -89,7 +89,7 @@ export default function SettingsScreen() {
     }).catch(() => {});
     // Auto-load server defaults (GitHub token + HuggingFace token)
     loadServerDefaults();
-    loadGlobalStyles();
+    loadPhotoStyles();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
@@ -195,62 +195,16 @@ export default function SettingsScreen() {
     } catch {}
   };
 
-  // ── Photo Styles Global Management functions ─────────────────────────────
-  const loadGlobalStyles = async () => {
+  // ── Photo Styles database master source ──────────────────────────────────
+  const loadPhotoStyles = async () => {
     setStylesLoading(true);
     try {
-      const data = await getGlobalPhotoStyles();
-      setGlobalStyles(data);
-    } catch (e) {
-      // server offline — silently skip
+      setPhotoStyles(await getPhotoStyles(true));
+    } catch (e: any) {
+      setPhotoStyles([]);
+      Alert.alert('Photo Styles load ஆகவில்லை', e?.message || 'Server connection check பண்ணுங்க.');
     } finally {
       setStylesLoading(false);
-    }
-  };
-
-  const clearPhotoStyleCaches = async (styleId: string) => {
-    const femaleIds = ALL_PERSONAS.filter(p => p.gender === 'female').map(p => p.id);
-    await Promise.all(
-      femaleIds.map(id => AsyncStorage.removeItem(`cloud_photos_${id}_${styleId}`).catch(() => {})),
-    );
-    for (const key of ['custom_photo_styles_v1', 'cloud_custom_styles']) {
-      try {
-        const raw = await AsyncStorage.getItem(key);
-        if (!raw) continue;
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) {
-          await AsyncStorage.setItem(key, JSON.stringify(list.filter((s: any) => s?.id !== styleId)));
-        }
-      } catch {}
-    }
-  };
-
-  const toggleHideBuiltinStyle = async (styleId: string) => {
-    const current = { ...globalStyles };
-    const isHidden = current.hidden.includes(styleId);
-    try {
-      if (isHidden) {
-        // Restore = add the same style folders back for every female character.
-        const results = await Promise.all(
-          ALL_PERSONAS.filter(p => p.gender === 'female').map(p =>
-            createCloudinaryFolder(`my-girls/${p.id}/${styleId}`)
-          )
-        );
-        if (results.some(ok => !ok)) throw new Error('folder create failed');
-      } else {
-        const result = await deleteStyleFolderGlobally(styleId);
-        if (!result.ok) throw new Error('folder delete failed');
-      }
-      const newHidden = isHidden
-        ? current.hidden.filter(id => id !== styleId)
-        : [...current.hidden, styleId];
-      const updated: GlobalPhotoStyles = { ...current, hidden: newHidden };
-      await saveGlobalPhotoStyles(updated);
-      await clearPhotoStyleCaches(styleId);
-      setGlobalStyles(updated);
-    } catch {
-      Alert.alert('பிழை', 'Style folder update ஆகல. மீண்டும் try பண்ணுங்க.');
-      setGlobalStyles(current);
     }
   };
 
@@ -259,97 +213,37 @@ export default function SettingsScreen() {
     if (!label) { Alert.alert('பிழை', 'Style name உள்ளிடுங்க'); return; }
     setSavingStyle(true);
     try {
-      // The folder ID is derived from the master style name so the same name
-      // is used by the Photo Style list and Cloudinary folders.
-      const baseId = label
-        .normalize('NFKD')
-        .replace(/[^a-zA-Z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .toLowerCase() || 'style';
-      const usedIds = new Set([
-        ...BUILTIN_PHOTO_STYLES.map(s => s.id),
-        ...globalStyles.custom.map(s => s.id),
-      ]);
-      let styleId = baseId;
-      let suffix = 2;
-      while (usedIds.has(styleId)) styleId = `${baseId}_${suffix++}`;
-
-      const newEntry: GlobalStyleEntry = {
-        id: styleId,
-        label,
-        prompt: newStylePrompt.trim() || label.toLowerCase(),
-      };
-      const updated: GlobalPhotoStyles = {
-        ...globalStyles,
-        custom: [...globalStyles.custom, newEntry],
-      };
-      // Create every folder first. Do not publish the master entry when folder setup fails.
-      const folderResults = await Promise.all([
-        createCloudinaryFolder(`my-girls/global_styles/${newEntry.id}`),
-        ...ALL_PERSONAS
-          .filter(p => p.gender === 'female')
-          .map(p => createCloudinaryFolder(`my-girls/${p.id}/${newEntry.id}`)),
-      ]);
-      if (folderResults.some(ok => !ok)) {
-        throw new Error('Cloudinary folder creation failed');
-      }
-      await saveGlobalPhotoStyles(updated);
-      // Save to AsyncStorage immediately — Cloud Storage + Chat screens work offline/instantly
-      try {
-        const styleEntry = { id: newEntry.id, label: newEntry.label, prompt: newEntry.prompt };
-        // cloud_custom_styles key (used by ai-girls-cloud.tsx)
-        const cloudRaw = await AsyncStorage.getItem('cloud_custom_styles').catch(() => null);
-        const cloudList: any[] = cloudRaw ? JSON.parse(cloudRaw) : [];
-        if (!cloudList.some((s: any) => s.id === newEntry.id)) {
-          await AsyncStorage.setItem('cloud_custom_styles', JSON.stringify([...cloudList, styleEntry]));
-        }
-        // custom_photo_styles_v1 key (used by chat.tsx)
-        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1').catch(() => null);
-        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
-        if (!chatList.some((s: any) => s.id === newEntry.id)) {
-          await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, styleEntry]));
-        }
-      } catch {}
-      setGlobalStyles(updated);
+      await createPhotoStyle(label, newStylePrompt.trim());
+      await loadPhotoStyles();
       setShowAddStyleModal(false);
       setNewStyleLabel('');
       setNewStylePrompt('');
       Alert.alert('✅ Added', '"' + label + '" style அனைத்து characters-க்கும் கிடைக்கும்.');
-    } catch {
-      Alert.alert('பிழை', 'Style save ஆகல. Server connection check பண்ணுங்க.');
+    } catch (e: any) {
+      Alert.alert('பிழை', e?.message || 'Style save ஆகல. Server connection check பண்ணுங்க.');
     } finally {
       setSavingStyle(false);
     }
   };
 
-  const deleteGlobalStyle = (styleId: string, isBuiltin: boolean) => {
+  const deleteGlobalStyle = (style: PhotoStyleRecord) => {
     Alert.alert(
       '🗑️ Style Delete',
-      isBuiltin
-        ? 'இந்த style-ஐ globally delete பண்ணணுமா? இந்த style folders + photos delete ஆகும்.'
+      style.isBuiltin
+        ? 'இந்த built-in style-ஐ globally remove பண்ணணுமா? Folders + photos delete ஆகும். Restore செய்யலாம்.'
         : 'இந்த custom style-ஐ permanently delete பண்ணணுமா? Cloudinary folders + photos யாவும் delete ஆகும்.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: isBuiltin ? 'Hide' : '🗑️ Delete',
+          text: style.isBuiltin ? 'Remove' : '🗑️ Delete',
           style: 'destructive',
           onPress: async () => {
-            setDeletingStyleId(styleId);
+            setDeletingStyleId(style.id);
             try {
-              // Delete the same-named style folder from every female character.
-              // Custom styles also have a global reference folder.
-              const cloudResult = await deleteStyleFolderGlobally(styleId);
-              if (!cloudResult.ok) throw new Error('Cloudinary folder delete failed');
-
-              const updated: GlobalPhotoStyles = isBuiltin
-                ? { ...globalStyles, hidden: Array.from(new Set([...globalStyles.hidden, styleId])) }
-                : { ...globalStyles, custom: globalStyles.custom.filter(s => s.id !== styleId) };
-
-              await saveGlobalPhotoStyles(updated);
-              await clearPhotoStyleCaches(styleId);
-              setGlobalStyles(updated);
-            } catch {
-              Alert.alert('பிழை', 'Delete ஆகல. மீண்டும் try பண்ணுங்க.');
+              await deletePhotoStyle(style.id);
+              await loadPhotoStyles();
+            } catch (e: any) {
+              Alert.alert('பிழை', e?.message || 'Delete ஆகல. Cloudinary folders மாற்றப்படவில்லை.');
             } finally {
               setDeletingStyleId(null);
             }
@@ -962,37 +856,53 @@ export default function SettingsScreen() {
             <ActivityIndicator color="#6C63FF" style={{ marginVertical: 10 }} />
           ) : (
             <>
-              <Text style={s.stylesSectionLabel}>Built-in Styles ({BUILTIN_PHOTO_STYLES.length})</Text>
-              {BUILTIN_PHOTO_STYLES.map(style => {
-                const isHidden = globalStyles.hidden.includes(style.id);
-                return (
-                  <View key={style.id} style={[s.styleRow, isHidden && s.styleRowHidden]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.styleRowLabel, isHidden && { color: '#555' }]}>{style.label}</Text>
-                      {isHidden && <Text style={s.styleHiddenBadge}>🚫 Hidden Globally</Text>}
-                    </View>
-                    <TouchableOpacity
-                      style={s.styleToggleBtn}
-                      onPress={() => toggleHideBuiltinStyle(style.id)}
-                    >
-                      <Text style={{ fontSize: 18 }}>{isHidden ? '👁️' : '🗑️'}</Text>
-                    </TouchableOpacity>
+              <Text style={s.stylesSectionLabel}>
+                Built-in Styles ({photoStyles.filter(style => style.isBuiltin).length})
+              </Text>
+              {photoStyles.filter(style => style.isBuiltin).map(style => (
+                <View key={style.id} style={[s.styleRow, !style.isActive && s.styleRowHidden]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.styleRowLabel, !style.isActive && { color: '#555' }]}>{style.name}</Text>
+                    {style.prompt ? <Text style={s.stylePromptHint} numberOfLines={1}>{style.prompt}</Text> : null}
+                    {!style.isActive && <Text style={s.styleHiddenBadge}>🚫 Removed — tap restore</Text>}
                   </View>
-                );
-              })}
-              {globalStyles.custom.length > 0 && (
+                  <TouchableOpacity
+                    style={s.styleToggleBtn}
+                    disabled={deletingStyleId === style.id}
+                    onPress={async () => {
+                      setDeletingStyleId(style.id);
+                      try {
+                        if (style.isActive) await deletePhotoStyle(style.id);
+                        else await restorePhotoStyle(style.id);
+                        await loadPhotoStyles();
+                      } catch (e: any) {
+                        Alert.alert('பிழை', e?.message || 'Style update ஆகவில்லை.');
+                      } finally {
+                        setDeletingStyleId(null);
+                      }
+                    }}
+                  >
+                    {deletingStyleId === style.id
+                      ? <ActivityIndicator color="#f85149" size="small" />
+                      : <Text style={{ fontSize: 18 }}>{style.isActive ? '🗑️' : '👁️'}</Text>}
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {photoStyles.filter(style => !style.isBuiltin && style.isActive).length > 0 && (
                 <>
-                  <Text style={[s.stylesSectionLabel, { marginTop: 14 }]}>Custom Styles ({globalStyles.custom.length})</Text>
-                  {globalStyles.custom.map(style => (
+                  <Text style={[s.stylesSectionLabel, { marginTop: 14 }]}>
+                    Custom Styles ({photoStyles.filter(style => !style.isBuiltin && style.isActive).length})
+                  </Text>
+                  {photoStyles.filter(style => !style.isBuiltin && style.isActive).map(style => (
                     <View key={style.id} style={s.styleRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.styleRowLabel}>{style.label}</Text>
+                        <Text style={s.styleRowLabel}>{style.name}</Text>
                         {style.prompt ? <Text style={s.stylePromptHint} numberOfLines={1}>{style.prompt}</Text> : null}
                       </View>
                       <TouchableOpacity
                         style={s.styleToggleBtn}
                         disabled={deletingStyleId === style.id}
-                        onPress={() => deleteGlobalStyle(style.id, false)}
+                        onPress={() => deleteGlobalStyle(style)}
                       >
                         {deletingStyleId === style.id
                           ? <ActivityIndicator color="#f85149" size="small" />

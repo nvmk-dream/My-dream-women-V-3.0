@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, getGlobalPhotoStyles, saveGlobalPhotoStyles, type GlobalPhotoStyles } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, getPhotoStyles, type PhotoStyleRecord } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -139,7 +139,7 @@ function detectPhotoStyle(
 
   // Check custom style labels dynamically
   for (const style of allStyles) {
-    if (style.id.startsWith('custom_') && t.includes(style.label.toLowerCase())) {
+    if (!['normal', 'nude', 'seminude', 'breast', 'halfbreast', 'cleavage', 'lowneck', 'lingerie', 'buttocks', 'highslit', 'seductive', 'wet', 'legs', 'saree', 'sleeping'].includes(style.id) && t.includes(style.label.toLowerCase())) {
       return style.id;
     }
   }
@@ -570,56 +570,15 @@ export default function ChatScreen() {
   const [translateResult, setTranslateResult]   = useState('');
   const [showTranslateModal, setShowTranslateModal] = useState(false);
 
-  // ── Custom Photo Styles (shared with Notes) ──
-  const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
-  const [hiddenBuiltinIds, setHiddenBuiltinIds] = useState<string[]>([]);
-
-  const HIDDEN_BUILTIN_KEY = 'hidden_builtin_styles_v1';
-
-  // Combined styles: built-in (minus hidden) + custom
-  const PHOTO_STYLES = [
-    ...BUILTIN_PHOTO_STYLES.filter(s => !hiddenBuiltinIds.includes(s.id)),
-    ...customStyles,
-  ];
-
-  const loadCustomStyles = useCallback(async () => {
-    try {
-      // Primary: load from global Cloudinary meta (managed via Settings → Photo Styles)
-      const global = await getGlobalPhotoStyles();
-      setCustomStyles(global.custom);
-      setHiddenBuiltinIds(global.hidden);
-      // Mirror to AsyncStorage as offline cache
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(global.custom)).catch(() => {});
-      await AsyncStorage.setItem(HIDDEN_BUILTIN_KEY, JSON.stringify(global.hidden)).catch(() => {});
-    } catch {
-      // Fallback: AsyncStorage if Cloudinary unavailable
-      try {
-        const [rawCustom, rawHidden] = await Promise.all([
-          AsyncStorage.getItem(CUSTOM_STYLES_KEY),
-          AsyncStorage.getItem(HIDDEN_BUILTIN_KEY),
-        ]);
-        if (rawCustom) {
-          const parsed = JSON.parse(rawCustom);
-          if (Array.isArray(parsed)) {
-            const valid = parsed.filter(s => s && typeof s.id === 'string' && typeof s.label === 'string');
-            setCustomStyles(valid);
-          }
-        }
-        if (rawHidden) {
-          const parsedHidden = JSON.parse(rawHidden);
-          if (Array.isArray(parsedHidden)) setHiddenBuiltinIds(parsedHidden);
-        }
-      } catch {}
-    }
+  // Photo Icon reads the database master source. No local fallback is used,
+  // because it could resurrect a style that Settings deleted.
+  const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
+  const PHOTO_STYLES = photoStyles.map(style => ({ ...style, label: style.name }));
+  const loadPhotoStyles = useCallback(async () => {
+    try { setPhotoStyles(await getPhotoStyles()); } catch { setPhotoStyles([]); }
   }, []);
-
-  useEffect(() => { loadCustomStyles(); }, [loadCustomStyles]);
-
-  // Refresh custom styles every time the style picker opens
-  // (so styles added in Notes appear immediately)
-  useEffect(() => {
-    if (showGenModal) loadCustomStyles();
-  }, [showGenModal, loadCustomStyles]);
+  useEffect(() => { loadPhotoStyles(); }, [loadPhotoStyles]);
+  useEffect(() => { if (showGenModal) loadPhotoStyles(); }, [showGenModal, loadPhotoStyles]);
 
   useEffect(() => {
     if (!personaId) return;
@@ -2234,7 +2193,7 @@ export default function ChatScreen() {
                 </Text>
                 {PHOTO_STYLES.map((style) => {
                   const isSelected = style.id === selectedStyleId;
-                  const isCustom = !BUILTIN_PHOTO_STYLES.some(builtin => builtin.id === style.id);
+                  const isCustom = !style.isBuiltin;
                   return (
                     <TouchableOpacity
                       key={style.id}

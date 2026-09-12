@@ -14,6 +14,7 @@ import appConfigRouter from "./app-config";
 import avatarProfileRouter from "./avatar-profile";
 import googleDriveRouter from "./google-drive";
 import storySaveRouter from "./story-save";
+import photoStylesRouter from "./photo-styles";
 
 const router: IRouter = Router();
 
@@ -31,6 +32,7 @@ router.use(appConfigRouter);
 router.use(avatarProfileRouter);
 router.use(googleDriveRouter);
 router.use(storySaveRouter);
+router.use(photoStylesRouter);
 
 // Temporary backup download route
 router.get("/download/backup", (_req, res) => {

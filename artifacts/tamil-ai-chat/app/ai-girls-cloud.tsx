@@ -10,7 +10,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as DocumentPicker from 'expo-document-picker';
 import { ALL_PERSONAS } from '../constants/personas';
-import { PHOTO_STYLES } from '../constants/photo-styles';
 import {
   listCloudinaryImages,
   trackCloudinaryUpload,
@@ -19,14 +18,14 @@ import {
   deleteFromCloudinary,
   createCloudinaryFolder,
   getCloudinaryMeta,
-  getGlobalPhotoStyles,
+  getPhotoStyles,
+  type PhotoStyleRecord,
   setCloudinaryMeta,
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
 const CUSTOM_CHARS_KEY = 'cloud_custom_chars';
-const CUSTOM_STYLES_KEY = 'cloud_custom_styles';
 
 const { width } = Dimensions.get('window');
 const PHOTO_COL = 3;
@@ -270,7 +269,7 @@ export default function AIGirlsCloudScreen() {
 
   // Custom folders
   const [customChars, setCustomChars] = useState<{ id: string; name: string; color: string; letter: string }[]>([]);
-  const [customStyles, setCustomStyles] = useState<{ id: string; label: string }[]>([]);
+  const [masterStyles, setMasterStyles] = useState<PhotoStyleRecord[]>([]);
 
   // New Folder dialog
   const [folderDialog, setFolderDialog] = useState(false);
@@ -296,11 +295,9 @@ export default function AIGirlsCloudScreen() {
     const loadFolders = async () => {
       // Step 1: Load from AsyncStorage immediately (fast, works offline)
       const localCharsRaw = await AsyncStorage.getItem(CUSTOM_CHARS_KEY).catch(() => null);
-      const localStylesRaw = await AsyncStorage.getItem(CUSTOM_STYLES_KEY).catch(() => null);
       const localChars = localCharsRaw ? JSON.parse(localCharsRaw) : [];
       const localStyles = localStylesRaw ? JSON.parse(localStylesRaw) : [];
       if (localChars.length) setCustomChars(localChars);
-      if (localStyles.length) setCustomStyles(localStyles);
 
       // Step 2: Fetch from Cloudinary meta in background and merge (restores after reinstall)
       try {
@@ -316,16 +313,8 @@ export default function AIGirlsCloudScreen() {
         }
         // Settings → Photo Styles is the only master source. A successful
         // empty master list must clear stale local/legacy style metadata too.
-        const globalStyles = await getGlobalPhotoStyles();
-        setGlobalHiddenStyles(new Set(globalStyles.hidden));
-        setCustomStyles(globalStyles.custom);
-        const serialized = JSON.stringify(globalStyles.custom);
-        await Promise.all([
-          AsyncStorage.setItem(CUSTOM_STYLES_KEY, serialized),
-          AsyncStorage.setItem('cloud_custom_styles', serialized),
-          AsyncStorage.setItem('custom_photo_styles_v1', serialized),
-        ]);
-      } catch { /* cloud fetch failed — local data still shown */ }
+        setMasterStyles(await getPhotoStyles());
+      } catch { setMasterStyles([]); }
     };
     loadFolders();
   }, []));
@@ -339,9 +328,9 @@ export default function AIGirlsCloudScreen() {
   }));
 
   const personas = [...basePersonas, ...customChars];
-  const photoStyles = [...PHOTO_STYLES, ...customStyles].filter(
-    s => !hiddenStyles.has(s.id) && !globalHiddenStyles.has(s.id),
-  );
+  const photoStyles = masterStyles
+    .filter(s => !hiddenStyles.has(s.id))
+    .map(s => ({ ...s, id: s.folderName, label: s.name }));
 
   const handleNewFolder = () => {
     setFolderName('');
@@ -687,25 +676,8 @@ export default function AIGirlsCloudScreen() {
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_chars', updated).catch(() => {}); // sync to cloud
     } else if (depth === 1) {
-      // Add custom style folder
-      const id = name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-      const newStyle = { id, label: name };
-      const updated = [...customStyles, newStyle];
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_styles', updated).catch(() => {}); // sync to cloud
-      // Sync to custom_photo_styles_v1 (used by chat.tsx)
-      try {
-        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
-        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
-        if (!chatList.some((s: any) => s.id === id)) {
-          await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify([...chatList, newStyle]));
-        }
-      } catch {}
-      // Auto-create Cloudinary folder for ALL female personas (global style)
-      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(p => {
-        createCloudinaryFolder(`my-girls/${p.id}/${id}`).catch(() => {});
-      });
+      Alert.alert('Settings-ல் மட்டும் மாற்றலாம்', 'Photo Styles → Settings screen-ல் Add/Delete பண்ணுங்க.');
+      return;
     }
     Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
@@ -791,7 +763,7 @@ export default function AIGirlsCloudScreen() {
     }).catch(() => {});
   };
 
-  const selectStyle = (style: typeof PHOTO_STYLES[0]) => {
+  const selectStyle = (style: typeof photoStyles[0]) => {
     setSelectedStyle(style);
     setDepth(2);
     if (selectedChar) {
@@ -844,9 +816,13 @@ export default function AIGirlsCloudScreen() {
   };
 
   const handleDeleteFolder = (id: string, name: string, type: 'char' | 'style') => {
+    if (type === 'style') {
+      Alert.alert('Settings-ல் மட்டும் மாற்றலாம்', 'Photo Styles → Settings screen-ல் Delete/Restore பண்ணுங்க.');
+      return;
+    }
     const isBuiltIn = type === 'char'
       ? basePersonas.some(p => p.id === id)
-      : PHOTO_STYLES.some(s => s.id === id);
+      : false;
     if (isBuiltIn && type === 'char') return; // only block built-in character folders
     setDeleteFolderTarget({ id, name, type });
   };
@@ -865,47 +841,12 @@ export default function AIGirlsCloudScreen() {
       await AsyncStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(updated));
       setCloudinaryMeta('custom_chars', updated).catch(() => {});
       try {
-        const allStyles = [...PHOTO_STYLES, ...customStyles];
+        const allStyles = masterStyles.map(style => ({ ...style, id: style.folderName }));
         for (const style of allStyles) {
           const imgs = await listCloudinaryImages(`my-girls/${id}/${style.id}`).catch(() => []);
           for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
         }
       } catch {}
-    } else {
-      // ── Custom style: remove from customStyles list ───────────────────────
-      const updated = customStyles.filter(s => s.id !== id);
-      setCustomStyles(updated);
-      await AsyncStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(updated));
-      setCloudinaryMeta('custom_styles', updated).catch(() => {});
-
-      // ── Built-in style: add to hiddenStyles so it disappears from the list ─
-      const isBuiltInStyle = PHOTO_STYLES.some(s => s.id === id);
-      if (isBuiltInStyle && charSnapshot) {
-        // FIX: functional updater avoids stale-closure bug on hiddenStyles state
-        setHiddenStyles(prev => new Set([...prev, id]));
-        // Persist to AsyncStorage by reading current saved value (not stale closure)
-        try {
-          const raw = await AsyncStorage.getItem(`hidden_styles_${charSnapshot.id}`);
-          const arr: string[] = raw ? JSON.parse(raw) : [];
-          if (!arr.includes(id)) arr.push(id);
-          await AsyncStorage.setItem(`hidden_styles_${charSnapshot.id}`, JSON.stringify(arr));
-        } catch {}
-      }
-
-      // Sync removal to custom_photo_styles_v1 (used by chat.tsx)
-      try {
-        const chatRaw = await AsyncStorage.getItem('custom_photo_styles_v1');
-        const chatList: any[] = chatRaw ? JSON.parse(chatRaw) : [];
-        const chatUpdated = chatList.filter((s: any) => s.id !== id);
-        await AsyncStorage.setItem('custom_photo_styles_v1', JSON.stringify(chatUpdated));
-      } catch {}
-      // Delete Cloudinary photos for ALL female personas (global style)
-      ALL_PERSONAS.filter(p => p.gender === 'female').forEach(async (p) => {
-        try {
-          const imgs = await listCloudinaryImages(`my-girls/${p.id}/${id}`).catch(() => []);
-          for (const img of imgs) { deleteFromCloudinary(img.public_id).catch(() => {}); }
-        } catch {}
-      });
     }
 
     // Clear local photo cache for the deleted folder
@@ -1013,9 +954,6 @@ export default function AIGirlsCloudScreen() {
                 <Text style={s.quickUploadTxt}>⬆️</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={s.trashBtn} onPress={() => handleDeleteFolder(item.id, item.label, 'style')}>
-              <Text style={s.trashIcon}>🗑</Text>
-            </TouchableOpacity>
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={s.sep} />}

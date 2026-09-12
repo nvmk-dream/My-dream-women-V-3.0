@@ -1177,6 +1177,44 @@ export async function getGlobalPhotoStyles(): Promise<GlobalPhotoStyles> {
   throw new Error('Global photo styles unavailable');
 }
 
+export type PhotoStyleRecord = {
+  id: string;
+  name: string;
+  prompt: string;
+  folderName: string;
+  isBuiltin: boolean;
+  isActive: boolean;
+};
+
+async function photoStylesRequest(path: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(`${REPLIT_API}/api/photo-styles${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Photo Styles request failed: HTTP ${res.status}`);
+  return data;
+}
+
+export async function getPhotoStyles(includeInactive = false): Promise<PhotoStyleRecord[]> {
+  const data = await photoStylesRequest(includeInactive ? '?includeInactive=true' : '');
+  return Array.isArray(data?.styles) ? data.styles : [];
+}
+
+export async function createPhotoStyle(name: string, prompt: string): Promise<PhotoStyleRecord> {
+  const data = await photoStylesRequest('', { method: 'POST', body: JSON.stringify({ name, prompt }) });
+  return data.style as PhotoStyleRecord;
+}
+
+export async function deletePhotoStyle(styleId: string): Promise<void> {
+  await photoStylesRequest(`/${encodeURIComponent(styleId)}`, { method: 'DELETE' });
+}
+
+export async function restorePhotoStyle(styleId: string): Promise<PhotoStyleRecord> {
+  const data = await photoStylesRequest(`/${encodeURIComponent(styleId)}/restore`, { method: 'POST' });
+  return data.style as PhotoStyleRecord;
+}
+
 export async function saveGlobalPhotoStyles(data: GlobalPhotoStyles): Promise<void> {
   await setCloudinaryMeta('global_photo_styles', data);
 }

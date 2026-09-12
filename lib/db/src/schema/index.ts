@@ -17,7 +17,7 @@
 //   export type InsertPost = z.infer<typeof insertPostSchema>;
 //   export type Post = typeof postsTable.$inferSelect;
 
-import { jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export type KallaatamStoryCharacter = {
   name: string;
@@ -46,3 +46,24 @@ export const kallaatamStoriesTable = pgTable(
 
 export type KallaatamStory = typeof kallaatamStoriesTable.$inferSelect;
 export type InsertKallaatamStory = typeof kallaatamStoriesTable.$inferInsert;
+
+export const photoStylesTable = pgTable(
+  "photo_styles",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(),
+    prompt: text("prompt").notNull().default(""),
+    folderName: text("folder_name").notNull(),
+    isBuiltin: boolean("is_builtin").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    nameKeyUnique: uniqueIndex("photo_styles_name_key_idx").on(table.nameKey),
+  }),
+);
+
+export type PhotoStyle = typeof photoStylesTable.$inferSelect;
+export type InsertPhotoStyle = typeof photoStylesTable.$inferInsert;
