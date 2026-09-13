@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { v2 as cloudinary } from "cloudinary";
+import { configureCloudinary, type CloudinaryClient } from "../lib/cloudinary-config";
 
 const router = Router();
 
@@ -9,12 +9,7 @@ const trackCache   = new Map<string, TrackEntry[]>(); // in-memory for speed
 const syncedFolders = new Set<string>(); // folders already Admin-API-synced this session
 
 function cfg() {
-  cloudinary.config({
-    cloud_name: process.env["CLOUDINARY_CLOUD_NAME"] || "dazmrxsyc",
-    api_key:    process.env["API_KEY"] || process.env["CLOUDINARY_API_KEY"] || process.env["Cloudinary_abi_key"],
-    api_secret: process.env["API_SECRET"] || process.env["CLOUDINARY_API_SECRET"] || process.env["Cloudinary_secret"],
-  });
-  return cloudinary;
+  return configureCloudinary("Cloudinary");
 }
 
 function trackMetaKey(folder: string): string {
@@ -22,7 +17,7 @@ function trackMetaKey(folder: string): string {
   return "track_" + folder.replace(/[^a-zA-Z0-9]/g, "_");
 }
 
-async function getTracked(folder: string, cl: typeof cloudinary): Promise<TrackEntry[]> {
+async function getTracked(folder: string, cl: CloudinaryClient): Promise<TrackEntry[]> {
   if (trackCache.has(folder)) return trackCache.get(folder)!;
   try {
     const key = trackMetaKey(folder);
@@ -46,7 +41,7 @@ async function getTracked(folder: string, cl: typeof cloudinary): Promise<TrackE
   }
 }
 
-async function saveTracked(folder: string, entries: TrackEntry[], cl: typeof cloudinary): Promise<void> {
+async function saveTracked(folder: string, entries: TrackEntry[], cl: CloudinaryClient): Promise<void> {
   trackCache.set(folder, entries);
   const key = trackMetaKey(folder);
   const b64 = Buffer.from(JSON.stringify(entries)).toString("base64");
@@ -60,7 +55,7 @@ async function saveTracked(folder: string, entries: TrackEntry[], cl: typeof clo
 
 // Run Admin API once per server-session per folder in background.
 // Merges any photos uploaded while server was sleeping (never tracked) into track store.
-async function backgroundSyncFolder(folder: string, cl: typeof cloudinary): Promise<void> {
+async function backgroundSyncFolder(folder: string, cl: CloudinaryClient): Promise<void> {
   if (syncedFolders.has(folder)) return;
   syncedFolders.add(folder);
   try {
