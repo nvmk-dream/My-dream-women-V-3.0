@@ -12,7 +12,16 @@ type FolderCleanupResult = {
   folderDeleted: boolean;
   missing: boolean;
   errors: string[];
+  diagnostics: CloudinaryFailureDetails[];
   fatal: boolean;
+};
+type CloudinaryFailureDetails = {
+  stage: string;
+  folder: string;
+  resourceType?: string;
+  cloudinaryHttpCode: number | null;
+  cloudinaryErrorCode: string | null;
+  cloudinaryMessage: string;
 };
 const BUILTIN_STYLES: Array<Omit<StyleRow, "isActive">> = [
   ["normal", "Normal Photo", "normal photo, fully clothed, casual"],
@@ -57,6 +66,20 @@ function cloudinaryError(error: any): string {
   const status = error?.http_code ?? error?.statusCode ?? error?.status;
   return status ? `${message} (HTTP ${status})` : message;
 }
+function cloudinaryFailure(error: any, stage: string, folder: string, resourceType?: string): CloudinaryFailureDetails {
+  const nested = error?.error ?? {};
+  const httpValue = error?.http_code ?? error?.statusCode ?? error?.status ?? nested?.http_code ?? nested?.statusCode;
+  const httpCode = Number.isFinite(Number(httpValue)) ? Number(httpValue) : null;
+  const codeValue = error?.code ?? nested?.code ?? error?.error_code ?? nested?.error_code;
+  return {
+    stage,
+    folder,
+    ...(resourceType ? { resourceType } : {}),
+    cloudinaryHttpCode: httpCode,
+    cloudinaryErrorCode: codeValue == null ? null : String(codeValue),
+    cloudinaryMessage: String(error?.message ?? nested?.message ?? error ?? "Unknown Cloudinary error"),
+  };
+}
 async function girls(c: CloudinaryClient) {
   const result = await (c.api as any).sub_folders("my-girls");
   return (result?.folders ?? []).map((x: any) => String(x.name ?? "")).filter((x: string) => x && x !== "meta" && x !== "global_styles");
@@ -78,6 +101,7 @@ async function remove(c: CloudinaryClient, folder: string): Promise<FolderCleanu
     folderDeleted: false,
     missing: false,
     errors: [],
+    diagnostics: [],
     fatal: false,
   };
 
@@ -95,6 +119,8 @@ async function remove(c: CloudinaryClient, folder: string): Promise<FolderCleanu
       if (missing(error)) result.missing = true;
       else {
         result.fatal = true;
+        const diagnostic = cloudinaryFailure(error, "delete_resources_by_prefix", folder, resource_type);
+        result.diagnostics.push(diagnostic);
         result.errors.push(`${resource_type}: ${cloudinaryError(error)}`);
       }
     }
@@ -109,6 +135,8 @@ async function remove(c: CloudinaryClient, folder: string): Promise<FolderCleanu
     } catch (error) {
       if (!missing(error)) {
         result.fatal = true;
+        const diagnostic = cloudinaryFailure(error, "tracking_metadata", folder);
+        result.diagnostics.push(diagnostic);
         result.errors.push(`tracking metadata: ${cloudinaryError(error)}`);
       }
     }
@@ -121,6 +149,8 @@ async function remove(c: CloudinaryClient, folder: string): Promise<FolderCleanu
     if (missing(error)) result.missing = true;
     else {
       result.fatal = true;
+      const diagnostic = cloudinaryFailure(error, "delete_folder", folder);
+      result.diagnostics.push(diagnostic);
       result.errors.push(`folder: ${cloudinaryError(error)}`);
     }
   }
@@ -266,16 +296,33 @@ router.delete("/photo-styles/:id", async (req, res) => {
     for (const folder of folders) deleted.push(await remove(c, folder));
     const fatalErrors = deleted.flatMap(item => item.errors);
     if (fatalErrors.length > 0) {
+      const diagnostic = deleted.flatMap(item => item.diagnostics)[0];
+      const detail = diagnostic
+        ? ` at ${diagnostic.stage} for ${diagnostic.folder}: ${diagnostic.cloudinaryMessage}${diagnostic.cloudinaryHttpCode ? ` (HTTP ${diagnostic.cloudinaryHttpCode})` : ""}`
+        : "";
       return res.status(502).json({
-        error: "Cloudinary Photo Style cleanup failed",
+        error: `Cloudinary Photo Style cleanup failed${detail}`,
         styleId: row.id,
+        success: false,
+        stage: diagnostic?.stage ?? "cleanup",
+        folder: diagnostic?.folder ?? null,
+        cloudinaryHttpCode: diagnostic?.cloudinaryHttpCode ?? null,
+        cloudinaryErrorCode: diagnostic?.cloudinaryErrorCode ?? null,
+        cloudinaryMessage: diagnostic?.cloudinaryMessage ?? fatalErrors[0],
         folders: deleted,
       });
     }
     if (row.is_builtin) await database.execute(sql`UPDATE photo_styles SET is_active = FALSE, updated_at = NOW() WHERE id = ${row.id}`);
     else await database.execute(sql`DELETE FROM photo_styles WHERE id = ${row.id}`);
     res.json({ ok: true, styleId: row.id, folders: deleted });
-  } catch (error: any) { res.status(500).json({ error: error?.message || "Photo Style deletion failed" }); }
+  } catch (error: any) {
+    const diagnostic = cloudinaryFailure(error, "delete_style", String(req.params.id));
+    res.status(500).json({
+      error: `Photo Style deletion failed: ${diagnostic.cloudinaryMessage}`,
+      success: false,
+      ...diagnostic,
+    });
+  }
 });
 
 export default router;
