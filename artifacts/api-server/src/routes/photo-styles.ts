@@ -55,9 +55,13 @@ function cl() {
   return configureCloudinary("Photo Styles Cloudinary");
 }
 function missing(error: any) {
-  const message = String(error?.message ?? error?.error?.message ?? "").toLowerCase();
-  return (error?.http_code ?? error?.statusCode ?? error?.status) === 404 ||
+  const nested = error?.error ?? {};
+  const message = String(error?.message ?? nested?.message ?? "").toLowerCase();
+  const status = error?.http_code ?? error?.statusCode ?? error?.status ?? nested?.http_code ?? nested?.statusCode;
+  return status === 404 ||
     message.includes("not found") ||
+    message.includes("can't find") ||
+    message.includes("cannot find") ||
     message.includes("does not exist") ||
     message.includes("no such resource");
 }

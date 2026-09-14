@@ -4,9 +4,6 @@ type CloudinarySettings = {
   cloudName: string;
   apiKey: string;
   apiSecret: string;
-  cloudNameSource: string | null;
-  apiKeySource: string | null;
-  apiSecretSource: string | null;
 };
 
 function firstConfiguredWithSource(...names: string[]): { value: string; source: string | null } {
@@ -25,23 +22,6 @@ function readSettings(): CloudinarySettings {
     cloudName: cloudName.value,
     apiKey: apiKey.value,
     apiSecret: apiSecret.value,
-    cloudNameSource: cloudName.source,
-    apiKeySource: apiKey.source,
-    apiSecretSource: apiSecret.source,
-  };
-}
-
-export function cloudinaryRuntimeSummary() {
-  const settings = readSettings();
-  return {
-    cloudName: settings.cloudName || null,
-    cloudNameSource: settings.cloudNameSource,
-    apiKeyConfigured: Boolean(settings.apiKey),
-    apiKeySuffix: settings.apiKey ? settings.apiKey.slice(-4) : null,
-    apiKeySource: settings.apiKeySource,
-    apiSecretConfigured: Boolean(settings.apiSecret),
-    apiSecretSource: settings.apiSecretSource,
-    // Deliberately never return the API secret or any value derived from it.
   };
 }
 
