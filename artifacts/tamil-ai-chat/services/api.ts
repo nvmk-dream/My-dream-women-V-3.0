@@ -1186,6 +1186,63 @@ export type PhotoStyleRecord = {
   isActive: boolean;
 };
 
+const PHOTO_STYLES_CACHE_KEY = 'photo_styles_master_v1';
+const PHOTO_STYLES_ALL_CACHE_KEY = 'photo_styles_master_all_v1';
+
+// Used only when the central style endpoint is temporarily unavailable and
+// there is no successful response cached on this device yet.
+const LOCAL_PHOTO_STYLES: PhotoStyleRecord[] = [
+  { id: 'normal', name: 'Normal Photo', prompt: 'normal photo, fully clothed, casual', folderName: 'normal', isBuiltin: true, isActive: true },
+  { id: 'nude', name: 'Nude 🔞', prompt: 'nude, fully naked, explicit', folderName: 'nude', isBuiltin: true, isActive: true },
+  { id: 'seminude', name: 'Semi Nude', prompt: 'semi nude, partially undressed', folderName: 'seminude', isBuiltin: true, isActive: true },
+  { id: 'breast', name: 'Breast Show', prompt: 'topless, showing breasts, bare chest', folderName: 'breast', isBuiltin: true, isActive: true },
+  { id: 'halfbreast', name: 'Half Breast', prompt: 'half breast visible, deep cleavage, low cut top', folderName: 'halfbreast', isBuiltin: true, isActive: true },
+  { id: 'cleavage', name: 'Cleavage', prompt: 'deep cleavage, low neckline, cleavage showing', folderName: 'cleavage', isBuiltin: true, isActive: true },
+  { id: 'lowneck', name: 'Low Neckline', prompt: 'low neckline, low cut dress, revealing neckline', folderName: 'lowneck', isBuiltin: true, isActive: true },
+  { id: 'lingerie', name: 'Lingerie', prompt: 'wearing lingerie, bra and panties, underwear', folderName: 'lingerie', isBuiltin: true, isActive: true },
+  { id: 'buttocks', name: 'Buttocks', prompt: 'showing buttocks, from behind, revealing buttocks', folderName: 'buttocks', isBuiltin: true, isActive: true },
+  { id: 'highslit', name: 'High Slit', prompt: 'high slit dress, thigh high slit, leg revealing slit', folderName: 'highslit', isBuiltin: true, isActive: true },
+  { id: 'seductive', name: 'Seductive', prompt: 'seductive pose, alluring, provocative look', folderName: 'seductive', isBuiltin: true, isActive: true },
+  { id: 'wet', name: 'Wet Clothes', prompt: 'wet clothes, drenched, see through wet fabric', folderName: 'wet', isBuiltin: true, isActive: true },
+  { id: 'legs', name: 'Legs Spread', prompt: 'legs spread wide, revealing pose', folderName: 'legs', isBuiltin: true, isActive: true },
+  { id: 'saree', name: 'Saree Tuck', prompt: 'lifting saree up, revealing thighs, traditional saree', folderName: 'saree', isBuiltin: true, isActive: true },
+  { id: 'sleeping', name: 'Sleeping', prompt: 'sleeping pose, exposed, lying down', folderName: 'sleeping', isBuiltin: true, isActive: true },
+];
+
+function normalizePhotoStyles(raw: unknown): PhotoStyleRecord[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((style: any): style is PhotoStyleRecord =>
+    style &&
+    typeof style.id === 'string' &&
+    typeof style.name === 'string' &&
+    typeof style.prompt === 'string' &&
+    typeof style.folderName === 'string' &&
+    typeof style.isBuiltin === 'boolean' &&
+    typeof style.isActive === 'boolean'
+  );
+}
+
+async function readCachedPhotoStyles(includeInactive: boolean): Promise<PhotoStyleRecord[] | null> {
+  try {
+    const AS = await _getAS();
+    const raw = await AS.getItem(includeInactive ? PHOTO_STYLES_ALL_CACHE_KEY : PHOTO_STYLES_CACHE_KEY);
+    if (raw === null) return null;
+    return normalizePhotoStyles(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+async function cachePhotoStyles(styles: PhotoStyleRecord[], includeInactive: boolean): Promise<void> {
+  try {
+    const AS = await _getAS();
+    await AS.setItem(
+      includeInactive ? PHOTO_STYLES_ALL_CACHE_KEY : PHOTO_STYLES_CACHE_KEY,
+      JSON.stringify(styles),
+    );
+  } catch {}
+}
+
 async function photoStylesRequest(path: string, init?: RequestInit): Promise<any> {
   const res = await fetch(`${REPLIT_API}/api/photo-styles${path}`, {
     ...init,
@@ -1197,8 +1254,21 @@ async function photoStylesRequest(path: string, init?: RequestInit): Promise<any
 }
 
 export async function getPhotoStyles(includeInactive = false): Promise<PhotoStyleRecord[]> {
-  const data = await photoStylesRequest(includeInactive ? '?includeInactive=true' : '');
-  return Array.isArray(data?.styles) ? data.styles : [];
+  try {
+    const data = await photoStylesRequest(includeInactive ? '?includeInactive=true' : '');
+    const styles = normalizePhotoStyles(data?.styles);
+    if (!styles) throw new Error('Photo Styles response was invalid');
+    await cachePhotoStyles(styles, includeInactive);
+    return styles;
+  } catch (error) {
+    const cached = await readCachedPhotoStyles(includeInactive);
+    if (cached !== null) return cached;
+
+    // The local list is only a first-install/network-outage fallback. Once a
+    // valid empty response is received, [] is cached and remains authoritative.
+    if (__DEV__) console.warn('[getPhotoStyles] using local fallback:', error);
+    return LOCAL_PHOTO_STYLES;
+  }
 }
 
 export async function createPhotoStyle(name: string, prompt: string): Promise<PhotoStyleRecord> {

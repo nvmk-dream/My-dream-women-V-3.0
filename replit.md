@@ -22,8 +22,8 @@ Tamil AI Chat app — Android APK with Render backend and 13 Gemini keys.
 
 ## Where things live
 
-- Render server: `my-girls-1-5.onrender.com` (latest active service)
-- GitHub repo: `nnvvmm663-sketch/my-dream-girle`
+- Render server: `my-dream-women-v-3-0.onrender.com` (APK/API host)
+- GitHub repo: `nvmk-dream/My-dream-women-V-3.0`
 - APK build: `.github/workflows/build-apk.yml` via GitHub Actions
 - 13 Gemini keys stored on Render
 
@@ -32,7 +32,7 @@ Tamil AI Chat app — Android APK with Render backend and 13 Gemini keys.
 ```
 Android APK
     ↓
-my-girls-1-5.onrender.com (Render Server)
+my-dream-women-v-3-0.onrender.com (Render Server)
     ↓
 13 Gemini Keys (stored on Render)
 ```
@@ -56,13 +56,12 @@ Tamil AI Chat Android app ("My Dream Girles") with multiple girl characters powe
   5. Fix ALL problems together in one build — not one at a time.
   Past failure: jumping to code on partial info wastes 15+ hrs and burns user trust.
 - **User device**: Honor (HMOS). Test only on real device, not emulator.
-- **Repo**: `nnvvmm663-sketch/my-dream-girle`. Build via GitHub Actions `build-apk.yml`.
+- **Repo**: `nvmk-dream/My-dream-women-V-3.0`. Build via GitHub Actions `build-apk.yml`.
 
 ## Gotchas
 
 - Do NOT trigger APK build without user's explicit OK.
-- Render service `my-girls-1-5` is the active server (srv-d83asc9kh4rs73adpq3g).
-- 5 Render services exist (my-girls-1 through my-girls-1-5), latest is -5.
+- Render service `my-dream-women-v-3-0` is the active APK/API host.
 
 ## Pointers
 

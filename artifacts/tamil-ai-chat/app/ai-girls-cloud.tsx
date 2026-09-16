@@ -296,7 +296,6 @@ export default function AIGirlsCloudScreen() {
       // Step 1: Load from AsyncStorage immediately (fast, works offline)
       const localCharsRaw = await AsyncStorage.getItem(CUSTOM_CHARS_KEY).catch(() => null);
       const localChars = localCharsRaw ? JSON.parse(localCharsRaw) : [];
-      const localStyles = localStylesRaw ? JSON.parse(localStylesRaw) : [];
       if (localChars.length) setCustomChars(localChars);
 
       // Step 2: Fetch from Cloudinary meta in background and merge (restores after reinstall)
@@ -314,7 +313,7 @@ export default function AIGirlsCloudScreen() {
         // Settings → Photo Styles is the only master source. A successful
         // empty master list must clear stale local/legacy style metadata too.
         setMasterStyles(await getPhotoStyles());
-      } catch { setMasterStyles([]); }
+      } catch { setMasterStyles(await getPhotoStyles()); }
     };
     loadFolders();
   }, []));

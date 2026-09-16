@@ -570,8 +570,8 @@ export default function ChatScreen() {
   const [translateResult, setTranslateResult]   = useState('');
   const [showTranslateModal, setShowTranslateModal] = useState(false);
 
-  // Photo Icon reads the database master source. No local fallback is used,
-  // because it could resurrect a style that Settings deleted.
+  // Photo Icon reads the database master source. The API helper preserves the
+  // last successful response, and only uses built-ins on a first-install outage.
   const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
   const PHOTO_STYLES = photoStyles.map(style => ({ ...style, label: style.name }));
   const loadPhotoStyles = useCallback(async () => {

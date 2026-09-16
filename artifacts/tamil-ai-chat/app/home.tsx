@@ -20,7 +20,7 @@ const COVER_H = 150;
 const DEFAULT_COVER = require('../assets/images/icon.png');
 const COVER_KEY = 'home_cover_image';
 const CUSTOM_SERVER_KEY = 'custom_server_url';
-const DEFAULT_RENDER_URL = 'https://my-dream-women-v2.onrender.com';
+const DEFAULT_RENDER_URL = 'https://my-dream-women-v-3-0.onrender.com';
 
 type CategoryIconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 type Category = { key: string; label: string; emoji: string; icon: CategoryIconName; bg: string; route: string };
