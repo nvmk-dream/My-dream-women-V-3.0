@@ -456,6 +456,7 @@ export async function uploadToCloudinary(
   form.append('file', `data:${mimeType};base64,${b64_json}`);
   form.append('upload_preset', CLOUDINARY_PRESET);
   form.append('folder', folder);
+  form.append('tags', folderToTag(folder));
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90000);

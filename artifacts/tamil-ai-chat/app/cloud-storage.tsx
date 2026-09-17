@@ -9,7 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
-import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, listCloudinaryBackups, deleteFromCloudinary, CloudinaryBackup } from '../services/api';
+import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, listCloudinaryBackups, deleteFromCloudinary, trackCloudinaryUpload, CloudinaryBackup } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
 
 const { width } = Dimensions.get('window');
@@ -66,6 +66,9 @@ export async function saveGeneratedImageToCloud(
       height: result.height,
     };
     await saveCloudImage(img);
+    // Keep the folder index available when the API/Cloudinary Admin endpoint
+    // is sleeping; listCloudinaryImages uses this metadata as a fallback.
+    await trackCloudinaryUpload(folder, result.public_id, result.url);
     return img;
   } catch {
     return null;
