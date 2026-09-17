@@ -228,14 +228,14 @@ export default function SettingsScreen() {
 
   const deleteGlobalStyle = (style: PhotoStyleRecord) => {
     Alert.alert(
-      '🗑️ Style Delete',
+      style.isBuiltin ? '🗑️ Style Remove' : '⚠️ Permanent Delete',
       style.isBuiltin
         ? 'இந்த built-in style-ஐ globally remove பண்ணணுமா? Folders + photos delete ஆகும். Restore செய்யலாம்.'
-        : 'இந்த custom style-ஐ permanently delete பண்ணணுமா? Cloudinary folders + photos யாவும் delete ஆகும்.',
+        : 'Permanently delete this Photo Style?\n\nThis will remove the style from the database and Cloudinary.\nThis action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: style.isBuiltin ? 'Remove' : '🗑️ Delete',
+          text: style.isBuiltin ? 'Remove' : 'Permanent Delete',
           style: 'destructive',
           onPress: async () => {
             setDeletingStyleId(style.id);
@@ -850,7 +850,7 @@ export default function SettingsScreen() {
             <Text style={s.cardTitle}>Photo Styles</Text>
           </View>
           <Text style={s.cardDesc}>
-            Chat மற்றும் AI Girls-ல் காண்பிக்கும் Photo Style list-ஐ globally manage பண்ணலாம். 🗑️ = delete folder + remove • 👁️ = restore
+            Chat மற்றும் AI Girls-ல் காண்பிக்கும் Photo Style list-ஐ globally manage பண்ணலாம். Built-in styles-க்கு Remove/Restore; custom styles-க்கு Permanent Delete.
           </Text>
           {stylesLoading ? (
             <ActivityIndicator color="#6C63FF" style={{ marginVertical: 10 }} />
@@ -900,13 +900,15 @@ export default function SettingsScreen() {
                         {style.prompt ? <Text style={s.stylePromptHint} numberOfLines={1}>{style.prompt}</Text> : null}
                       </View>
                       <TouchableOpacity
-                        style={s.styleToggleBtn}
+                        style={s.permanentDeleteBtn}
                         disabled={deletingStyleId === style.id}
                         onPress={() => deleteGlobalStyle(style)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Permanently delete ${style.name}`}
                       >
                         {deletingStyleId === style.id
                           ? <ActivityIndicator color="#f85149" size="small" />
-                          : <Text style={{ fontSize: 18 }}>🗑️</Text>}
+                          : <Text style={s.permanentDeleteTxt}>Permanent Delete</Text>}
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1135,6 +1137,12 @@ const s = StyleSheet.create({
     width: 36, height: 36, borderRadius: 8,
     backgroundColor: '#161b22', justifyContent: 'center', alignItems: 'center',
   },
+  permanentDeleteBtn: {
+    backgroundColor: '#321719', borderRadius: 8, borderWidth: 1,
+    borderColor: '#f85149', paddingHorizontal: 9, paddingVertical: 8,
+    justifyContent: 'center', alignItems: 'center', marginLeft: 8,
+  },
+  permanentDeleteTxt: { color: '#f85149', fontSize: 11, fontWeight: '800' },
   addStyleBtn: {
     backgroundColor: '#1c2a1c', borderRadius: 10, borderWidth: 1,
     borderColor: '#238636', borderStyle: 'dashed',

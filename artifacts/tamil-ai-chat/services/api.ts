@@ -1279,6 +1279,29 @@ export async function createPhotoStyle(name: string, prompt: string): Promise<Ph
 
 export async function deletePhotoStyle(styleId: string): Promise<void> {
   await photoStylesRequest(`/${encodeURIComponent(styleId)}`, { method: 'DELETE' });
+  // A successful delete must not leave a stale style in the offline cache.
+  // Built-ins stay as inactive tombstones so Restore remains available;
+  // custom styles are removed from both active and restore caches.
+  try {
+    const AS = await _getAS();
+    const allRaw = await AS.getItem(PHOTO_STYLES_ALL_CACHE_KEY);
+    if (allRaw) {
+      const all = normalizePhotoStyles(JSON.parse(allRaw)) ?? [];
+      const deleted = all.find(style => style.id === styleId);
+      const nextAll = deleted?.isBuiltin
+        ? all.map(style => style.id === styleId ? { ...style, isActive: false } : style)
+        : all.filter(style => style.id !== styleId);
+      await AS.setItem(PHOTO_STYLES_ALL_CACHE_KEY, JSON.stringify(nextAll));
+    }
+    const activeRaw = await AS.getItem(PHOTO_STYLES_CACHE_KEY);
+    if (activeRaw) {
+      const active = normalizePhotoStyles(JSON.parse(activeRaw)) ?? [];
+      await AS.setItem(
+        PHOTO_STYLES_CACHE_KEY,
+        JSON.stringify(active.filter(style => style.id !== styleId)),
+      );
+    }
+  } catch {}
 }
 
 export async function restorePhotoStyle(styleId: string): Promise<PhotoStyleRecord> {
