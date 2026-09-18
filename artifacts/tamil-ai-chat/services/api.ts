@@ -1306,7 +1306,40 @@ export async function deletePhotoStyle(styleId: string): Promise<void> {
 
 export async function restorePhotoStyle(styleId: string): Promise<PhotoStyleRecord> {
   const data = await photoStylesRequest(`/${encodeURIComponent(styleId)}/restore`, { method: 'POST' });
-  return data.style as PhotoStyleRecord;
+  const restored = normalizePhotoStyles([data.style])?.[0];
+  if (!restored) throw new Error('Photo Styles restore response was invalid');
+
+  // Keep both caches consistent immediately. This matters when the follow-up
+  // refresh briefly loses the network and would otherwise re-read the inactive
+  // tombstone from the offline cache.
+  try {
+    const AS = await _getAS();
+    const allRaw = await AS.getItem(PHOTO_STYLES_ALL_CACHE_KEY);
+    if (allRaw) {
+      const all = normalizePhotoStyles(JSON.parse(allRaw)) ?? [];
+      const found = all.some(style => style.id === styleId);
+      await AS.setItem(
+        PHOTO_STYLES_ALL_CACHE_KEY,
+        JSON.stringify(found
+          ? all.map(style => style.id === styleId ? restored : style)
+          : [...all, restored]),
+      );
+    }
+
+    const activeRaw = await AS.getItem(PHOTO_STYLES_CACHE_KEY);
+    if (activeRaw) {
+      const active = normalizePhotoStyles(JSON.parse(activeRaw)) ?? [];
+      const found = active.some(style => style.id === styleId);
+      await AS.setItem(
+        PHOTO_STYLES_CACHE_KEY,
+        JSON.stringify(found
+          ? active.map(style => style.id === styleId ? restored : style)
+          : [...active, restored]),
+      );
+    }
+  } catch {}
+
+  return restored;
 }
 
 export async function saveGlobalPhotoStyles(data: GlobalPhotoStyles): Promise<void> {
