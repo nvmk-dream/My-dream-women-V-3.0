@@ -1280,18 +1280,16 @@ export async function createPhotoStyle(name: string, prompt: string): Promise<Ph
 export async function deletePhotoStyle(styleId: string): Promise<void> {
   await photoStylesRequest(`/${encodeURIComponent(styleId)}`, { method: 'DELETE' });
   // A successful delete must not leave a stale style in the offline cache.
-  // Built-ins stay as inactive tombstones so Restore remains available;
-  // custom styles are removed from both active and restore caches.
+  // All styles are permanently deleted, so remove them from both caches.
   try {
     const AS = await _getAS();
     const allRaw = await AS.getItem(PHOTO_STYLES_ALL_CACHE_KEY);
     if (allRaw) {
       const all = normalizePhotoStyles(JSON.parse(allRaw)) ?? [];
-      const deleted = all.find(style => style.id === styleId);
-      const nextAll = deleted?.isBuiltin
-        ? all.map(style => style.id === styleId ? { ...style, isActive: false } : style)
-        : all.filter(style => style.id !== styleId);
-      await AS.setItem(PHOTO_STYLES_ALL_CACHE_KEY, JSON.stringify(nextAll));
+      await AS.setItem(
+        PHOTO_STYLES_ALL_CACHE_KEY,
+        JSON.stringify(all.filter(style => style.id !== styleId)),
+      );
     }
     const activeRaw = await AS.getItem(PHOTO_STYLES_CACHE_KEY);
     if (activeRaw) {
@@ -1302,44 +1300,6 @@ export async function deletePhotoStyle(styleId: string): Promise<void> {
       );
     }
   } catch {}
-}
-
-export async function restorePhotoStyle(styleId: string): Promise<PhotoStyleRecord> {
-  const data = await photoStylesRequest(`/${encodeURIComponent(styleId)}/restore`, { method: 'POST' });
-  const restored = normalizePhotoStyles([data.style])?.[0];
-  if (!restored) throw new Error('Photo Styles restore response was invalid');
-
-  // Keep both caches consistent immediately. This matters when the follow-up
-  // refresh briefly loses the network and would otherwise re-read the inactive
-  // tombstone from the offline cache.
-  try {
-    const AS = await _getAS();
-    const allRaw = await AS.getItem(PHOTO_STYLES_ALL_CACHE_KEY);
-    if (allRaw) {
-      const all = normalizePhotoStyles(JSON.parse(allRaw)) ?? [];
-      const found = all.some(style => style.id === styleId);
-      await AS.setItem(
-        PHOTO_STYLES_ALL_CACHE_KEY,
-        JSON.stringify(found
-          ? all.map(style => style.id === styleId ? restored : style)
-          : [...all, restored]),
-      );
-    }
-
-    const activeRaw = await AS.getItem(PHOTO_STYLES_CACHE_KEY);
-    if (activeRaw) {
-      const active = normalizePhotoStyles(JSON.parse(activeRaw)) ?? [];
-      const found = active.some(style => style.id === styleId);
-      await AS.setItem(
-        PHOTO_STYLES_CACHE_KEY,
-        JSON.stringify(found
-          ? active.map(style => style.id === styleId ? restored : style)
-          : [...active, restored]),
-      );
-    }
-  } catch {}
-
-  return restored;
 }
 
 export async function saveGlobalPhotoStyles(data: GlobalPhotoStyles): Promise<void> {

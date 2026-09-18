@@ -181,11 +181,27 @@ async function ensureSchema() {
         is_builtin BOOLEAN NOT NULL DEFAULT FALSE, is_active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
-    `).then(async () => {
+    `).then(() => database.execute(sql`
+      CREATE TABLE IF NOT EXISTS photo_style_builtin_seeds (
+        id TEXT PRIMARY KEY,
+        seeded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `)).then(async () => {
       for (const s of BUILTIN_STYLES) {
+        const seeded = await database.execute(sql`
+          SELECT id FROM photo_style_builtin_seeds WHERE id = ${s.id} LIMIT 1
+        `);
+        // The seed marker survives a permanent delete, so a deleted built-in
+        // is not recreated on the next request or server restart.
+        if ((seeded.rows ?? []).length > 0) continue;
         await database.execute(sql`
           INSERT INTO photo_styles (id,name,name_key,prompt,folder_name,is_builtin,is_active)
           VALUES (${s.id},${s.name},${keyOf(s.name)},${s.prompt},${s.folderName},TRUE,TRUE)
+          ON CONFLICT DO NOTHING
+        `);
+        await database.execute(sql`
+          INSERT INTO photo_style_builtin_seeds (id)
+          VALUES (${s.id})
           ON CONFLICT (id) DO NOTHING
         `);
       }
@@ -202,7 +218,7 @@ router.get("/photo-styles", async (req, res) => {
     await ensureSchema();
     const result = await dbOrThrow().execute(sql`
       SELECT id,name,prompt,folder_name,is_builtin,is_active FROM photo_styles
-      WHERE is_active = TRUE OR ${req.query.includeInactive === "true"}
+      WHERE is_active = TRUE
       ORDER BY is_builtin DESC, created_at ASC, name ASC
     `);
     res.json({ styles: (result.rows ?? []).map(out) });
@@ -257,36 +273,6 @@ router.post("/photo-styles", async (req, res) => {
   } catch (error: any) { res.status(error?.message?.includes("already exists") ? 409 : 500).json({ error: error?.message || "Photo Style creation failed" }); }
 });
 
-router.post("/photo-styles/:id/restore", async (req, res) => {
-  try {
-    await ensureSchema();
-    const database = dbOrThrow();
-    const result = await database.execute(sql`SELECT * FROM photo_styles WHERE id = ${req.params.id} LIMIT 1`);
-    const row = result.rows?.[0] as any;
-    if (!row || !row.is_builtin) return res.status(404).json({ error: "Built-in Photo Style not found" });
-    const c = cl();
-    const folderList = await styleFolders(c, String(row.folder_name));
-    const folderResults: Array<{ folder: string; created: boolean; error?: string }> = [];
-    for (const folder of folderList) {
-      try {
-        await create(c, folder);
-        folderResults.push({ folder, created: true });
-      } catch (error) {
-        folderResults.push({ folder, created: false, error: cloudinaryError(error) });
-      }
-    }
-    const failedFolders = folderResults.filter(item => !item.created);
-    if (failedFolders.length > 0) {
-      return res.status(502).json({
-        error: "Built-in Photo Style restore failed in Cloudinary",
-        folders: folderResults,
-      });
-    }
-    await database.execute(sql`UPDATE photo_styles SET is_active = TRUE, updated_at = NOW() WHERE id = ${row.id}`);
-    res.json({ style: out({ ...row, is_active: true }), folders: folderResults });
-  } catch (error: any) { res.status(500).json({ error: error?.message || "Photo Style restore failed" }); }
-});
-
 router.delete("/photo-styles/:id", async (req, res) => {
   try {
     await ensureSchema();
@@ -316,8 +302,7 @@ router.delete("/photo-styles/:id", async (req, res) => {
         folders: deleted,
       });
     }
-    if (row.is_builtin) await database.execute(sql`UPDATE photo_styles SET is_active = FALSE, updated_at = NOW() WHERE id = ${row.id}`);
-    else await database.execute(sql`DELETE FROM photo_styles WHERE id = ${row.id}`);
+    await database.execute(sql`DELETE FROM photo_styles WHERE id = ${row.id}`);
     res.json({ ok: true, styleId: row.id, folders: deleted });
   } catch (error: any) {
     const diagnostic = cloudinaryFailure(error, "delete_style", String(req.params.id));
