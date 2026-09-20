@@ -301,6 +301,96 @@ export async function pingServer(): Promise<void> {
   } catch { /* fire-and-forget — wake Render server */ }
 }
 
+export interface CharacterUrl {
+  id: number;
+  characterId: string;
+  url: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+async function characterUrlRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${REPLIT_API}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
+  }
+  return data as T;
+}
+
+export async function getCharacterUrls(characterId: string): Promise<CharacterUrl[]> {
+  const data = await characterUrlRequest<{ success: boolean; urls: CharacterUrl[] }>(
+    `/api/character-urls/${encodeURIComponent(characterId)}`,
+  );
+  return data.urls ?? [];
+}
+
+export async function addCharacterUrl(
+  characterId: string,
+  url: string,
+  sortOrder?: number,
+): Promise<CharacterUrl> {
+  const data = await characterUrlRequest<{ url: CharacterUrl }>(
+    `/api/character-urls/${encodeURIComponent(characterId)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ url, ...(sortOrder === undefined ? {} : { sortOrder }) }),
+    },
+  );
+  return data.url;
+}
+
+export async function updateCharacterUrl(
+  characterId: string,
+  urlId: number,
+  changes: { url?: string; sortOrder?: number },
+): Promise<CharacterUrl> {
+  const data = await characterUrlRequest<{ url: CharacterUrl }>(
+    `/api/character-urls/${encodeURIComponent(characterId)}/${urlId}`,
+    { method: "PUT", body: JSON.stringify(changes) },
+  );
+  return data.url;
+}
+
+export async function deleteCharacterUrl(characterId: string, urlId: number): Promise<void> {
+  await characterUrlRequest(
+    `/api/character-urls/${encodeURIComponent(characterId)}/${urlId}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function setCharacterUrlActive(
+  characterId: string,
+  urlId: number,
+  isActive: boolean,
+): Promise<CharacterUrl> {
+  const data = await characterUrlRequest<{ url: CharacterUrl }>(
+    `/api/character-urls/${encodeURIComponent(characterId)}/${urlId}/active`,
+    { method: "PATCH", body: JSON.stringify({ isActive }) },
+  );
+  return data.url;
+}
+
+export async function getNextCharacterUrl(
+  characterId: string,
+): Promise<{ url: string; urlId: number; index: number; nextIndex: number }> {
+  return characterUrlRequest(
+    `/api/character-urls/${encodeURIComponent(characterId)}/next`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
 export async function generateImage(params: {
   imgFace?: string;
   imgBody?: string;

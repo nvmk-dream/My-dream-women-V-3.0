@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, getPhotoStyles, type PhotoStyleRecord } from '../services/api';
+import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, generateImageHuggingFace, listCloudinaryImages, listCloudinaryVideos, analyzeFile, uploadUriToCloudinary, uploadToCloudinary, setCloudinaryMeta, getCloudinaryMeta, analyzeAvatarProfile, wasCloudRestoreChecked, markCloudRestoreChecked, getPhotoStyles, getNextCharacterUrl, type PhotoStyleRecord } from '../services/api';
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
@@ -170,6 +170,35 @@ function detectPhotoStyle(
   return null;
 }
 
+function isUrlTrigger(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return false;
+  if (/^(url|urls|link|links|url\?|link\?)$/.test(normalized)) return true;
+  const triggerWords = [
+    "send url",
+    "send link",
+    "get url",
+    "get link",
+    "next url",
+    "next link",
+    "url please",
+    "link please",
+    "url send",
+    "link send",
+    "url kudu",
+    "link kudu",
+    "url anuppu",
+    "link anuppu",
+    "url அனுப்பு",
+    "link அனுப்பு",
+    "url கொடு",
+    "link கொடு",
+    "லிங்க்",
+    "url வேணும்",
+    "link வேணும்",
+  ];
+  return triggerWords.some((trigger) => normalized.includes(trigger));
+}
 
 // ─── Family Group contexts — each character knows only their family ─────────
 const FAMILY_1_CONTEXT = `
@@ -1241,6 +1270,50 @@ export default function ChatScreen() {
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
+
+    // URL requests stay in the existing Chat TXT composer but bypass AI.
+    // The API receives the same personaId that opened this chat.
+    if (persona && isUrlTrigger(text)) {
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setLoading(true);
+      try {
+        const next = await getNextCharacterUrl(persona.id);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: next.url,
+            timestamp: new Date(),
+          },
+        ]);
+      } catch (error: any) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              error?.message || "இந்த character-க்கு active URL கிடைக்கவில்லை.",
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setLoading(false);
+        setTimeout(
+          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          100,
+        );
+      }
+      return;
+    }
 
     // ── Video request detection ──────────────────────────────────
     const videoKeywords = ['video', 'வீடியோ', 'clip', 'send video', 'video அனுப்பு', 'video வேணும்', 'video போடு'];

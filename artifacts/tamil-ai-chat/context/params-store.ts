@@ -19,6 +19,7 @@ let _offlineChatPersonaId: string | null = null;
 let _pendingPhotoStyle: string = '';
 let _autoStoryQuery: boolean = false;
 let _pendingGalleryMedia: PendingGalleryMedia | null = null;
+let _urlPersonaId: string | null = null;
 
 export const ParamsStore = {
   setChatParams: (p: ChatParams) => { _chatParams = p; },
@@ -44,4 +45,8 @@ export const ParamsStore = {
   setPendingGalleryMedia: (media: PendingGalleryMedia) => { _pendingGalleryMedia = media; },
   getPendingGalleryMedia: () => _pendingGalleryMedia,
   clearPendingGalleryMedia: () => { _pendingGalleryMedia = null; },
+  setUrlPersonaId: (id: string) => {
+    _urlPersonaId = id;
+  },
+  getUrlPersonaId: () => _urlPersonaId,
 };

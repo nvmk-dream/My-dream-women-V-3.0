@@ -684,6 +684,11 @@ AsyncStorage-ல் save ஆச்சு!`
     setShowEditRel(true);
   };
 
+  const openUrlSettings = (p: PersonaWithExtra) => {
+    ParamsStore.setUrlPersonaId(p.id);
+    router.push('/character-urls');
+  };
+
   const saveRelationship = async () => {
     if (!editingPersona) return;
     await AsyncStorage.setItem(`relationship_${editingPersona.id}`, relInput.trim());
@@ -1016,6 +1021,13 @@ Then write these prompts:
           </Text>
         </View>
         <View style={s.chatRight}>
+          <TouchableOpacity
+            style={s.urlSettingsBtn}
+            onPress={() => openUrlSettings(p)}
+            accessibilityLabel={`Manage URLs for ${p.name}`}
+          >
+            <Text style={s.urlSettingsTxt}>🔗</Text>
+          </TouchableOpacity>
           <Text style={s.chatTime}>{p.time}</Text>
           {autoMsgEnabled && iv && (
             <Text style={s.timerBadge}>⏱{iv}m</Text>
@@ -1421,6 +1433,12 @@ Then write these prompts:
               <TouchableOpacity style={s.saveBtn} onPress={saveRelationship}>
                 <Text style={s.saveTxt}>சேமி ✓</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={s.saveBtn} onPress={() => {
+                setShowEditRel(false);
+                if (editingPersona) openUrlSettings(editingPersona);
+              }}>
+                <Text style={s.saveTxt}>🔗 URLs</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#c62828' }]} onPress={deleteCharacter}>
                 <Text style={s.saveTxt}>🗑 Delete</Text>
               </TouchableOpacity>
@@ -1775,6 +1793,8 @@ const s = StyleSheet.create({
   chatName: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 3 },
   chatSub: { fontSize: 13, color: '#666' },
   chatRight: { alignItems: 'flex-end', gap: 4 },
+  urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
+  urlSettingsTxt: { fontSize: 17 },
   chatTime: { fontSize: 12, color: '#888' },
   timerBadge: { fontSize: 10, color: '#075E54', fontWeight: '700' },
   badge: { backgroundColor: '#25D366', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },

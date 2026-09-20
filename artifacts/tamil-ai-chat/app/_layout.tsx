@@ -223,6 +223,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="home" options={{ headerShown: false }} />
             <Stack.Screen name="ai-girls" options={{ headerShown: false }} />
+            <Stack.Screen name="character-urls" options={{ headerShown: false }} />
             <Stack.Screen name="keys" options={{ headerShown: false }} />
             <Stack.Screen name="notes" options={{ headerShown: false }} />
             <Stack.Screen name="gallery" options={{ headerShown: false }} />

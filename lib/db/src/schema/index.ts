@@ -17,7 +17,7 @@
 //   export type InsertPost = z.infer<typeof insertPostSchema>;
 //   export type Post = typeof postsTable.$inferSelect;
 
-import { boolean, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 export type KallaatamStoryCharacter = {
   name: string;
@@ -67,3 +67,29 @@ export const photoStylesTable = pgTable(
 
 export type PhotoStyle = typeof photoStylesTable.$inferSelect;
 export type InsertPhotoStyle = typeof photoStylesTable.$inferInsert;
+
+export const characterUrls = pgTable(
+  "character_urls",
+  {
+    id: serial("id").primaryKey(),
+    characterId: text("character_id").notNull(),
+    url: text("url").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    characterSortIdx: index("character_urls_character_sort_idx").on(
+      table.characterId,
+      table.sortOrder,
+      table.id,
+    ),
+  }),
+);
+
+export const characterUrlRotation = pgTable("character_url_rotation", {
+  characterId: text("character_id").primaryKey(),
+  currentIndex: integer("current_index").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
