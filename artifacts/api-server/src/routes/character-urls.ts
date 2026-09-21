@@ -1,17 +1,58 @@
 import { Router } from "express";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { characterUrlRotation, characterUrls } from "@workspace/db/schema";
 
 const router = Router();
 const database = db!;
 
-router.use((_req, res, next) => {
+let schemaPromise: Promise<void> | null = null;
+
+function ensureDatabaseSchema(): Promise<void> {
+  if (!schemaPromise) {
+    schemaPromise = (async () => {
+      await database.execute(sql`
+        CREATE TABLE IF NOT EXISTS character_urls (
+          id SERIAL PRIMARY KEY,
+          character_id TEXT NOT NULL,
+          url TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await database.execute(sql`
+        CREATE INDEX IF NOT EXISTS character_urls_character_sort_idx
+        ON character_urls (character_id, sort_order, id)
+      `);
+      await database.execute(sql`
+        CREATE TABLE IF NOT EXISTS character_url_rotation (
+          character_id TEXT PRIMARY KEY,
+          current_index INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    })().catch((error) => {
+      schemaPromise = null;
+      throw error;
+    });
+  }
+  return schemaPromise;
+}
+
+router.use(async (req, res, next) => {
   if (!db) {
     res.status(503).json({ success: false, message: "Character URL database is not configured" });
     return;
   }
-  next();
+  try {
+    await ensureDatabaseSchema();
+    next();
+  } catch (error) {
+    req.log.error({ error }, "Character URL database schema is unavailable");
+    res.status(503).json({ success: false, message: "Character URL database is unavailable" });
+  }
 });
 
 function characterIdFrom(req: { params: Record<string, string | undefined> }): string | null {
