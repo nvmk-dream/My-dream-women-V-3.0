@@ -1,0 +1,1 @@
+- [Render database schema provisioning](render-db-schema-provisioning.md) — Render builds do not apply newly added Drizzle tables automatically.
