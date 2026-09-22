@@ -1,1 +1,2 @@
 - [Render database schema provisioning](render-db-schema-provisioning.md) — Render builds do not apply newly added Drizzle tables automatically.
+- [Opera-only external links](opera-only-external-links.md) — chat URLs must use an explicit Android Opera package intent with no default-browser fallback.
