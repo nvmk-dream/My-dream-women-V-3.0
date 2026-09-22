@@ -24,6 +24,7 @@ import {
   setCharacterUrlActive,
   updateCharacterUrl,
 } from "../services/api";
+import { openExternalHttpUrl } from "../utils/external-url";
 
 export default function CharacterUrlsScreen() {
   const router = useRouter();
@@ -71,6 +72,14 @@ export default function CharacterUrlsScreen() {
     setEditingUrlId(url?.id ?? null);
     setDraftUrl(url?.url ?? "");
     setEditorVisible(true);
+  };
+
+  const openSavedUrl = async (value: string) => {
+    try {
+      await openExternalHttpUrl(value);
+    } catch (error: any) {
+      Alert.alert("URL open ஆகவில்லை", error?.message || "Browser open ஆகவில்லை.");
+    }
   };
 
   const saveUrl = async () => {
@@ -241,9 +250,15 @@ export default function CharacterUrlsScreen() {
                       </TouchableOpacity>
                     </View>
                     <View style={styles.urlCopy}>
-                      <Text style={[styles.urlText, !item.isActive && styles.disabledText]} numberOfLines={3}>
-                        {item.url}
-                      </Text>
+                      <TouchableOpacity
+                        onPress={() => openSavedUrl(item.url)}
+                        accessibilityRole="link"
+                        testID={`character-url-${item.id}`}
+                      >
+                        <Text style={[styles.urlText, !item.isActive && styles.disabledText]} numberOfLines={3}>
+                          {item.url}
+                        </Text>
+                      </TouchableOpacity>
                       <Text style={[styles.statusText, item.isActive ? styles.activeText : styles.disabledText]}>
                         {item.isActive ? "● Active" : "○ Disabled"}
                       </Text>

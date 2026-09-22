@@ -71,6 +71,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
+import { getSafeExternalHttpUrl, openExternalHttpUrl } from '../utils/external-url';
 
 const { width, height } = Dimensions.get('window');
 
@@ -1911,9 +1912,18 @@ export default function ChatScreen() {
     if (personaId) await AsyncStorage.setItem(`birthday_${personaId}`, val).catch(() => {});
   };
 
+  const openChatUrl = async (value: string) => {
+    try {
+      await openExternalHttpUrl(value);
+    } catch (error: any) {
+      Alert.alert('URL open ஆகவில்லை', error?.message || 'Browser open ஆகவில்லை.');
+    }
+  };
+
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
     const aiTextStyle = isUser ? { color: msgTextColor } : { color: aiMsgTextColor, fontSize: aiMsgFontSize };
+    const messageUrl = getSafeExternalHttpUrl(item.content);
     return (
       <View style={[styles.msgRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && persona && (
@@ -1990,6 +2000,14 @@ export default function ChatScreen() {
               </TouchableOpacity>
               <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 4 }]}>{item.content}</Text>
             </View>
+          ) : messageUrl ? (
+            <TouchableOpacity
+              onPress={() => openChatUrl(messageUrl)}
+              accessibilityRole="link"
+              testID={`chat-url-${item.id}`}
+            >
+              <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
+            </TouchableOpacity>
           ) : (
             <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
           )}
