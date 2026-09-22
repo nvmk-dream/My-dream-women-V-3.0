@@ -1,4 +1,10 @@
-import { Linking } from "react-native";
+import { Platform } from "react-native";
+import * as IntentLauncher from "expo-intent-launcher";
+
+export const OPERA_BROWSER_PACKAGE = "com.opera.browser";
+const ANDROID_VIEW_ACTION = "android.intent.action.VIEW";
+export const OPERA_NOT_INSTALLED_MESSAGE =
+  "Opera Browser is not installed. Please install Opera Browser to open this URL.";
 
 export function getSafeExternalHttpUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -27,8 +33,19 @@ export async function openExternalHttpUrl(value: unknown): Promise<void> {
     throw new Error("Only valid http:// or https:// URLs can be opened.");
   }
 
-  // React Native's Android implementation uses ACTION_VIEW. Android then
-  // resolves the installed browser/default-app choice; no browser is chosen
-  // or embedded by the app.
-  await Linking.openURL(safeUrl);
+  if (Platform.OS !== "android") {
+    throw new Error(OPERA_NOT_INSTALLED_MESSAGE);
+  }
+
+  try {
+    // An explicit package-targeted ACTION_VIEW intent checks that Opera can
+    // handle the URL and launches only Opera. Android will not show a chooser
+    // or fall back to another browser.
+    await IntentLauncher.startActivityAsync(ANDROID_VIEW_ACTION, {
+      data: safeUrl,
+      packageName: OPERA_BROWSER_PACKAGE,
+    });
+  } catch {
+    throw new Error(OPERA_NOT_INSTALLED_MESSAGE);
+  }
 }
