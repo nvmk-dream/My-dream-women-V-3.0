@@ -1,0 +1,94 @@
+I want to modify the newly implemented Character URL feature.
+
+CURRENT BEHAVIOR:
+When the user taps a saved URL, I want the URL to open directly in an external browser.
+
+NEW REQUIRED BEHAVIOR:
+
+1. User taps a saved URL.
+
+2. BEFORE opening the URL, show an Android browser selection/confirmation dialog.
+
+Example:
+
+Open this URL with:
+
+○ Chrome
+○ Firefox
+○ Samsung Internet
+○ Other available browsers
+
+[ Just once ]   [ Always ]
+
+3. The app must use the Android system URL ACTION_VIEW intent / external browser mechanism.
+
+IMPORTANT:
+- Do NOT open the URL inside an in-app WebView.
+- Do NOT build a custom browser.
+- Do NOT hardcode Chrome.
+- Detect browsers installed on the user's Android device.
+- Let Android handle the available browser choices.
+
+4. If the user has multiple browsers installed:
+Show the Android system chooser so the user can select which browser to use.
+
+5. If only one suitable browser is installed:
+Open that browser directly, or use the system behavior without creating an unnecessary custom dialog.
+
+6. If the user selects "Always":
+Respect Android's default-app behavior.
+
+7. If the user selects "Just once":
+The next URL click should allow browser selection again according to Android's system behavior.
+
+8. IMPORTANT:
+Every saved URL in Character URL Settings must use the same external-browser behavior.
+
+This applies to:
+- URL list
+- Chat TXT URL reply
+- Any clickable URL generated from the Character URL rotation system
+
+9. URL security:
+Only launch valid http:// and https:// URLs.
+Do not execute javascript:, file:, intent:, or other unsafe URL schemes.
+
+10. Do not change:
+- URL rotation
+- character-specific URL storage
+- active/inactive URLs
+- URL ordering
+- Chat TXT behavior
+- Photo Styles
+- Cloudinary
+
+11. Use the existing React Native / Expo architecture in this project.
+First inspect package.json and the existing navigation/link handling.
+Use the project's existing supported method for opening external URLs.
+
+12. Test on Android:
+- Chrome installed
+- Chrome + Firefox installed
+- Multiple browsers installed
+- Only one browser installed
+- Invalid URL
+- HTTPS URL
+- HTTP URL
+
+Acceptance test:
+
+Character → Saved URLs → tap URL
+↓
+Android browser chooser/confirmation
+↓
+User selects browser
+↓
+URL opens in that external browser
+
+The URL must NOT open inside the app.
+
+After implementation, tell me:
+- exact files changed
+- which Android external URL API was used
+- how browser selection is handled
+- test results
