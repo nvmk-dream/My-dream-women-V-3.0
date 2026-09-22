@@ -4,7 +4,7 @@ import {
   FlatList, StyleSheet, KeyboardAvoidingView,
   Platform, ActivityIndicator, Alert, Modal,
   Image, ScrollView, Dimensions, StatusBar,
-  Clipboard,
+  Clipboard, StyleProp, TextStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
@@ -19,6 +19,59 @@ function cloudVideoThumbnail(videoUrl: string): string {
       .replace('/video/upload/', '/video/upload/so_0,w_400,h_225,c_fill,f_jpg/')
       .replace(/\.(mp4|mov|avi|mkv|webm|m4v)(\?.*)?$/, '.jpg');
   } catch { return ''; }
+}
+
+function renderTextWithOperaLinks(
+  content: string,
+  textStyle: StyleProp<TextStyle>,
+  linkStyle: StyleProp<TextStyle>,
+  onLinkPress: (url: string) => void,
+) {
+  const nodes: React.ReactNode[] = [];
+  const urlPattern = /https?:\/\/[^\s<>"'`]+/gi;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlPattern.exec(content)) !== null) {
+    const rawUrl = match[0];
+    const trailingPunctuation = rawUrl.match(/[.,!?;:'")\]}]+$/)?.[0] ?? '';
+    const candidate = trailingPunctuation
+      ? rawUrl.slice(0, rawUrl.length - trailingPunctuation.length)
+      : rawUrl;
+    const safeUrl = getSafeExternalHttpUrl(candidate);
+    const urlStart = match.index;
+
+    if (urlStart > lastIndex) {
+      nodes.push(content.slice(lastIndex, urlStart));
+    }
+
+    if (safeUrl) {
+      nodes.push(
+        <Text
+          key={`opera-link-${urlStart}`}
+          style={linkStyle}
+          onPress={() => onLinkPress(safeUrl)}
+          accessibilityRole="link"
+        >
+          {candidate}
+        </Text>,
+      );
+    } else {
+      nodes.push(rawUrl);
+    }
+
+    lastIndex = urlStart + rawUrl.length;
+  }
+
+  if (nodes.length === 0) {
+    return <Text selectable style={textStyle}>{content}</Text>;
+  }
+
+  if (lastIndex < content.length) {
+    nodes.push(content.slice(lastIndex));
+  }
+
+  return <Text selectable style={textStyle}>{nodes}</Text>;
 }
 
 // Per-style photo cache helpers — same key as ai-girls-cloud.tsx uses
@@ -1923,7 +1976,6 @@ export default function ChatScreen() {
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
     const aiTextStyle = isUser ? { color: msgTextColor } : { color: aiMsgTextColor, fontSize: aiMsgFontSize };
-    const messageUrl = getSafeExternalHttpUrl(item.content);
     return (
       <View style={[styles.msgRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && persona && (
@@ -1951,7 +2003,7 @@ export default function ChatScreen() {
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
               <ActivityIndicator color="#075E54" size="small" />
-              <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
+              {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle], styles.messageLink, openChatUrl)}
             </View>
           ) : item.imageUrl ? (
             <View>
@@ -1959,7 +2011,9 @@ export default function ChatScreen() {
                 <Image source={{ uri: item.imageUrl }} style={styles.generatedImg} resizeMode="cover" />
               </TouchableOpacity>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 8 }}>
-                <Text selectable style={[styles.msgText, aiTextStyle, { flex: 1 }]}>{item.content}</Text>
+                <View style={{ flex: 1 }}>
+                  {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle], styles.messageLink, openChatUrl)}
+                </View>
                 <TouchableOpacity
                   onPress={() => saveAiImageToGallery(item.imageUrl!)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(37,211,102,0.15)', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(37,211,102,0.4)' }}
@@ -1991,25 +2045,17 @@ export default function ChatScreen() {
                   <Text style={{ color: '#fff', fontSize: 10, marginTop: 6, fontWeight: '600', opacity: 0.9 }}>🎬 Video</Text>
                 </View>
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 6 }]}>{item.content}</Text>
+              {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle, { marginTop: 6 }], styles.messageLink, openChatUrl)}
             </View>
           ) : item.sentMediaType === 'image' && item.sentMediaUri ? (
             <View>
               <TouchableOpacity activeOpacity={0.88} onPress={() => setFullViewImg(item.sentMediaUri!)}>
                 <Image source={{ uri: item.sentMediaUri }} style={{ width: 200, height: 200, borderRadius: 10 }} resizeMode="cover" />
               </TouchableOpacity>
-              <Text selectable style={[styles.msgText, aiTextStyle, { marginTop: 4 }]}>{item.content}</Text>
+              {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle, { marginTop: 4 }], styles.messageLink, openChatUrl)}
             </View>
-          ) : messageUrl ? (
-            <TouchableOpacity
-              onPress={() => openChatUrl(messageUrl)}
-              accessibilityRole="link"
-              testID={`chat-url-${item.id}`}
-            >
-              <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
-            </TouchableOpacity>
           ) : (
-            <Text selectable style={[styles.msgText, aiTextStyle]}>{item.content}</Text>
+            renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle], styles.messageLink, openChatUrl)
           )}
           {item.videoUrl && (
             <View style={{ marginBottom: 6 }}>
@@ -2997,6 +3043,7 @@ const styles = StyleSheet.create({
   aiBubble: { backgroundColor: '#fff', borderTopLeftRadius: 2 },
   galleryBubble: { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0 },
   msgText: { fontSize: 15, lineHeight: 22, color: '#111' },
+  messageLink: { color: '#1565C0', textDecorationLine: 'underline' },
   timeText: { fontSize: 10, color: '#888', alignSelf: 'flex-end', marginTop: 3 },
   loadingRow: { flexDirection: 'row', padding: 8, paddingLeft: 14 },
   loadingBubble: { backgroundColor: '#fff', borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
