@@ -1015,19 +1015,21 @@ Then write these prompts:
           }
         </View>
         <View style={s.chatMid}>
-          <Text style={s.chatName} numberOfLines={1}>{p.name}</Text>
+          <View style={s.chatNameRow}>
+            <Text style={s.chatName} numberOfLines={1}>{p.name}</Text>
+            <TouchableOpacity
+              style={s.urlSettingsBtn}
+              onPress={() => openUrlSettings(p)}
+              accessibilityLabel={`Manage URLs for ${p.name}`}
+            >
+              <Text style={s.urlSettingsTxt}>🔗</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={s.chatSub} numberOfLines={1}>
             {p.editedRelationship ?? p.relationship} · {p.profession}
           </Text>
         </View>
         <View style={s.chatRight}>
-          <TouchableOpacity
-            style={s.urlSettingsBtn}
-            onPress={() => openUrlSettings(p)}
-            accessibilityLabel={`Manage URLs for ${p.name}`}
-          >
-            <Text style={s.urlSettingsTxt}>🔗</Text>
-          </TouchableOpacity>
           <Text style={s.chatTime}>{p.time}</Text>
           {autoMsgEnabled && iv && (
             <Text style={s.timerBadge}>⏱{iv}m</Text>
@@ -1790,7 +1792,8 @@ const s = StyleSheet.create({
   avatarImg: { width: 52, height: 52, borderRadius: 26 },
   avatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   chatMid: { flex: 1 },
-  chatName: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 3 },
+  chatNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginBottom: 3 },
+  chatName: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: '#111' },
   chatSub: { fontSize: 13, color: '#666' },
   chatRight: { alignItems: 'flex-end', gap: 4 },
   urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
