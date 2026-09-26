@@ -2,8 +2,12 @@ name: Build APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+    inputs:
+      deploy_render:
+        description: "Also redeploy the Render API server"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -243,6 +247,7 @@ jobs:
           echo "https://github.com/${{ github.repository }}/releases/download/$TAG/$APK_NAME"
 
       - name: Trigger Render Redeploy (best effort)
+        if: ${{ inputs.deploy_render == true }}
         env:
           RENDER_HOOK: ${{ secrets.RENDER_HOOK }}
           RENDER_KEY: ${{ secrets.RENDER_KEY }}

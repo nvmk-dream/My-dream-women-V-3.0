@@ -32,7 +32,71 @@ const PHOTO_COL = 3;
 const PHOTO_SIZE = (width - 4 * (PHOTO_COL + 1)) / PHOTO_COL;
 
 
-interface CloudPhoto { url: string; public_id: string }
+const CLOUDINARY_CLOUD = 'dazmrxsyc';
+
+interface CloudPhoto {
+  /** Original Cloudinary asset URL. Keep this for full-screen view and saving. */
+  url: string;
+  /** Stable Cloudinary asset id used for keys and deletion. */
+  public_id: string;
+  originalUrl?: string;
+  thumbnailUrl?: string;
+}
+
+function isUsableImageUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const url = value.trim();
+  if (!/^https?:\/\//i.test(url)) return false;
+  if (/placeholder|undefined|null|about:blank/i.test(url)) return false;
+  return !/\/image\/upload\/(?:\?|$)/i.test(url);
+}
+
+function buildCloudinaryOriginalUrl(publicId: string): string {
+  const encodedPublicId = publicId
+    .split('/')
+    .map(part => encodeURIComponent(part))
+    .join('/');
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/${encodedPublicId}`;
+}
+
+function getCloudinaryThumbnailUrl(originalUrl: string): string {
+  const marker = '/image/upload/';
+  if (!originalUrl.includes(marker)) return originalUrl;
+  return originalUrl.replace(
+    marker,
+    `${marker}f_auto,q_auto,c_fill,w_320,h_320/`,
+  );
+}
+
+function normalizeCloudPhoto(value: any): CloudPhoto | null {
+  const publicId = typeof value?.public_id === 'string' ? value.public_id.trim() : '';
+  if (!publicId || /placeholder|undefined|null/i.test(publicId)) return null;
+  const candidateUrl =
+    value?.originalUrl ??
+    value?.url ??
+    value?.secure_url ??
+    value?.thumbnailUrl;
+  const originalUrl = buildCloudinaryOriginalUrl(publicId);
+  if (!isUsableImageUrl(originalUrl) && !isUsableImageUrl(candidateUrl)) return null;
+  return {
+    url: originalUrl,
+    originalUrl,
+    thumbnailUrl: getCloudinaryThumbnailUrl(originalUrl),
+    public_id: publicId,
+  };
+}
+
+function normalizeCloudPhotos(value: unknown): CloudPhoto[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value
+    .map(normalizeCloudPhoto)
+    .filter((photo): photo is CloudPhoto => {
+      if (!photo || seen.has(photo.public_id)) return false;
+      seen.add(photo.public_id);
+      return true;
+    });
+}
 
 type PickerAssetMetadata = {
   uri: string;
@@ -262,6 +326,7 @@ export default function AIGirlsCloudScreen() {
 
   // Photos state (depth 2)
   const [photos, setPhotos] = useState<CloudPhoto[]>([]);
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set());
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fullView, setFullView] = useState<CloudPhoto | null>(null);
@@ -370,7 +435,11 @@ export default function AIGirlsCloudScreen() {
         const folder = `my-girls/${charId}/${styleId}`;
         const mime = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
         const uploaded = await uploadUriToCloudinary(asset.uri, mime, folder);
-        newPhotos.push({ url: uploaded.url, public_id: uploaded.public_id });
+        const normalizedPhoto = normalizeCloudPhoto(uploaded);
+        if (!normalizedPhoto) {
+          throw new Error('Cloudinary returned an invalid image URL');
+        }
+        newPhotos.push(normalizedPhoto);
         // Track server-side so photos survive app reinstall
         trackCloudinaryUpload(folder, uploaded.public_id, uploaded.url).catch(() => {});
         uploadedAssets.push({ pickerAsset: asset, folder, uploaded });
@@ -394,8 +463,8 @@ export default function AIGirlsCloudScreen() {
     if (newPhotos.length) {
       const key = `cloud_photos_${charId}_${styleId}`;
       const cached = await AsyncStorage.getItem(key);
-      const existing: CloudPhoto[] = cached ? JSON.parse(cached) : [];
-      const merged = [...newPhotos, ...existing];
+      const existing = normalizeCloudPhotos(cached ? JSON.parse(cached) : []);
+      const merged = normalizeCloudPhotos([...newPhotos, ...existing]);
       await AsyncStorage.setItem(key, JSON.stringify(merged));
       if (selectedChar?.id === charId && selectedStyle?.id === styleId) {
         setPhotos(merged);
@@ -684,17 +753,19 @@ export default function AIGirlsCloudScreen() {
   const loadPhotos = useCallback(async (charId: string, styleId: string) => {
     setLoadingPhotos(true);
     setPhotos([]);
+    setFailedPhotoIds(new Set());
     try {
       // 1. Load from AsyncStorage first (instant, works offline)
       const key = `cloud_photos_${charId}_${styleId}`;
       const cached = await AsyncStorage.getItem(key);
-      const local: CloudPhoto[] = cached ? JSON.parse(cached) : [];
+      const local = normalizeCloudPhotos(cached ? JSON.parse(cached) : []);
       if (local.length > 0) setPhotos(local);
+      await AsyncStorage.setItem(key, JSON.stringify(local));
 
       // 2. Try Cloudinary list in background and merge
       try {
         const folder = `my-girls/${charId}/${styleId}`;
-        const cloud = await listCloudinaryImages(folder);
+        const cloud = normalizeCloudPhotos(await listCloudinaryImages(folder));
         if (cloud.length > 0) {
           // Merge: cloud list wins, add any local-only items
           const cloudIds = new Set(cloud.map(p => p.public_id));
@@ -793,6 +864,7 @@ export default function AIGirlsCloudScreen() {
     if (savingPhoto) return;
     setSavingPhoto(true);
     try {
+      const originalUrl = photo.originalUrl || photo.url;
       const permission = await requestPhotoVideoPermissionsAsync();
       if (!permission.granted) {
         Alert.alert('Permission இல்லை', 'Settings → My Girls → Permissions → Files & Media → Allow all');
@@ -800,10 +872,10 @@ export default function AIGirlsCloudScreen() {
         return;
       }
       // Extract extension from URL to avoid mime-type mismatch
-      const urlClean = photo.url.split('?')[0];
+      const urlClean = originalUrl.split('?')[0];
       const ext = urlClean.match(/.(webp|png|jpg|jpeg|gif)$/i)?.[1] ?? 'jpg';
       const fileUri = FileSystem.cacheDirectory + 'save_' + Date.now() + '.' + ext;
-      const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
+      const { uri } = await FileSystem.downloadAsync(originalUrl, fileUri);
       await MediaLibrary.saveToLibraryAsync(uri);
       FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
       Alert.alert('✅ Saved!', 'Photo Gallery-ல் save ஆச்சு! 🎉');
@@ -983,54 +1055,76 @@ export default function AIGirlsCloudScreen() {
           </View>
         ) : (
           <>
-            {photoSelMode && photoSelIds.size > 0 && (
-              <View style={s.photoSelBar}>
-                <TouchableOpacity onPress={exitPhotoSel}>
-                  <Text style={s.photoSelCancel}>✕</Text>
-                </TouchableOpacity>
-                <Text style={s.photoSelCount}>{photoSelIds.size} selected</Text>
-                <TouchableOpacity style={s.photoSelDeleteBtn} onPress={deleteSelectedPhotos}>
-                  <Text style={s.photoSelDeleteTxt}>🗑️ Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <ScrollView style={{ flex: 1, backgroundColor: '#111' }}>
-              {/* Date header — phone gallery style */}
-              <View style={s.dateHeader}>
-                <Text style={s.dateHeaderTxt}>{dateStr}</Text>
-                <Text style={s.dateHeaderSub}>{timeStr} · {photos.length} photos</Text>
-              </View>
-              <View style={s.photoGrid}>
-                {photos.map(photo => {
-                  const isSel = photoSelIds.has(photo.public_id);
-                  return (
-                    <View key={photo.public_id} style={s.photoWrap}>
-                      <TouchableOpacity
-                        onPress={() => photoSelMode ? togglePhotoSel(photo.public_id) : setFullView(photo)}
-                        onLongPress={() => { setPhotoSelMode(true); setPhotoSelIds(new Set([photo.public_id])); }}
-                        activeOpacity={0.85}
-                      >
+            <FlatList
+              data={photos}
+              numColumns={PHOTO_COL}
+              keyExtractor={photo => photo.public_id}
+              extraData={{ photoSelIds, failedPhotoIds, photoSelMode }}
+              style={s.photoList}
+              contentContainerStyle={s.photoListContent}
+              columnWrapperStyle={s.photoRow}
+              ListHeaderComponent={
+                <>
+                  <View style={s.dateHeader}>
+                    <Text style={s.dateHeaderTxt}>{dateStr}</Text>
+                    <Text style={s.dateHeaderSub}>{timeStr} · {photos.length} photos</Text>
+                  </View>
+                  {photoSelMode && photoSelIds.size > 0 && (
+                    <View style={s.photoSelBar}>
+                      <TouchableOpacity onPress={exitPhotoSel}>
+                        <Text style={s.photoSelCancel}>✕</Text>
+                      </TouchableOpacity>
+                      <Text style={s.photoSelCount}>{photoSelIds.size} selected</Text>
+                      <TouchableOpacity style={s.photoSelDeleteBtn} onPress={deleteSelectedPhotos}>
+                        <Text style={s.photoSelDeleteTxt}>🗑️ Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
+              }
+              renderItem={({ item: photo }) => {
+                const isSel = photoSelIds.has(photo.public_id);
+                const failed = failedPhotoIds.has(photo.public_id);
+                return (
+                  <View style={s.photoWrap}>
+                    <TouchableOpacity
+                      onPress={() => photoSelMode ? togglePhotoSel(photo.public_id) : setFullView(photo)}
+                      onLongPress={() => { setPhotoSelMode(true); setPhotoSelIds(new Set([photo.public_id])); }}
+                      activeOpacity={0.85}
+                    >
+                      {failed ? (
+                        <View style={s.photoWarningTile}>
+                          <Text style={s.photoWarningIcon}>⚠️</Text>
+                          <Text style={s.photoWarningTxt}>Image load failed</Text>
+                        </View>
+                      ) : (
                         <Image
-                          source={{ uri: photo.url }}
+                          source={{ uri: photo.thumbnailUrl || photo.url }}
                           style={[s.photoThumb, isSel && { opacity: 0.6 }]}
                           resizeMode="cover"
+                          onError={() => setFailedPhotoIds(prev => {
+                            if (prev.has(photo.public_id)) return prev;
+                            const next = new Set(prev);
+                            next.add(photo.public_id);
+                            return next;
+                          })}
                         />
-                        {isSel && (
-                          <View style={s.photoSelOverlay}>
-                            <Text style={s.photoSelCheck}>✓</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                      {!photoSelMode && (
-                        <TouchableOpacity style={s.photoDelete} onPress={() => handleDeletePhoto(photo)}>
-                          <Text style={s.photoDeleteTxt}>🗑</Text>
-                        </TouchableOpacity>
                       )}
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
+                      {isSel && (
+                        <View style={s.photoSelOverlay}>
+                          <Text style={s.photoSelCheck}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {!photoSelMode && (
+                      <TouchableOpacity style={s.photoDelete} onPress={() => handleDeletePhoto(photo)}>
+                        <Text style={s.photoDeleteTxt}>🗑</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }}
+            />
           </>
         )}
       </>
@@ -1075,7 +1169,7 @@ export default function AIGirlsCloudScreen() {
           <TouchableOpacity style={s.fullViewClose} onPress={() => setFullView(null)}>
             <Text style={s.fullViewCloseTxt}>✕</Text>
           </TouchableOpacity>
-          <Image source={{ uri: fullView.url }} style={s.fullViewImg} resizeMode="contain" />
+          <Image source={{ uri: fullView.originalUrl || fullView.url }} style={s.fullViewImg} resizeMode="contain" />
           <View style={s.fullViewActions}>
             <TouchableOpacity style={s.fullViewSave} onPress={() => handleSaveToGallery(fullView)} disabled={savingPhoto}>
               <Text style={s.fullViewSaveTxt}>{savingPhoto ? '⏳ Saving...' : '⬇️ Gallery Save'}</Text>
@@ -1260,10 +1354,9 @@ const s = StyleSheet.create({
   },
   dateHeaderTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
   dateHeaderSub: { color: '#aaa', fontSize: 12, marginTop: 2 },
-  photoGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    padding: 2, gap: 2, backgroundColor: '#111',
-  },
+  photoList: { flex: 1, backgroundColor: '#111' },
+  photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: '#111' },
+  photoRow: { justifyContent: 'space-between', marginBottom: 2 },
   photoSelBar: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a',
     paddingHorizontal: 14, paddingVertical: 10, gap: 10,
@@ -1272,8 +1365,15 @@ const s = StyleSheet.create({
   photoSelCount: { flex: 1, color: '#fff', fontWeight: '700', fontSize: 14 },
   photoSelDeleteBtn: { backgroundColor: '#c62828', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
   photoSelDeleteTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  photoWrap: { position: 'relative' },
+  photoWrap: { position: 'relative', width: PHOTO_SIZE },
   photoThumb: { width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 4 },
+  photoWarningTile: {
+    width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 4,
+    backgroundColor: '#3a2414', borderWidth: 1, borderColor: '#b56b2a',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5,
+  },
+  photoWarningIcon: { fontSize: 22, marginBottom: 4 },
+  photoWarningTxt: { color: '#ffd7a0', fontSize: 10, fontWeight: '700', textAlign: 'center' },
   photoSelOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(21,101,192,0.35)', borderRadius: 4,
