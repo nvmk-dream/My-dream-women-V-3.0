@@ -49,6 +49,7 @@ const STYLE_TO_PROMPT: Record<string, string> = {
 };
 
 const INTERVALS = [10, 20, 30] as const;
+const CHARACTER_VIEW_MODE_KEY = 'ai_girls_character_view_mode';
 
 // ── Ringtone definitions ───────────────────────────────────────────
 export const RINGTONES = [
@@ -142,6 +143,7 @@ export default function AIGirlsScreen() {
 
   // ── Settings state ────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
+  const [characterViewMode, setCharacterViewMode] = useState<'list' | 'grid'>('list');
   const [isOnline, setIsOnline] = useState(true);
   const [wakingServer, setWakingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<'unknown'|'ok'|'sleeping'>('unknown');
@@ -401,6 +403,10 @@ AsyncStorage-ல் save ஆச்சு!`
 
   const loadSettingsAndCheck = useCallback(async () => {
     try {
+      const savedViewMode = await AsyncStorage.getItem(CHARACTER_VIEW_MODE_KEY).catch(() => null);
+      if (savedViewMode === 'list' || savedViewMode === 'grid') {
+        setCharacterViewMode(savedViewMode);
+      }
       const [onlineVal, autoVal, pinVal, userPhotoVal, ringtoneVal, userNameVal, userBehaviourVal] = await Promise.all([
         AsyncStorage.getItem('chat_is_online'),
         AsyncStorage.getItem('auto_msg_enabled'),
@@ -456,6 +462,15 @@ AsyncStorage-ல் save ஆச்சு!`
       setAutoUnreads(unreadMap);
     } catch {}
   }, []);
+
+  const changeCharacterViewMode = async (mode: 'list' | 'grid') => {
+    try {
+      await AsyncStorage.setItem(CHARACTER_VIEW_MODE_KEY, mode);
+      setCharacterViewMode(mode);
+    } catch (error) {
+      Alert.alert('அமைப்பைச் சேமிக்க முடியவில்லை', String(error));
+    }
+  };
 
   // ── Setup native notifications + SW fallback for web ──
   useEffect(() => {
@@ -1014,6 +1029,60 @@ Then write these prompts:
       { edge: '#FFD36D', fill: ['#292536', '#271E35', '#171A31'] as const },
     ];
     const rowPalette = rowPalettes[index % rowPalettes.length];
+    if (characterViewMode === 'grid') {
+      return (
+        <TouchableOpacity
+          style={[s.gridCard, { borderColor: rowPalette.edge, shadowColor: rowPalette.edge }]}
+          onPress={() => goChat(p)}
+          onLongPress={() => openActionSheet(p)}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel={`Open chat with ${p.name}`}
+        >
+          <View style={[s.gridPhoto, { backgroundColor: p.avatarColor }]}>
+            {p.avatarPhotoUri
+              ? <Image source={{ uri: p.avatarPhotoUri }} style={s.gridPhotoImage} resizeMode="cover" />
+              : <LinearGradient colors={rowPalette.fill} style={s.gridPhotoFallback}>
+                  <Text style={s.gridPhotoEmoji}>{p.emoji}</Text>
+                </LinearGradient>
+            }
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(5, 8, 20, 0.04)', 'rgba(5, 8, 20, 0.82)']}
+              locations={[0.35, 1]}
+              style={[StyleSheet.absoluteFillObject, s.gridPhotoShade]}
+            />
+            <View style={s.gridPhotoTop}>
+              <Text style={s.gridTime}>{p.time}</Text>
+              <View style={s.gridPhotoActions}>
+                {autoMsgEnabled && iv ? <Text style={s.gridTimerBadge}>{iv}m</Text> : null}
+                {(hasAutoUnread || (p.unread ?? 0) > 0) && (
+                  <View style={s.badge}>
+                    <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={s.gridUrlButton}
+                  onPress={() => openUrlSettings(p)}
+                  accessibilityLabel={`Manage URLs for ${p.name}`}
+                  accessibilityRole="button"
+                  testID={`grid-character-urls-${p.id}`}
+                >
+                  <Text style={s.gridUrlText}>🔗</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={s.gridPhotoBottom}>
+              <Text style={s.gridName} numberOfLines={1}>{p.name}</Text>
+              <Text style={s.gridSub} numberOfLines={2}>
+                {p.editedRelationship ?? p.relationship} · {p.profession}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     return (
       <TouchableOpacity
         style={[s.chatRow, { borderColor: rowPalette.edge, shadowColor: rowPalette.edge }]}
@@ -1123,12 +1192,15 @@ Then write these prompts:
         <View style={s.loadingWrap}><ActivityIndicator color="#51D8F2" size="large" /></View>
       ) : (
         <FlatList
+          key={characterViewMode}
           style={s.list}
           data={personas}
+          numColumns={characterViewMode === 'grid' ? 2 : 1}
           keyExtractor={p => p.id}
           renderItem={renderCharRow}
-          ItemSeparatorComponent={() => <View style={s.sep} />}
-          contentContainerStyle={s.listContent}
+          columnWrapperStyle={characterViewMode === 'grid' ? s.gridColumn : undefined}
+          ItemSeparatorComponent={() => <View style={characterViewMode === 'grid' ? s.gridSeparator : s.sep} />}
+          contentContainerStyle={characterViewMode === 'grid' ? s.gridListContent : s.listContent}
         />
       )}
 
@@ -1276,6 +1348,34 @@ Then write these prompts:
             <Text style={s.settingsTitle}>⚙️ Settings</Text>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: '85%' }}>
+
+              {/* Character list layout */}
+              <View style={s.settingsSection}>
+                <Text style={s.settingsRowTitle}>Character display</Text>
+                <Text style={s.settingsRowSub}>Home screen-ல் character-களை list அல்லது grid-ஆகக் காட்டுங்கள்</Text>
+                <View style={s.characterViewOptions}>
+                  <TouchableOpacity
+                    testID="character-view-list"
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: characterViewMode === 'list' }}
+                    style={[s.characterViewOption, characterViewMode === 'list' && s.characterViewOptionActive]}
+                    onPress={() => changeCharacterViewMode('list')}
+                  >
+                    <Text style={[s.characterViewIcon, characterViewMode === 'list' && s.characterViewTextActive]}>☰</Text>
+                    <Text style={[s.characterViewText, characterViewMode === 'list' && s.characterViewTextActive]}>List view</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="character-view-grid"
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: characterViewMode === 'grid' }}
+                    style={[s.characterViewOption, characterViewMode === 'grid' && s.characterViewOptionActive]}
+                    onPress={() => changeCharacterViewMode('grid')}
+                  >
+                    <Text style={[s.characterViewIcon, characterViewMode === 'grid' && s.characterViewTextActive]}>▦</Text>
+                    <Text style={[s.characterViewText, characterViewMode === 'grid' && s.characterViewTextActive]}>Grid view</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* 1. Online / Offline */}
               <View style={s.settingsSection}>
@@ -1817,6 +1917,40 @@ const s = StyleSheet.create({
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080B18' },
   list: { flex: 1, backgroundColor: '#080B18' },
   listContent: { paddingTop: 10, paddingBottom: 120 },
+  gridListContent: { paddingTop: 10, paddingBottom: 120, paddingLeft: 12, paddingRight: 84 },
+  gridColumn: { justifyContent: 'space-between' },
+  gridSeparator: { height: 12 },
+  gridCard: {
+    width: '48%', height: 184, borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1.2, backgroundColor: '#11172F', marginBottom: 1,
+    shadowOpacity: 0.32, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 4,
+  },
+  gridPhoto: { flex: 1, overflow: 'hidden' },
+  gridPhotoImage: StyleSheet.absoluteFillObject,
+  gridPhotoFallback: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  gridPhotoEmoji: { fontSize: 52 },
+  gridPhotoShade: { borderRadius: 14 },
+  gridPhotoTop: {
+    position: 'absolute', top: 8, left: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4,
+  },
+  gridTime: {
+    color: '#F4F6FF', fontSize: 10, fontWeight: '700',
+    backgroundColor: 'rgba(8, 11, 24, 0.72)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 10,
+  },
+  gridPhotoActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  gridTimerBadge: {
+    color: '#F2CF68', fontSize: 9, fontWeight: '800',
+    backgroundColor: 'rgba(8, 11, 24, 0.72)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 9,
+  },
+  gridUrlButton: {
+    width: 26, height: 26, justifyContent: 'center', alignItems: 'center',
+    borderRadius: 13, backgroundColor: 'rgba(8, 11, 24, 0.72)',
+  },
+  gridUrlText: { fontSize: 13 },
+  gridPhotoBottom: { position: 'absolute', left: 9, right: 9, bottom: 9 },
+  gridName: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  gridSub: { color: '#E0E5F5', fontSize: 10, lineHeight: 14 },
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1910,6 +2044,18 @@ const s = StyleSheet.create({
   settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   settingsRowTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 3 },
   settingsRowSub: { fontSize: 12, color: '#777' },
+  characterViewOptions: {
+    flexDirection: 'row', gap: 10, marginTop: 12,
+    backgroundColor: '#F2F4F8', padding: 4, borderRadius: 13,
+  },
+  characterViewOption: {
+    flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: 'transparent',
+  },
+  characterViewOptionActive: { backgroundColor: '#171D38', borderColor: '#51D8F2' },
+  characterViewIcon: { color: '#515A70', fontSize: 17, fontWeight: '700' },
+  characterViewText: { color: '#394155', fontSize: 13, fontWeight: '700' },
+  characterViewTextActive: { color: '#F3F4FF' },
 
   // ── Custom Toggle ──
   toggle: {
