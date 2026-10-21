@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Modal, Pressable, Image,
@@ -1002,12 +1003,29 @@ Then write these prompts:
   };
 
   // ── Character row ─────────────────────────────────────────────
-  const renderCharRow = ({ item: p }: { item: PersonaWithExtra }) => {
+  const renderCharRow = ({ item: p, index }: { item: PersonaWithExtra; index: number }) => {
     const hasAutoUnread = autoUnreads[p.id];
     const iv = intervals[p.id];
+    const rowPalettes = [
+      { edge: '#51D8F2', fill: ['#142039', '#171B34', '#221834'] as const },
+      { edge: '#C47CFF', fill: ['#1B1838', '#211936', '#171B33'] as const },
+      { edge: '#FF70B8', fill: ['#24172F', '#281931', '#191A32'] as const },
+      { edge: '#7CE5A2', fill: ['#122C31', '#183138', '#191D35'] as const },
+      { edge: '#FFD36D', fill: ['#292536', '#271E35', '#171A31'] as const },
+    ];
+    const rowPalette = rowPalettes[index % rowPalettes.length];
     return (
-      <TouchableOpacity style={s.chatRow} onPress={() => goChat(p)}
+      <TouchableOpacity
+        style={[s.chatRow, { borderColor: rowPalette.edge, shadowColor: rowPalette.edge }]}
+        onPress={() => goChat(p)}
         onLongPress={() => openActionSheet(p)} activeOpacity={0.7}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={rowPalette.fill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, s.chatSurface]}
+        />
         <View style={[s.avatar, { backgroundColor: p.avatarColor }]}>
           {p.avatarPhotoUri
             ? <Image source={{ uri: p.avatarPhotoUri }} style={s.avatarImg} />
@@ -1050,8 +1068,13 @@ Then write these prompts:
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* WhatsApp-style Header */}
-      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
+      {/* Character-list header */}
+      <LinearGradient
+        colors={['#12203D', '#11172F', '#261633']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.85 }}
+        style={[s.header, { paddingTop: insets.top + 14 }]}
+      >
         <TouchableOpacity onPress={openProfileModal} style={s.userAvatarBtn}>
           {uploadingUserPhoto
             ? <View style={s.userPhotoDefault}><ActivityIndicator color="#fff" size="small" /></View>
@@ -1063,7 +1086,7 @@ Then write these prompts:
             <Text style={s.userNameBadge} numberOfLines={1}>{userName}</Text>
           )}
         </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+        <View style={s.headerControls}>
           <View style={s.buildBadge}>
             <Text style={s.buildBadgeTxt}>
               v{Constants.expoConfig?.version ?? '1.0'} ({Constants.expoConfig?.android?.versionCode ?? ''})
@@ -1093,44 +1116,51 @@ Then write these prompts:
             <Text style={s.headerGear}>⚙️</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Chat list */}
       {loading ? (
-        <View style={s.loadingWrap}><ActivityIndicator color="#075E54" size="large" /></View>
+        <View style={s.loadingWrap}><ActivityIndicator color="#51D8F2" size="large" /></View>
       ) : (
         <FlatList
+          style={s.list}
           data={personas}
           keyExtractor={p => p.id}
           renderItem={renderCharRow}
           ItemSeparatorComponent={() => <View style={s.sep} />}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={s.listContent}
         />
       )}
 
       {/* Floating action buttons */}
       <View style={[s.fab, { bottom: insets.bottom + 16 }]}>
-        <TouchableOpacity style={[s.fabBtn, { backgroundColor: '#E91E8C' }]} onPress={() => router.push('/prompt-image')}>
+        <TouchableOpacity style={[s.fabBtn, s.fabPink]} onPress={() => router.push('/prompt-image')}>
+          <LinearGradient pointerEvents="none" colors={['#6B2055', '#371A3C', '#1D1931']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Text style={s.fabIcon}>🎨</Text>
           <Text style={[s.fabLabel, { color: '#fff' }]}>Text→Img</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, { backgroundColor: '#00897B' }]} onPress={() => setShowAddCharModal(true)}>
+        <TouchableOpacity style={[s.fabBtn, s.fabTeal]} onPress={() => setShowAddCharModal(true)}>
+          <LinearGradient pointerEvents="none" colors={['#17635A', '#17434A', '#16233A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Text style={[s.fabIcon, { color: '#fff' }]}>➕</Text>
           <Text style={[s.fabLabel, { color: '#fff' }]}>Character</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.fabBtn} onPress={() => setShowGroupModal(true)}>
+        <TouchableOpacity style={[s.fabBtn, s.fabCyan]} onPress={() => setShowGroupModal(true)}>
+          <LinearGradient pointerEvents="none" colors={['#1C4D68', '#1D3653', '#171D38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Text style={s.fabIcon}>👥</Text>
-          <Text style={s.fabLabel}>Group</Text>
+          <Text style={[s.fabLabel, { color: '#fff' }]}>Group</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, { backgroundColor: '#4A1D96' }]} onPress={handlePhotoToScript}>
+        <TouchableOpacity style={[s.fabBtn, s.fabViolet]} onPress={handlePhotoToScript}>
+          <LinearGradient pointerEvents="none" colors={['#59277A', '#382051', '#201A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Image source={require('../assets/images/photo-to-script-icon.png')} style={s.fabScriptImg} />
           <Text style={[s.fabLabel, { color: '#e9d5ff', fontSize: 9 }]}>Script</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, { backgroundColor: '#6A1B9A' }]} onPress={() => router.push('/face-swap')}>
+        <TouchableOpacity style={[s.fabBtn, s.fabPinkDeep]} onPress={() => router.push('/face-swap')}>
+          <LinearGradient pointerEvents="none" colors={['#69235F', '#411D50', '#241936']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Text style={s.fabIcon}>🤳</Text>
           <Text style={[s.fabLabel, { color: '#fff' }]}>Swap</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, { backgroundColor: '#1565C0' }]} onPress={() => router.push('/home')}>
+        <TouchableOpacity style={[s.fabBtn, s.fabBlue]} onPress={() => router.push('/home')}>
+          <LinearGradient pointerEvents="none" colors={['#1E5573', '#22395A', '#191D38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
           <Text style={s.fabIcon}>☁️</Text>
           <Text style={[s.fabLabel, { color: '#fff' }]}>Cloud</Text>
         </TouchableOpacity>
@@ -1680,26 +1710,27 @@ Then write these prompts:
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#ECE5DD' },
+  safe: { flex: 1, backgroundColor: '#080B18' },
 
   header: {
-    backgroundColor: '#128C7E',
+    backgroundColor: '#0B1023',
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 14,
-    gap: 10,
-    elevation: 4,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 2 },
+    paddingHorizontal: 10, paddingVertical: 14,
+    gap: 6,
+    borderBottomWidth: 1, borderBottomColor: '#263152',
+    elevation: 8,
+    shadowColor: '#51D8F2', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
   },
-  userAvatarBtn: { alignItems: 'center', gap: 2, minWidth: 48 },
-  userPhotoImg: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#fff' },
+  userAvatarBtn: { alignItems: 'center', gap: 2, minWidth: 42 },
+  userPhotoImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#51D8F2' },
   userPhotoDefault: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#17203A',
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#fff',
+    borderWidth: 2, borderColor: '#51D8F2',
   },
   userNameBadge: {
-    color: '#fff', fontSize: 9, fontWeight: '700',
+    color: '#BFEFF7', fontSize: 9, fontWeight: '700',
     maxWidth: 60, textAlign: 'center',
   },
 
@@ -1760,7 +1791,7 @@ const s = StyleSheet.create({
   profileSaveBtnTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', paddingLeft: 4, letterSpacing: 0.3 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   headerCharBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: '#00897B', borderRadius: 16,
@@ -1768,52 +1799,66 @@ const s = StyleSheet.create({
   },
   headerCharIcon: { fontSize: 12, color: '#fff' },
   headerCharTxt: { fontSize: 12, color: '#fff', fontWeight: '700' },
-  headerBtn: { padding: 6 },
-  headerGear: { fontSize: 20 },
-  buildBadge: { backgroundColor: '#7C3AED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  buildBadgeTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  wakePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: '#1a3a5c', justifyContent: 'center', alignItems: 'center' },
-  wakePillOk: { backgroundColor: '#1B5E20' },
-  wakePillTxt: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  statusOnline: { backgroundColor: '#1B5E20' },
-  statusOffline: { backgroundColor: '#B71C1C' },
-  statusPillTxt: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  headerBtn: { padding: 5, borderRadius: 12, borderWidth: 1, borderColor: '#38436A', backgroundColor: '#141A32' },
+  headerGear: { fontSize: 19 },
+  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 },
+  buildBadge: { backgroundColor: '#4A236D', borderWidth: 1, borderColor: '#D47CFF', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10 },
+  buildBadgeTxt: { color: '#F3D9FF', fontSize: 9, fontWeight: '800' },
+  statusPill: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 11, borderWidth: 1 },
+  wakePill: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 11, backgroundColor: '#13283F', borderWidth: 1, borderColor: '#5CCEFF', justifyContent: 'center', alignItems: 'center' },
+  wakePillOk: { backgroundColor: '#173E34', borderColor: '#67E89F' },
+  wakePillTxt: { color: '#D9F4FF', fontSize: 10, fontWeight: '700' },
+  statusOnline: { backgroundColor: '#13372F', borderColor: '#5BE99B' },
+  statusOffline: { backgroundColor: '#3A192C', borderColor: '#FF6FB7' },
+  statusPillTxt: { color: '#E8FFF4', fontSize: 10, fontWeight: '700' },
   pushStatusRow: { marginTop: 6 },
   pushBadge: { color: '#fff', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
 
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080B18' },
+  list: { flex: 1, backgroundColor: '#080B18' },
+  listContent: { paddingTop: 10, paddingBottom: 120 },
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: 'transparent', marginLeft: 12, marginRight: 82,
+    paddingHorizontal: 11, paddingVertical: 11,
+    borderRadius: 15, borderWidth: 1,
+    shadowOpacity: 0.27, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
-  avatar: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  avatarImg: { width: 52, height: 52, borderRadius: 26 },
+  chatSurface: { borderRadius: 14 },
+  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 11, borderWidth: 1.5, borderColor: '#7583A8', overflow: 'hidden' },
+  avatarImg: { width: 48, height: 48, borderRadius: 24 },
   avatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   chatMid: { flex: 1 },
   chatNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginBottom: 3 },
-  chatName: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: '#111' },
-  chatSub: { fontSize: 13, color: '#666' },
-  chatRight: { alignItems: 'flex-end', gap: 4 },
+  chatName: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: '#F3F4FF', letterSpacing: 0.15 },
+  chatSub: { fontSize: 12, color: '#A8B1CA' },
+  chatRight: { alignItems: 'flex-end', gap: 4, marginLeft: 5 },
   urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
   urlSettingsTxt: { fontSize: 17 },
-  chatTime: { fontSize: 12, color: '#888' },
-  timerBadge: { fontSize: 10, color: '#075E54', fontWeight: '700' },
-  badge: { backgroundColor: '#25D366', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  chatTime: { fontSize: 11, color: '#9CA8C4' },
+  timerBadge: { fontSize: 10, color: '#F2CF68', fontWeight: '700' },
+  badge: { backgroundColor: '#24C980', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#A1FFD0' },
   badgeTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  sep: { height: 1, backgroundColor: '#f0f0f0', marginLeft: 80 },
+  sep: { height: 9 },
 
-  fab: { position: 'absolute', right: 12, bottom: 20, gap: 10, alignItems: 'center' },
+  fab: { position: 'absolute', right: 10, bottom: 20, gap: 8, alignItems: 'center' },
   fabBtn: {
-    backgroundColor: '#fff', borderRadius: 12,
-    paddingVertical: 8, paddingHorizontal: 10,
-    alignItems: 'center', elevation: 4,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
-    minWidth: 64, width: 64,
+    backgroundColor: 'transparent', borderRadius: 14, paddingVertical: 7, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center', elevation: 8,
+    shadowOpacity: 0.62, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
+    minWidth: 66, width: 66, height: 66, borderWidth: 1.5,
   },
+  fabGradient: { borderRadius: 12.5 },
+  fabPink: { backgroundColor: '#29132B', borderColor: '#F14DB7', shadowColor: '#F14DB7' },
+  fabTeal: { backgroundColor: '#102B30', borderColor: '#2FE3C5', shadowColor: '#2FE3C5' },
+  fabCyan: { backgroundColor: '#14243A', borderColor: '#70D7FF', shadowColor: '#70D7FF' },
+  fabViolet: { backgroundColor: '#251632', borderColor: '#C47CFF', shadowColor: '#C47CFF' },
+  fabPinkDeep: { backgroundColor: '#2D1530', borderColor: '#F06BD0', shadowColor: '#F06BD0' },
+  fabBlue: { backgroundColor: '#11253A', borderColor: '#5DCBFF', shadowColor: '#5DCBFF' },
   fabIcon: { fontSize: 20 },
-  fabLabel: { fontSize: 10, fontWeight: '700', color: '#333', marginTop: 2 },
+  fabLabel: { fontSize: 9, fontWeight: '800', color: '#F7F4FF', marginTop: 2, textAlign: 'center', lineHeight: 11 },
   fabScriptImg: { width: 28, height: 28, borderRadius: 6 },
 
   // ── Photo to Script Modal ──
