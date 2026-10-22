@@ -82,6 +82,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    DreamScript: require("../assets/fonts/DancingScript.ttf"),
   });
 
   const [pinLocked, setPinLocked] = useState(false);

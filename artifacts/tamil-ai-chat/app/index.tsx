@@ -1,5 +1,5 @@
-import { Redirect } from 'expo-router';
+import LaunchHomeScreen from '../components/LaunchHomeScreen';
 
 export default function Index() {
-  return <Redirect href="/ai-girls" />;
+  return <LaunchHomeScreen />;
 }
