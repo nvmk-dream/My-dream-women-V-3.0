@@ -9,7 +9,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
@@ -1016,6 +1016,23 @@ Then write these prompts:
     await AsyncStorage.removeItem('app_pin').catch(() => {});
     setExistingPin(null);
   };
+
+  const { launch } = useLocalSearchParams<{ launch?: string }>();
+  const handledLaunchRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!launch) {
+      handledLaunchRef.current = null;
+      return;
+    }
+    if (loading || handledLaunchRef.current === launch) return;
+    if (launch !== 'group' && launch !== 'script' && launch !== 'settings') return;
+
+    handledLaunchRef.current = launch;
+    router.setParams({ launch: '' } as any);
+    if (launch === 'group') setShowGroupModal(true);
+    if (launch === 'script') void handlePhotoToScript();
+    if (launch === 'settings') setShowSettings(true);
+  }, [handlePhotoToScript, launch, loading, router]);
 
   // ── Character row ─────────────────────────────────────────────
   const renderCharRow = ({ item: p, index }: { item: PersonaWithExtra; index: number }) => {
