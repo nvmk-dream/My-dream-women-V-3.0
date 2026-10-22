@@ -20,7 +20,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
-const HERO_HEIGHT = Math.min(Math.round((screenWidth - 32) * 1.15), 460);
+const HERO_IMAGE_WIDTH = 1122;
+const HERO_IMAGE_HEIGHT = 1402;
+const HERO_HEIGHT = Math.round((screenWidth - 32) * HERO_IMAGE_HEIGHT / HERO_IMAGE_WIDTH);
 const TILE_WIDTH = (screenWidth - 32 - 24) / 3;
 
 type ServerStatus = 'unknown' | 'ok' | 'sleeping';
@@ -141,7 +143,7 @@ export default function LaunchHomeScreen() {
             imageStyle={styles.heroImageStyle}
           >
             <LinearGradient
-              colors={['rgba(3, 7, 25, 0.02)', 'rgba(3, 7, 25, 0.22)', 'rgba(3, 7, 25, 0.82)']}
+              colors={['rgba(3, 7, 25, 0.02)', 'rgba(3, 7, 25, 0.10)', 'rgba(3, 7, 25, 0.30)']}
               start={{ x: 0.1, y: 0.05 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
@@ -170,10 +172,12 @@ export default function LaunchHomeScreen() {
             </View>
 
             <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>Your Dream.</Text>
-              <Text style={styles.heroTitleCyan}>Our Creation.</Text>
-              <Text style={styles.heroEyebrow}>CREATE  ·  CHAT  ·  EXPLORE</Text>
-              <Text style={styles.heroSubtitle}>Your Perfect AI partner</Text>
+              <View style={styles.heroTextGroup}>
+                <Text style={styles.heroTitle}>Your Dream.</Text>
+                <Text style={styles.heroTitleCyan}>Our Creation.</Text>
+                <Text style={styles.heroEyebrow}>CREATE  ·  CHAT  ·  EXPLORE</Text>
+                <Text style={styles.heroSubtitle}>Your Perfect AI partner</Text>
+              </View>
               <TouchableOpacity
                 accessibilityRole="button"
                 onPress={() => router.push('/ai-girls')}
@@ -236,7 +240,8 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   wakeButton: { minWidth: 76, height: 42, paddingHorizontal: 13, borderRadius: 22, borderWidth: 1.5, borderColor: '#63B6FF', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5, 13, 35, 0.72)' },
   statusText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  heroCopy: { position: 'absolute', right: 14, bottom: 18, width: '61%', alignItems: 'flex-end' },
+  heroCopy: { position: 'absolute', top: 76, right: 14, bottom: 18, width: '61%', alignItems: 'flex-end', justifyContent: 'space-between' },
+  heroTextGroup: { alignItems: 'flex-end' },
   heroTitle: { color: '#FFF1FF', fontFamily: 'DreamScript', fontSize: 33, lineHeight: 38, textAlign: 'right', textShadowColor: '#F55CFF', textShadowRadius: 9 },
   heroTitleCyan: { color: '#8AF4FF', fontFamily: 'DreamScript', fontSize: 32, lineHeight: 37, textAlign: 'right', textShadowColor: '#2EDCFF', textShadowRadius: 10 },
   heroEyebrow: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 1.35, marginTop: 10, textAlign: 'right' },
