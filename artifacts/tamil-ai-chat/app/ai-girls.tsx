@@ -118,6 +118,7 @@ export default function AIGirlsScreen() {
   const router = useRouter();
   const { launch } = useLocalSearchParams<{ launch?: string }>();
   const launchHandledRef = useRef<string | null>(null);
+  const isHomeFeatureLaunch = launch === 'group-chat' || launch === 'image-to-script';
   const insets = useSafeAreaInsets();
   const [personas, setPersonas] = useState<PersonaWithExtra[]>([]);
   const [loading, setLoading] = useState(true);
@@ -793,6 +794,16 @@ AsyncStorage-ல் save ஆச்சு!`
     router.push('/group-chat');
   };
 
+  const cancelHomeFeatureLaunch = () => {
+    setSelectedForGroup([]);
+    router.back();
+  };
+
+  const closeScriptModal = () => {
+    setShowScriptModal(false);
+    if (launch === 'image-to-script') router.back();
+  };
+
   // ── Ringtone helpers ──────────────────────────────────────────
   const pickRingtone = async (id: string) => {
     setRingtone(id);
@@ -804,9 +815,21 @@ AsyncStorage-ல் save ஆச்சு!`
   // ── Photo to Script (Gemini key direct → All 13 Gemini keys auto-retry) ──
   const handlePhotoToScript = async () => {
     const perm = await requestPhotoVideoPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க'); return; }
+    if (!perm.granted) {
+      if (launch === 'image-to-script') {
+        Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க', [
+          { text: 'சரி', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Permission வேணும்', 'Photos access allow பண்ணுங்க');
+      }
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
-    if (res.canceled || !res.assets[0]) return;
+    if (res.canceled || !res.assets[0]) {
+      if (launch === 'image-to-script') router.back();
+      return;
+    }
     const pickedAsset = res.assets[0];
     setScriptImageUri(pickedAsset.uri);
     setScriptText('');
@@ -944,20 +967,12 @@ Then write these prompts:
     }
   };
 
-  // Home shortcuts reuse the existing feature flows after character data loads.
+  // The photo flow does not depend on persona data; launch it immediately from Home.
   useEffect(() => {
-    if (loading || typeof launch !== 'string' || launchHandledRef.current === launch) return;
-    if (launch !== 'group-chat' && launch !== 'image-to-script') return;
-
+    if (launch !== 'image-to-script' || launchHandledRef.current === launch) return;
     launchHandledRef.current = launch;
-    if (launch === 'group-chat') {
-      setSelectedForGroup([]);
-      setShowGroupModal(true);
-      return;
-    }
-
     void handlePhotoToScript();
-  }, [launch, loading, handlePhotoToScript]);
+  }, [launch, handlePhotoToScript]);
 
     // ── Settings helpers ──────────────────────────────────────────
   const toggleOnline = async () => {
@@ -1195,6 +1210,78 @@ Then write these prompts:
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Stack.Screen options={{ headerShown: false }} />
 
+      {isHomeFeatureLaunch ? (
+        launch === 'group-chat' ? (
+          <View style={s.directLaunchRoot}>
+            <LinearGradient
+              colors={['#12203D', '#11172F', '#261633']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0.85 }}
+              style={[s.directLaunchHeader, { paddingTop: insets.top + 12 }]}
+            >
+              <TouchableOpacity onPress={cancelHomeFeatureLaunch} style={s.directLaunchBack}>
+                <Text style={s.directLaunchBackText}>‹</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={s.directLaunchTitle}>👥 Group Chat</Text>
+                <Text style={s.directLaunchSubtitle}>2+ characters select பண்ணுங்க</Text>
+              </View>
+            </LinearGradient>
+            {loading ? (
+              <View style={s.directLaunchLoading}><ActivityIndicator color="#51D8F2" size="large" /></View>
+            ) : (
+              <FlatList
+                style={s.directGroupList}
+                contentContainerStyle={s.directGroupListContent}
+                data={personas}
+                keyExtractor={p => p.id}
+                renderItem={({ item: p }) => {
+                  const selected = selectedForGroup.includes(p.id);
+                  return (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={[s.directGroupRow, selected && s.directGroupRowSelected]}
+                      onPress={() => setSelectedForGroup(prev =>
+                        prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                      )}
+                    >
+                      <View style={[s.sheetAvatar, { backgroundColor: p.avatarColor }]}>
+                        <Text style={s.sheetAvatarTxt}>{p.emoji}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.sheetName, s.directGroupName]}>{p.name}</Text>
+                        <Text style={[s.sheetRel, s.directGroupRelationship]}>
+                          {p.editedRelationship ?? p.relationship} · {p.profession}
+                        </Text>
+                      </View>
+                      {selected && <Text style={s.check}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+            <View style={s.directGroupActions}>
+              <TouchableOpacity style={s.directGroupCancel} onPress={cancelHomeFeatureLaunch}>
+                <Text style={s.directGroupCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.directGroupStart, selectedForGroup.length < 2 && s.directGroupStartDisabled]}
+                onPress={startGroupChat}
+                disabled={selectedForGroup.length < 2 || loading}
+              >
+                <Text style={s.directGroupStartText}>Start ({selectedForGroup.length})</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={s.directLaunchLoading}>
+            <ActivityIndicator color="#51D8F2" size="large" />
+            <Text style={s.directLaunchLoadingText}>Photo to Script திறக்கிறது...</Text>
+          </View>
+        )
+      ) : (
+        <>
       {/* Character-list header */}
       <LinearGradient
         colors={['#12203D', '#11172F', '#261633']}
@@ -1295,6 +1382,8 @@ Then write these prompts:
           <Text style={[s.fabLabel, { color: '#fff' }]}>Cloud</Text>
         </TouchableOpacity>
       </View>
+        </>
+      )}
 
       {/* ── MY PROFILE MODAL ── */}
       <Modal visible={showUserPhotoModal} transparent animationType="slide"
@@ -1638,12 +1727,12 @@ Then write these prompts:
       </Modal>
 
       {/* ── Photo to Script Modal ── */}
-      <Modal visible={showScriptModal} animationType="slide" onRequestClose={() => setShowScriptModal(false)}>
+      <Modal visible={showScriptModal} animationType="slide" onRequestClose={closeScriptModal}>
         <SafeAreaView style={s.scriptSafe} edges={['top','bottom']}>
 
           {/* Header */}
           <View style={s.scriptHeader}>
-            <TouchableOpacity onPress={() => setShowScriptModal(false)} style={s.scriptBack}>
+            <TouchableOpacity onPress={closeScriptModal} style={s.scriptBack}>
               <Text style={s.scriptBackTxt}>✕</Text>
             </TouchableOpacity>
             <View style={{ flex:1, alignItems:'center' }}>
@@ -1768,7 +1857,7 @@ Then write these prompts:
       </Modal>
 
       {/* ── Group Chat Modal ── */}
-      <Modal visible={showGroupModal} transparent animationType="slide"
+      <Modal visible={showGroupModal && launch !== 'group-chat'} transparent animationType="slide"
         onRequestClose={() => setShowGroupModal(false)}>
         <View style={s.overlay}>
           <View style={s.sheet}>
@@ -1869,6 +1958,39 @@ Then write these prompts:
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#080B18' },
+  directLaunchRoot: { flex: 1, backgroundColor: '#080B18' },
+  directLaunchHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingBottom: 18,
+    borderBottomWidth: 1, borderBottomColor: '#263152',
+  },
+  directLaunchBack: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  directLaunchBackText: { color: '#fff', fontSize: 32, lineHeight: 36, marginTop: -3 },
+  directLaunchTitle: { color: '#F3F4FF', fontSize: 19, fontWeight: '800' },
+  directLaunchSubtitle: { color: '#B8C0D8', fontSize: 13, marginTop: 3 },
+  directLaunchLoading: {
+    flex: 1, backgroundColor: '#080B18', alignItems: 'center', justifyContent: 'center', gap: 12,
+  },
+  directLaunchLoadingText: { color: '#C7D2FE', fontSize: 15 },
+  directGroupList: { flex: 1 },
+  directGroupListContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
+  directGroupRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 10,
+    borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: '#263152',
+    backgroundColor: '#11172B',
+  },
+  directGroupRowSelected: { borderColor: '#38E6A1', backgroundColor: '#132C31' },
+  directGroupName: { color: '#F3F4FF' },
+  directGroupRelationship: { color: '#AEB8D0' },
+  directGroupActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#263152' },
+  directGroupCancel: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#66708A', alignItems: 'center' },
+  directGroupCancelText: { color: '#E5E7EB', fontWeight: '700' },
+  directGroupStart: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: '#075E54', alignItems: 'center' },
+  directGroupStartDisabled: { opacity: 0.4 },
+  directGroupStartText: { color: '#fff', fontWeight: '800' },
 
   header: {
     backgroundColor: '#0B1023',
