@@ -32,12 +32,12 @@ type Feature = {
   subtitle: string;
   icon: string;
   color: string;
-  route: string;
+  route?: string;
 };
 
 const FEATURES: Feature[] = [
   { title: 'Text to Image', subtitle: 'Create Images', icon: 'image-outline', color: '#E64BFF', route: '/prompt-image' },
-  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF', route: '/ai-girls' },
+  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF' },
   { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', route: '/ai-girls' },
   { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', route: '/ai-girls' },
   { title: 'Face Swap', subtitle: 'Cloud', icon: 'swap-horizontal-outline', color: '#E64BFF', route: '/face-swap' },
@@ -190,7 +190,7 @@ export default function LaunchHomeScreen() {
 
   const version = Constants.expoConfig?.version ?? '1.3.0';
   const versionCode = Constants.expoConfig?.android?.versionCode;
-  const subtitle = 'your dream companion  ·  V' + version + (versionCode ? ' (' + versionCode + ')' : '');
+  const versionLabel = 'V' + version + (versionCode ? ' (' + versionCode + ')' : '');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
@@ -210,7 +210,10 @@ export default function LaunchHomeScreen() {
           />
           <View style={styles.headerText}>
             <Text numberOfLines={1} style={[styles.headerTitle, { fontSize: Math.min(22, headerHeight * 0.35) }]}>My Dream Women</Text>
-            <Text numberOfLines={1} style={styles.headerSubtitle}>{subtitle}</Text>
+            <View style={styles.headerMeta}>
+              <Text numberOfLines={1} style={styles.headerSubtitle}>your dream companion</Text>
+              <Text numberOfLines={1} style={styles.headerVersion}>{versionLabel}</Text>
+            </View>
           </View>
           <TouchableOpacity
             accessibilityRole="button"
@@ -319,9 +322,11 @@ export default function LaunchHomeScreen() {
               key={feature.title}
               accessibilityRole="button"
               accessibilityLabel={feature.title + ', ' + feature.subtitle}
+              accessibilityState={{ disabled: !feature.route }}
               activeOpacity={0.82}
+              disabled={!feature.route}
               style={[styles.featureCard, { width: tileWidth, height: cardHeight, borderColor: feature.color, shadowColor: feature.color }]}
-              onPress={() => router.push(feature.route as any)}
+              onPress={feature.route ? () => router.push(feature.route as any) : undefined}
             >
               <View style={[styles.featureIconRing, { width: iconRingSize, height: iconRingSize, borderRadius: iconRingSize / 2, marginBottom: smallText ? 5 : 10, borderColor: feature.color, shadowColor: feature.color }]}>
                 <Ionicons name={feature.icon as any} size={iconRingSize * 0.44} color={feature.color} />
@@ -344,7 +349,9 @@ const styles = StyleSheet.create({
   logo: { width: 62, height: 62, borderRadius: 18, borderWidth: 1.5, borderColor: '#D64DFF' },
   headerText: { flex: 1, minWidth: 0 },
   headerTitle: { color: '#F7F8FF', fontSize: 22, fontWeight: '800' },
-  headerSubtitle: { color: '#ABB6D2', fontSize: 12, marginTop: 3 },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, minWidth: 0 },
+  headerSubtitle: { color: '#ABB6D2', fontSize: 10, flexShrink: 1 },
+  headerVersion: { color: '#ABB6D2', fontSize: 10, flexShrink: 0 },
   settingsButton: { width: 54, height: 54, borderRadius: 28, borderWidth: 1.5, borderColor: '#54617E', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(16, 23, 48, 0.78)' },
   hero: { width: '100%', borderRadius: 24, borderWidth: 1.5, borderColor: '#35DFFF', overflow: 'hidden', backgroundColor: '#10172F', shadowColor: '#16CFFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   heroImage: { width: '100%', height: '100%' },

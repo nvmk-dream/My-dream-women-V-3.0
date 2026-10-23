@@ -50,6 +50,7 @@ const STYLE_TO_PROMPT: Record<string, string> = {
 
 const INTERVALS = [10, 20, 30] as const;
 const CHARACTER_VIEW_MODE_KEY = 'ai_girls_character_view_mode';
+const AVATAR_RESTORE_RETRY_MS = 15 * 60 * 1000;
 
 // ── Ringtone definitions ───────────────────────────────────────────
 export const RINGTONES = [
@@ -216,6 +217,46 @@ export default function AIGirlsScreen() {
       }));
       if (!restoreAlreadyChecked) await markCloudRestoreChecked();
       setPersonas(merged);
+
+      // Retry missing avatar photos in the background; the one-time full restore
+      // may have completed before those images were available in cloud metadata.
+      const restoreMissingAvatars = async (entries: PersonaWithExtra[]) => {
+        const missing = entries.filter(persona => !persona.avatarPhotoUri);
+        for (let i = 0; i < missing.length; i += 4) {
+          await Promise.all(missing.slice(i, i + 4).map(async persona => {
+            const attemptKey = `persona_avatar_restore_checked_at_${persona.id}`;
+            const lastAttemptRaw = await AsyncStorage.getItem(attemptKey).catch(() => null);
+            const lastAttempt = Number(lastAttemptRaw);
+            if (Number.isFinite(lastAttempt) && lastAttempt > 0 && Date.now() - lastAttempt < AVATAR_RESTORE_RETRY_MS) {
+              return;
+            }
+
+            await AsyncStorage.setItem(attemptKey, String(Date.now())).catch(() => {});
+            try {
+              const cloudData = await getCloudinaryMeta(`persona_edit_${persona.id}`) as { avatarPhotoUri?: unknown } | null;
+              const cloudAvatarUri = typeof cloudData?.avatarPhotoUri === 'string' ? cloudData.avatarPhotoUri : '';
+              if (!cloudAvatarUri) return;
+
+              const storageKey = `persona_edit_${persona.id}`;
+              const savedRaw = await AsyncStorage.getItem(storageKey).catch(() => null);
+              let currentData: Record<string, unknown> = {};
+              if (savedRaw) {
+                try { currentData = JSON.parse(savedRaw) as Record<string, unknown>; } catch {}
+              }
+              if (typeof currentData.avatarPhotoUri === 'string' && currentData.avatarPhotoUri) return;
+
+              await AsyncStorage.setItem(storageKey, JSON.stringify({ ...currentData, avatarPhotoUri: cloudAvatarUri }));
+              setPersonas(current => current.map(item =>
+                item.id === persona.id && !item.avatarPhotoUri
+                  ? { ...item, avatarPhotoUri: cloudAvatarUri }
+                  : item,
+              ));
+            } catch {}
+          }));
+        }
+      };
+
+      void restoreMissingAvatars(merged);
     } catch {}
     setLoading(false);
   }, []);
