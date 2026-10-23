@@ -9,7 +9,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
@@ -116,6 +116,8 @@ const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
 export default function AIGirlsScreen() {
   const router = useRouter();
+  const { launch } = useLocalSearchParams<{ launch?: string }>();
+  const launchHandledRef = useRef<string | null>(null);
   const insets = useSafeAreaInsets();
   const [personas, setPersonas] = useState<PersonaWithExtra[]>([]);
   const [loading, setLoading] = useState(true);
@@ -941,6 +943,21 @@ Then write these prompts:
       setScriptLoading(false);
     }
   };
+
+  // Home shortcuts reuse the existing feature flows after character data loads.
+  useEffect(() => {
+    if (loading || typeof launch !== 'string' || launchHandledRef.current === launch) return;
+    if (launch !== 'group-chat' && launch !== 'image-to-script') return;
+
+    launchHandledRef.current = launch;
+    if (launch === 'group-chat') {
+      setSelectedForGroup([]);
+      setShowGroupModal(true);
+      return;
+    }
+
+    void handlePhotoToScript();
+  }, [launch, loading, handlePhotoToScript]);
 
     // ── Settings helpers ──────────────────────────────────────────
   const toggleOnline = async () => {
