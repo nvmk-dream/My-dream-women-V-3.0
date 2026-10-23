@@ -33,13 +33,14 @@ type Feature = {
   icon: string;
   color: string;
   route?: string;
+  launchIntent?: 'group-chat' | 'image-to-script';
 };
 
 const FEATURES: Feature[] = [
   { title: 'Text to Image', subtitle: 'Create Images', icon: 'image-outline', color: '#E64BFF', route: '/prompt-image' },
   { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF' },
-  { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', route: '/ai-girls' },
-  { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', route: '/ai-girls' },
+  { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', route: '/ai-girls', launchIntent: 'group-chat' },
+  { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', route: '/ai-girls', launchIntent: 'image-to-script' },
   { title: 'Face Swap', subtitle: 'Cloud', icon: 'swap-horizontal-outline', color: '#E64BFF', route: '/face-swap' },
   { title: 'Cloud', subtitle: 'Your Gallery', icon: 'cloud-outline', color: '#42CFFF', route: '/home' },
 ];
@@ -326,7 +327,13 @@ export default function LaunchHomeScreen() {
               activeOpacity={0.82}
               disabled={!feature.route}
               style={[styles.featureCard, { width: tileWidth, height: cardHeight, borderColor: feature.color, shadowColor: feature.color }]}
-              onPress={feature.route ? () => router.push(feature.route as any) : undefined}
+              onPress={feature.route ? () => {
+                if (feature.launchIntent) {
+                  router.push({ pathname: '/ai-girls', params: { launch: feature.launchIntent } });
+                  return;
+                }
+                router.push(feature.route as any);
+              } : undefined}
             >
               <View style={[styles.featureIconRing, { width: iconRingSize, height: iconRingSize, borderRadius: iconRingSize / 2, marginBottom: smallText ? 5 : 10, borderColor: feature.color, shadowColor: feature.color }]}>
                 <Ionicons name={feature.icon as any} size={iconRingSize * 0.44} color={feature.color} />
