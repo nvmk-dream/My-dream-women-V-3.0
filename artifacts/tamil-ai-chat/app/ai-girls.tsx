@@ -1300,32 +1300,16 @@ Then write these prompts:
             <Text style={s.userNameBadge} numberOfLines={1}>{userName}</Text>
           )}
         </TouchableOpacity>
-        <View style={s.headerControls}>
-          <View style={s.buildBadge}>
-            <Text style={s.buildBadgeTxt}>
-              v{Constants.expoConfig?.version ?? '1.0'} ({Constants.expoConfig?.android?.versionCode ?? ''})
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[s.statusPill, isOnline ? s.statusOnline : s.statusOffline]}
-            onPress={toggleOnline}
-            activeOpacity={0.8}
-          >
-            <Text style={s.statusPillTxt}>{isOnline ? '🌐 Online' : '📡 Offline'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.wakePill, serverStatus === 'ok' && s.wakePillOk]}
-            onPress={wakeRenderServer}
-            disabled={wakingServer}
-            activeOpacity={0.7}
-          >
-            {wakingServer
-              ? <ActivityIndicator size="small" color="#fff" style={{ width: 16, height: 16 }} />
-              : <Text style={s.wakePillTxt}>{serverStatus === 'ok' ? '✅ Server' : '🔄 Wake'}</Text>
-            }
-          </TouchableOpacity>
-        </View>
+        <View style={s.headerSpacer} />
         <View style={s.headerIcons}>
+          <TouchableOpacity
+            onPress={() => setShowAddCharModal(true)}
+            style={s.headerAddCharBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Add new character"
+          >
+            <Text style={s.headerAddCharTxt}>+</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
             <Text style={s.headerGear}>⚙️</Text>
           </TouchableOpacity>
@@ -1349,39 +1333,6 @@ Then write these prompts:
         />
       )}
 
-      {/* Floating action buttons */}
-      <View style={[s.fab, { bottom: insets.bottom + 16 }]}>
-        <TouchableOpacity style={[s.fabBtn, s.fabPink]} onPress={() => router.push('/prompt-image')}>
-          <LinearGradient pointerEvents="none" colors={['#6B2055', '#371A3C', '#1D1931']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Text style={s.fabIcon}>🎨</Text>
-          <Text style={[s.fabLabel, { color: '#fff' }]}>Text→Img</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, s.fabTeal]} onPress={() => setShowAddCharModal(true)}>
-          <LinearGradient pointerEvents="none" colors={['#17635A', '#17434A', '#16233A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Text style={[s.fabIcon, { color: '#fff' }]}>➕</Text>
-          <Text style={[s.fabLabel, { color: '#fff' }]}>Character</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, s.fabCyan]} onPress={() => setShowGroupModal(true)}>
-          <LinearGradient pointerEvents="none" colors={['#1C4D68', '#1D3653', '#171D38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Text style={s.fabIcon}>👥</Text>
-          <Text style={[s.fabLabel, { color: '#fff' }]}>Group</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, s.fabViolet]} onPress={handlePhotoToScript}>
-          <LinearGradient pointerEvents="none" colors={['#59277A', '#382051', '#201A37']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Image source={require('../assets/images/photo-to-script-icon.png')} style={s.fabScriptImg} />
-          <Text style={[s.fabLabel, { color: '#e9d5ff', fontSize: 9 }]}>Script</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, s.fabPinkDeep]} onPress={() => router.push('/face-swap')}>
-          <LinearGradient pointerEvents="none" colors={['#69235F', '#411D50', '#241936']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Text style={s.fabIcon}>🤳</Text>
-          <Text style={[s.fabLabel, { color: '#fff' }]}>Swap</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.fabBtn, s.fabBlue]} onPress={() => router.push('/home')}>
-          <LinearGradient pointerEvents="none" colors={['#1E5573', '#22395A', '#191D38']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, s.fabGradient]} />
-          <Text style={s.fabIcon}>☁️</Text>
-          <Text style={[s.fabLabel, { color: '#fff' }]}>Cloud</Text>
-        </TouchableOpacity>
-      </View>
         </>
       )}
 
@@ -2071,7 +2022,13 @@ const s = StyleSheet.create({
   profileSaveBtnTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', paddingLeft: 4, letterSpacing: 0.3 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerAddCharBtn: {
+    width: 38, height: 38, borderRadius: 19, borderWidth: 1.5,
+    borderColor: '#2FE3C5', backgroundColor: '#102B30',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerAddCharTxt: { color: '#fff', fontSize: 23, lineHeight: 25, fontWeight: '700' },
   headerCharBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: '#00897B', borderRadius: 16,
@@ -2081,7 +2038,7 @@ const s = StyleSheet.create({
   headerCharTxt: { fontSize: 12, color: '#fff', fontWeight: '700' },
   headerBtn: { padding: 5, borderRadius: 12, borderWidth: 1, borderColor: '#38436A', backgroundColor: '#141A32' },
   headerGear: { fontSize: 19 },
-  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 },
+  headerSpacer: { flex: 1 },
   buildBadge: { backgroundColor: '#4A236D', borderWidth: 1, borderColor: '#D47CFF', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10 },
   buildBadgeTxt: { color: '#F3D9FF', fontSize: 9, fontWeight: '800' },
   statusPill: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 11, borderWidth: 1 },
@@ -2097,7 +2054,7 @@ const s = StyleSheet.create({
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080B18' },
   list: { flex: 1, backgroundColor: '#080B18' },
   listContent: { paddingTop: 10, paddingBottom: 120 },
-  gridListContent: { paddingTop: 10, paddingBottom: 120, paddingLeft: 12, paddingRight: 84 },
+  gridListContent: { paddingTop: 10, paddingBottom: 120, paddingLeft: 12, paddingRight: 12 },
   gridColumn: { justifyContent: 'space-between' },
   gridSeparator: { height: 12 },
   gridCard: {
@@ -2134,7 +2091,7 @@ const s = StyleSheet.create({
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'transparent', marginLeft: 12, marginRight: 82,
+    backgroundColor: 'transparent', marginLeft: 12, marginRight: 12,
     paddingHorizontal: 11, paddingVertical: 11,
     borderRadius: 15, borderWidth: 1,
     shadowOpacity: 0.27, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
