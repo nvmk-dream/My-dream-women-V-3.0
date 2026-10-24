@@ -18,13 +18,8 @@ import {
   CHARACTER_SETTINGS_CHANGED_EVENT,
   CHARACTER_VIEW_MODE_KEY,
 } from '../services/character-settings';
-import { playRingtone, RINGTONES } from '../services/notification-sounds';
-import { isModelCached, isWebGPUSupported } from '../services/webllm';
-import {
-  subscribeToPush, unsubscribeFromPush,
-  isPushSupported, getNotificationPermission,
-  registerServiceWorker,
-} from '../services/push-notifications';
+import { playRingtone } from '../services/notification-sounds';
+import { registerServiceWorker } from '../services/push-notifications';
 import {
   showNativeNotification,
   setupNotificationChannel,
@@ -53,27 +48,9 @@ const STYLE_TO_PROMPT: Record<string, string> = {
   saree: 'wearing a traditional saree, elegant drape',
 };
 
-const INTERVALS = [10, 20, 30] as const;
 const AVATAR_RESTORE_RETRY_MS = 15 * 60 * 1000;
 
 type PersonaWithExtra = Persona & { editedRelationship?: string };
-
-// ── Custom ON/OFF Toggle ──────────────────────────────────────────
-const Toggle = ({ value, onToggle }: { value: boolean; onToggle: () => void }) => (
-  <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-    style={[s.toggle, value ? s.toggleOn : s.toggleOff]}>
-    {value
-      ? <Text style={s.toggleLabel}>ON</Text>
-      : null}
-    <View style={[s.toggleDot, value ? s.toggleDotRight : s.toggleDotLeft]} />
-    {!value
-      ? <Text style={[s.toggleLabel, { color: '#fff', marginLeft: 6 }]}>OFF</Text>
-      : null}
-  </TouchableOpacity>
-);
-
-// ── PIN numpad ────────────────────────────────────────────────────
-const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
 export default function AIGirlsScreen() {
   const router = useRouter();
@@ -107,15 +84,12 @@ export default function AIGirlsScreen() {
   const [relInput, setRelInput] = useState('');
 
   // ── Settings state ────────────────────────────────────────────
-  const [showSettings, setShowSettings] = useState(false);
   const [characterViewMode, setCharacterViewMode] = useState<'list' | 'grid'>('list');
-  const [isOnline, setIsOnline] = useState(true);
   const [wakingServer, setWakingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<'unknown'|'ok'|'sleeping'>('unknown');
   const [autoMsgEnabled, setAutoMsgEnabled] = useState(false);
   const [intervals, setIntervals] = useState<Record<string, number | null>>({});
   const [autoUnreads, setAutoUnreads] = useState<Record<string, boolean>>({});
-  const [pushStatus, setPushStatus] = useState<'idle' | 'subscribing' | 'active' | 'denied' | 'unsupported'>('idle');
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [showUserPhotoModal, setShowUserPhotoModal] = useState(false);
   const [userPhotoCloudInput, setUserPhotoCloudInput] = useState('');
@@ -129,7 +103,6 @@ export default function AIGirlsScreen() {
   const [profileSaved, setProfileSaved]   = useState(false);
 
   // Ringtone
-  const [ringtone, setRingtone] = useState('classic');
   const ringtoneRef = React.useRef('classic');
 
   // Photo to Script
@@ -140,13 +113,6 @@ export default function AIGirlsScreen() {
   const [scriptCopied, setScriptCopied] = useState(false);
   const [scriptModelUsed, setScriptModelUsed] = useState('');
 
-  // PIN setup within settings
-  const [showPinSetup, setShowPinSetup] = useState(false);
-  const [pinStep, setPinStep] = useState<'set' | 'confirm'>('set');
-  const [pinFirst, setPinFirst] = useState('');
-  const [pinInput, setPinInput] = useState('');
-  const [pinMsg, setPinMsg] = useState('');
-  const [existingPin, setExistingPin] = useState<string | null>(null);
   const loadPhotoStyles = useCallback(async () => {
     try { setPhotoStyles(await getPhotoStyles()); } catch { setPhotoStyles([]); }
   }, []);
@@ -412,10 +378,8 @@ AsyncStorage-ல் save ஆச்சு!`
       if (savedViewMode === 'list' || savedViewMode === 'grid') {
         setCharacterViewMode(savedViewMode);
       }
-      const [onlineVal, autoVal, pinVal, userPhotoVal, ringtoneVal, userNameVal, userBehaviourVal] = await Promise.all([
-        AsyncStorage.getItem('chat_is_online'),
+      const [autoVal, userPhotoVal, ringtoneVal, userNameVal, userBehaviourVal] = await Promise.all([
         AsyncStorage.getItem('auto_msg_enabled'),
-        AsyncStorage.getItem('app_pin'),
         AsyncStorage.getItem('user_profile_photo'),
         AsyncStorage.getItem('ringtone'),
         AsyncStorage.getItem('user_name'),
@@ -433,11 +397,9 @@ AsyncStorage-ல் save ஆச்சு!`
           }
         } catch {}
       }
-      if (onlineVal !== null) setIsOnline(onlineVal === 'true');
       const autoEnabled = autoVal === 'true';
       setAutoMsgEnabled(autoEnabled);
-      setExistingPin(pinVal);
-      if (ringtoneVal) { setRingtone(ringtoneVal); ringtoneRef.current = ringtoneVal; }
+      if (ringtoneVal) ringtoneRef.current = ringtoneVal;
       if (userNameVal) setUserName(userNameVal);
       if (userBehaviourVal) setUserBehaviour(userBehaviourVal);
 
@@ -465,15 +427,6 @@ AsyncStorage-ல் save ஆச்சு!`
       setAutoUnreads(unreadMap);
     } catch {}
   }, []);
-
-  const changeCharacterViewMode = async (mode: 'list' | 'grid') => {
-    try {
-      await AsyncStorage.setItem(CHARACTER_VIEW_MODE_KEY, mode);
-      setCharacterViewMode(mode);
-    } catch (error) {
-      Alert.alert('அமைப்பைச் சேமிக்க முடியவில்லை', String(error));
-    }
-  };
 
   // ── Setup native notifications + SW fallback for web ──
   useEffect(() => {
@@ -771,14 +724,6 @@ AsyncStorage-ல் save ஆச்சு!`
     if (launch === 'image-to-script') router.back();
   };
 
-  // ── Ringtone helpers ──────────────────────────────────────────
-  const pickRingtone = async (id: string) => {
-    setRingtone(id);
-    ringtoneRef.current = id;
-    await AsyncStorage.setItem('ringtone', id).catch(() => {});
-    playRingtone(id);
-  };
-
   // ── Photo to Script (Gemini key direct → All 13 Gemini keys auto-retry) ──
   const handlePhotoToScript = async () => {
     const perm = await requestPhotoVideoPermissionsAsync();
@@ -942,11 +887,6 @@ Then write these prompts:
   }, [launch, handlePhotoToScript]);
 
     // ── Settings helpers ──────────────────────────────────────────
-  const toggleOnline = async () => {
-    const next = !isOnline;
-    setIsOnline(next);
-    try { await AsyncStorage.setItem('chat_is_online', String(next)); } catch {}
-  };
   const wakeRenderServer = async () => {
     if (wakingServer) return;
     setWakingServer(true);
@@ -971,90 +911,6 @@ Then write these prompts:
     } finally {
       setWakingServer(false);
     }
-  };
-
-  const buildPushPayload = (ivMap: Record<string, number | null>) => {
-    const activeIntervals: Record<string, number> = {};
-    const personaNames: Record<string, string> = {};
-    for (const p of personas) {
-      const iv = ivMap[p.id];
-      if (iv) { activeIntervals[p.id] = iv; personaNames[p.id] = p.name; }
-    }
-    return { activeIntervals, personaNames };
-  };
-
-  const syncPushSubscription = async (enabled: boolean, ivMap: Record<string, number | null>) => {
-    if (!isPushSupported()) { setPushStatus('unsupported'); return; }
-    if (!enabled) { await unsubscribeFromPush(); setPushStatus('idle'); return; }
-    const { activeIntervals, personaNames } = buildPushPayload(ivMap);
-    if (Object.keys(activeIntervals).length === 0) return;
-    setPushStatus('subscribing');
-    await registerServiceWorker();
-    const ok = await subscribeToPush(activeIntervals, personaNames);
-    if (ok) { setPushStatus('active'); }
-    else { setPushStatus(getNotificationPermission() === 'denied' ? 'denied' : 'idle'); }
-  };
-
-  const toggleAutoMsg = async () => {
-    const next = !autoMsgEnabled;
-    setAutoMsgEnabled(next);
-    try { await AsyncStorage.setItem('auto_msg_enabled', String(next)); } catch {}
-    if (!next) setAutoUnreads({});
-    await syncPushSubscription(next, intervals);
-  };
-
-  const setIntervalForPersona = async (personaId: string, iv: number | null) => {
-    const next = { ...intervals, [personaId]: iv };
-    setIntervals(next);
-    try {
-      if (iv) await AsyncStorage.setItem(`auto_msg_interval_${personaId}`, String(iv));
-      else await AsyncStorage.removeItem(`auto_msg_interval_${personaId}`);
-    } catch {}
-    if (autoMsgEnabled) await syncPushSubscription(true, next);
-  };
-
-  // ── PIN setup ─────────────────────────────────────────────────
-  const openPinSetup = () => {
-    setPinStep('set');
-    setPinFirst('');
-    setPinInput('');
-    setPinMsg('');
-    setShowPinSetup(true);
-  };
-
-  const handlePinKey = (key: string) => {
-    if (key === '⌫') {
-      setPinInput(p => p.slice(0, -1));
-      return;
-    }
-    if (pinInput.length >= 4) return;
-    const next = pinInput + key;
-    setPinInput(next);
-    if (next.length === 4) {
-      if (pinStep === 'set') {
-        setPinFirst(next);
-        setPinInput('');
-        setPinStep('confirm');
-        setPinMsg('மீண்டும் PIN enter பண்ணுங்க (confirm)');
-      } else {
-        if (next === pinFirst) {
-          AsyncStorage.setItem('app_pin', next).catch(() => {});
-          setExistingPin(next);
-          setPinMsg('✅ PIN set ஆகிட்டது!');
-          setTimeout(() => setShowPinSetup(false), 1200);
-        } else {
-          setPinMsg('❌ Match ஆகல! மீண்டும் try பண்ணுங்க');
-          setPinInput('');
-          setPinStep('set');
-          setPinFirst('');
-        }
-      }
-    }
-  };
-
-  const removePin = async () => {
-    await AsyncStorage.removeItem('app_pin').catch(() => {});
-    setExistingPin(null);
   };
 
   // ── Character row ─────────────────────────────────────────────
@@ -1277,9 +1133,6 @@ Then write these prompts:
           >
             <Text style={s.headerAddCharTxt}>+</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/settings')} style={s.headerBtn}>
-            <Text style={s.headerGear}>⚙️</Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -1399,213 +1252,6 @@ Then write these prompts:
 
               <View style={{ height: 20 }} />
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── SETTINGS BOTTOM SHEET ── */}
-      <Modal visible={showSettings} transparent animationType="slide"
-        onRequestClose={() => setShowSettings(false)}>
-        <View style={s.settingsOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettings(false)} />
-          <View style={[s.settingsSheet, { paddingBottom: insets.bottom + 8 }]}>
-            <View style={s.settingsHandle} />
-            <Text style={s.settingsTitle}>⚙️ Settings</Text>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: '85%' }}>
-
-              {/* Character list layout */}
-              <View style={s.settingsSection}>
-                <Text style={s.settingsRowTitle}>Character display</Text>
-                <Text style={s.settingsRowSub}>Home screen-ல் character-களை list அல்லது grid-ஆகக் காட்டுங்கள்</Text>
-                <View style={s.characterViewOptions}>
-                  <TouchableOpacity
-                    testID="character-view-list"
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: characterViewMode === 'list' }}
-                    style={[s.characterViewOption, characterViewMode === 'list' && s.characterViewOptionActive]}
-                    onPress={() => changeCharacterViewMode('list')}
-                  >
-                    <Text style={[s.characterViewIcon, characterViewMode === 'list' && s.characterViewTextActive]}>☰</Text>
-                    <Text style={[s.characterViewText, characterViewMode === 'list' && s.characterViewTextActive]}>List view</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    testID="character-view-grid"
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: characterViewMode === 'grid' }}
-                    style={[s.characterViewOption, characterViewMode === 'grid' && s.characterViewOptionActive]}
-                    onPress={() => changeCharacterViewMode('grid')}
-                  >
-                    <Text style={[s.characterViewIcon, characterViewMode === 'grid' && s.characterViewTextActive]}>▦</Text>
-                    <Text style={[s.characterViewText, characterViewMode === 'grid' && s.characterViewTextActive]}>Grid view</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* 1. Online / Offline */}
-              <View style={s.settingsSection}>
-                <View style={s.settingsRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.settingsRowTitle}>🌐 Online Mode</Text>
-                    <Text style={s.settingsRowSub}>
-                      {isOnline ? 'Gemini API வழியா chat' : 'Offline / Gemma mode'}
-                    </Text>
-                  </View>
-                  <Toggle value={isOnline} onToggle={toggleOnline} />
-                </View>
-              </View>
-
-              {/* 2. Auto-message toggle */}
-              <View style={s.settingsSection}>
-                <View style={s.settingsRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.settingsRowTitle}>💬 Auto Message</Text>
-                    <Text style={s.settingsRowSub}>
-                      App close ஆனாலும் push notification வரும்
-                    </Text>
-                    {autoMsgEnabled && (
-                      <View style={s.pushStatusRow}>
-                        {pushStatus === 'active'      && <Text style={[s.pushBadge, { backgroundColor: '#1B5E20' }]}>🔔 Notifications Active</Text>}
-                        {pushStatus === 'subscribing' && <Text style={[s.pushBadge, { backgroundColor: '#E65100' }]}>⏳ Enabling...</Text>}
-                        {pushStatus === 'denied'      && <Text style={[s.pushBadge, { backgroundColor: '#B71C1C' }]}>🔕 Permission Denied — Edge Settings-ல் allow பண்ணுங்க</Text>}
-                        {pushStatus === 'unsupported' && <Text style={[s.pushBadge, { backgroundColor: '#555' }]}>⚠️ This browser doesn't support push</Text>}
-                      </View>
-                    )}
-                  </View>
-                  <Toggle value={autoMsgEnabled} onToggle={toggleAutoMsg} />
-                </View>
-
-                {/* Per-character intervals */}
-                {autoMsgEnabled && (
-                  <View style={s.intervalList}>
-                    <Text style={s.intervalHeading}>⏱ Interval per Character</Text>
-                    {personas.map(p => (
-                      <View key={p.id} style={s.intervalRow}>
-                        <View style={[s.intervalAvatar, { backgroundColor: p.avatarColor }]}>
-                          {p.avatarPhotoUri
-                            ? <Image source={{ uri: p.avatarPhotoUri }} style={s.intervalAvatarImg} />
-                            : <Text style={s.intervalAvatarTxt}>{p.emoji}</Text>}
-                        </View>
-                        <Text style={s.intervalName} numberOfLines={1}>{p.name}</Text>
-                        <View style={s.intervalBtns}>
-                          {INTERVALS.map(iv => (
-                            <TouchableOpacity key={iv}
-                              style={[s.ivBtn, intervals[p.id] === iv && s.ivBtnActive]}
-                              onPress={() => setIntervalForPersona(p.id, intervals[p.id] === iv ? null : iv)}>
-                              <Text style={[s.ivBtnTxt, intervals[p.id] === iv && s.ivBtnTxtActive]}>
-                                {iv}m
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                          <TouchableOpacity
-                            style={[s.ivBtn, intervals[p.id] == null && s.ivBtnOff]}
-                            onPress={() => setIntervalForPersona(p.id, null)}>
-                            <Text style={[s.ivBtnTxt, intervals[p.id] == null && s.ivBtnOffTxt]}>off</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* 3. Gemma AI */}
-              <View style={s.settingsSection}>
-                <Text style={s.settingsRowTitle}>🧠 Gemma AI (Offline)</Text>
-                <View style={s.gemmaStatusRow}>
-                  {isWebGPUSupported()
-                    ? isModelCached()
-                      ? <Text style={s.gemmaStatusOk}>✅ Ready — offline chat கிடைக்கும்</Text>
-                      : <Text style={s.gemmaStatusWarn}>⬇️ Download ஆகல — Chat screen-ல் 🧠 icon tap பண்ணுங்க</Text>
-                    : <Text style={s.gemmaStatusErr}>⚠️ Chrome 121+ தேவை (WebGPU)</Text>
-                  }
-                </View>
-              </View>
-
-              {/* 4. Ringtone */}
-              <View style={s.settingsSection}>
-                <Text style={s.settingsRowTitle}>🔔 Notification Ringtone</Text>
-                <Text style={s.settingsRowSub}>Auto-message வரும்போது play ஆகும்</Text>
-                <View style={s.ringtoneGrid}>
-                  {RINGTONES.map(r => (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={[s.ringtoneBtn, ringtone === r.id && s.ringtoneBtnActive]}
-                      onPress={() => pickRingtone(r.id)}
-                    >
-                      <Text style={s.ringtoneEmoji}>{r.emoji}</Text>
-                      <Text style={[s.ringtoneTxt, ringtone === r.id && s.ringtoneTxtActive]}>
-                        {r.label}
-                      </Text>
-                      {ringtone === r.id && <Text style={s.ringtoneCheck}>✓</Text>}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* 5. PIN Lock */}
-              <View style={s.settingsSection}>
-                <Text style={s.settingsRowTitle}>🔒 App PIN Lock</Text>
-                <Text style={s.settingsRowSub}>
-                  {existingPin ? '✅ PIN set ஆகிருக்கு — மற்றவங்க திறக்க முடியாது' : 'PIN இல்லை — யாரும் திறக்கலாம்'}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity style={s.pinBtn} onPress={openPinSetup}>
-                    <Text style={s.pinBtnTxt}>{existingPin ? '🔄 PIN மாத்து' : '🔒 PIN Set பண்ணு'}</Text>
-                  </TouchableOpacity>
-                  {existingPin && (
-                    <TouchableOpacity style={[s.pinBtn, { backgroundColor: '#fdecea' }]} onPress={removePin}>
-                      <Text style={[s.pinBtnTxt, { color: '#c62828' }]}>🗑 Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-            </ScrollView>
-
-            <TouchableOpacity style={s.keysShortcut} onPress={() => { setShowSettings(false); router.push('/keys'); }}>
-              <Text style={s.keysShortcutTxt}>🔑 Keys & Accounts</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={s.settingsClose} onPress={() => setShowSettings(false)}>
-              <Text style={s.settingsCloseTxt}>✓ Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── PIN SETUP MODAL ── */}
-      <Modal visible={showPinSetup} transparent animationType="fade"
-        onRequestClose={() => setShowPinSetup(false)}>
-        <View style={s.pinOverlay}>
-          <View style={s.pinBox}>
-            <Text style={s.pinTitle}>
-              {pinStep === 'set' ? '🔒 New PIN Set பண்ணு' : '🔒 PIN Confirm பண்ணு'}
-            </Text>
-            <Text style={s.pinSub}>4 digits enter பண்ணுங்க</Text>
-
-            {/* 4 dots */}
-            <View style={s.pinDots}>
-              {[0,1,2,3].map(i => (
-                <View key={i} style={[s.pinDot, pinInput.length > i && s.pinDotFilled]} />
-              ))}
-            </View>
-
-            {pinMsg ? <Text style={s.pinMsg}>{pinMsg}</Text> : null}
-
-            {/* Numpad */}
-            <View style={s.numpad}>
-              {KEYS.map((k, i) => (
-                k === '' ? <View key={i} style={s.numKey} /> :
-                <TouchableOpacity key={i} style={[s.numKey, s.numKeyActive]} onPress={() => handlePinKey(k)}>
-                  <Text style={s.numKeyTxt}>{k}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity style={s.pinCancelBtn} onPress={() => setShowPinSetup(false)}>
-              <Text style={s.pinCancelTxt}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2003,8 +1649,6 @@ const s = StyleSheet.create({
   },
   headerCharIcon: { fontSize: 12, color: '#fff' },
   headerCharTxt: { fontSize: 12, color: '#fff', fontWeight: '700' },
-  headerBtn: { padding: 5, borderRadius: 12, borderWidth: 1, borderColor: '#38436A', backgroundColor: '#141A32' },
-  headerGear: { fontSize: 19 },
   headerSpacer: { flex: 1 },
   buildBadge: { backgroundColor: '#4A236D', borderWidth: 1, borderColor: '#D47CFF', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10 },
   buildBadgeTxt: { color: '#F3D9FF', fontSize: 9, fontWeight: '800' },
@@ -2015,7 +1659,6 @@ const s = StyleSheet.create({
   statusOnline: { backgroundColor: '#13372F', borderColor: '#5BE99B' },
   statusOffline: { backgroundColor: '#3A192C', borderColor: '#FF6FB7' },
   statusPillTxt: { color: '#E8FFF4', fontSize: 10, fontWeight: '700' },
-  pushStatusRow: { marginTop: 6 },
   pushBadge: { color: '#fff', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
 
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080B18' },
@@ -2128,135 +1771,6 @@ const s = StyleSheet.create({
   scriptRetryTxt: { color: '#9ca3af', fontSize: 14, fontWeight: '600' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-
-  // ── Settings Sheet ──
-  settingsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  settingsSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingTop: 12, paddingHorizontal: 20, paddingBottom: 0,
-    maxHeight: '80%',
-  },
-  settingsHandle: {
-    width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2,
-    alignSelf: 'center', marginBottom: 14,
-  },
-  settingsTitle: { fontSize: 20, fontWeight: 'bold', color: '#111', marginBottom: 16 },
-  settingsSection: {
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
-    paddingVertical: 16,
-  },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  settingsRowTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 3 },
-  settingsRowSub: { fontSize: 12, color: '#777' },
-  characterViewOptions: {
-    flexDirection: 'row', gap: 10, marginTop: 12,
-    backgroundColor: '#F2F4F8', padding: 4, borderRadius: 13,
-  },
-  characterViewOption: {
-    flex: 1, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: 'transparent',
-  },
-  characterViewOptionActive: { backgroundColor: '#171D38', borderColor: '#51D8F2' },
-  characterViewIcon: { color: '#515A70', fontSize: 17, fontWeight: '700' },
-  characterViewText: { color: '#394155', fontSize: 13, fontWeight: '700' },
-  characterViewTextActive: { color: '#F3F4FF' },
-
-  // ── Custom Toggle ──
-  toggle: {
-    width: 80, height: 36, borderRadius: 18,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 4, overflow: 'hidden',
-  },
-  toggleOn: { backgroundColor: '#25D366' },
-  toggleOff: { backgroundColor: '#EF5350' },
-  toggleDot: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff',
-    elevation: 2, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
-  },
-  toggleDotRight: { marginLeft: 'auto' as any },
-  toggleDotLeft: { marginRight: 'auto' as any },
-  toggleLabel: { color: '#fff', fontSize: 11, fontWeight: '800', marginRight: 2 },
-
-  // ── Auto-message intervals ──
-  intervalList: { marginTop: 14, gap: 10 },
-  intervalHeading: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 4 },
-  intervalRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#f9f9f9', borderRadius: 10, padding: 8,
-  },
-  intervalAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  intervalAvatarImg: { width: 32, height: 32, borderRadius: 16 },
-  intervalAvatarTxt: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  intervalName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#333' },
-  intervalBtns: { flexDirection: 'row', gap: 4 },
-  ivBtn: {
-    paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8,
-    borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fff',
-  },
-  ivBtnActive: { backgroundColor: '#075E54', borderColor: '#075E54' },
-  ivBtnOff: { backgroundColor: '#ffebee', borderColor: '#ef9a9a' },
-  ivBtnTxt: { fontSize: 11, fontWeight: '700', color: '#555' },
-  ivBtnTxtActive: { color: '#fff' },
-  ivBtnOffTxt: { color: '#c62828' },
-
-  // ── Ringtone picker ──
-  ringtoneGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12,
-  },
-  ringtoneBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd',
-    backgroundColor: '#fafafa',
-  },
-  ringtoneBtnActive: {
-    borderColor: '#075E54', backgroundColor: '#e8f5e9',
-  },
-  ringtoneEmoji: { fontSize: 16 },
-  ringtoneTxt: { fontSize: 12, fontWeight: '600', color: '#555' },
-  ringtoneTxtActive: { color: '#075E54' },
-  ringtoneCheck: { fontSize: 12, color: '#075E54', fontWeight: '900', marginLeft: 2 },
-
-  // ── Gemma status ──
-  gemmaStatusRow: { marginTop: 8, padding: 10, backgroundColor: '#f5f5f5', borderRadius: 10 },
-  gemmaStatusOk: { color: '#2e7d32', fontSize: 13, fontWeight: '600' },
-  gemmaStatusWarn: { color: '#e65100', fontSize: 13 },
-  gemmaStatusErr: { color: '#c62828', fontSize: 13 },
-
-  // ── PIN in settings ──
-  pinBtn: {
-    flex: 1, backgroundColor: '#e8f5e9', borderRadius: 10,
-    paddingVertical: 12, alignItems: 'center',
-  },
-  pinBtnTxt: { color: '#075E54', fontWeight: '700', fontSize: 14 },
-
-  keysShortcut: {
-    backgroundColor: '#FEF3C7', borderRadius: 12,
-    paddingVertical: 13, alignItems: 'center', marginTop: 12,
-    borderWidth: 1, borderColor: '#F59E0B',
-  },
-  keysShortcutTxt: { color: '#92400E', fontSize: 15, fontWeight: 'bold' },
-  settingsClose: {
-    backgroundColor: '#075E54', borderRadius: 14,
-    paddingVertical: 15, alignItems: 'center', marginVertical: 10,
-  },
-  settingsCloseTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
-  // ── PIN setup modal ──
-  pinOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  pinBox: { backgroundColor: '#fff', borderRadius: 24, padding: 28, width: '100%', alignItems: 'center' },
-  pinTitle: { fontSize: 18, fontWeight: 'bold', color: '#111', marginBottom: 6, textAlign: 'center' },
-  pinSub: { fontSize: 13, color: '#777', marginBottom: 24, textAlign: 'center' },
-  pinDots: { flexDirection: 'row', gap: 18, marginBottom: 16 },
-  pinDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#aaa', backgroundColor: '#fff' },
-  pinDotFilled: { backgroundColor: '#075E54', borderColor: '#075E54' },
-  pinMsg: { fontSize: 13, color: '#c62828', marginBottom: 14, textAlign: 'center' },
-  numpad: { flexDirection: 'row', flexWrap: 'wrap', width: 240, gap: 10, justifyContent: 'center', marginBottom: 16 },
-  numKey: { width: 68, height: 56, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  numKeyActive: { backgroundColor: '#f0f0f0', elevation: 1 },
-  numKeyTxt: { fontSize: 22, fontWeight: '600', color: '#111' },
-  pinCancelBtn: { paddingVertical: 10, paddingHorizontal: 24 },
-  pinCancelTxt: { color: '#888', fontSize: 14, fontWeight: '600' },
 
   // ── Edit Relationship ──
   editBox: { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '88%' },
