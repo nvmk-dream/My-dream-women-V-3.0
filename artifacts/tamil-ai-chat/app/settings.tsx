@@ -10,6 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, getPhotoStyles, createPhotoStyle, deletePhotoStyle, type PhotoStyleRecord, type GlobalStyleEntry } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
+import CharacterSettingsSection from '../components/CharacterSettingsSection';
 
 const APP_VERSION = '1.2.0';
 const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
@@ -587,6 +588,8 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.version}>Version {APP_VERSION}</Text>
+
+        <CharacterSettingsSection />
 
         <View style={s.card}>
           <View style={s.cardHeader}>
