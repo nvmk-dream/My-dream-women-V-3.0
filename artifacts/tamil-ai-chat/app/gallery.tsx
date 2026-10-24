@@ -12,7 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, listGoogleDriveBackups, uploadFileToGoogleDrive, uploadBackupToGoogleDrive, trackCloudinaryUpload, deleteFromCloudinary, getCloudinaryMeta, setCloudinaryMeta, createCloudinaryFolder, CLOUDINARY_UPLOAD_CLOUD, CLOUDINARY_UPLOAD_PRESET, GOOGLE_DRIVE_BACKUP_FOLDER_URL, getGoogleDriveStatus, type CloudinaryBackup, type GoogleDriveBackup, type GoogleDriveStatus } from '../services/api';
-import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, type NativeBackupUploadState } from '../services/installed-apk';
+import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, addBackupZipProgressListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 
@@ -90,6 +90,9 @@ export default function GalleryScreen() {
   const [backingUp, setBackingUp]           = useState(false);
   const [backupStep, setBackupStep]         = useState('');
   const [backupZipReady, setBackupZipReady] = useState(false);
+  const [backupZipProgress, setBackupZipProgress] = useState(0);
+  const [backupApkReady, setBackupApkReady] = useState(false);
+  const [backupProjectDataReady, setBackupProjectDataReady] = useState(false);
   const [backupUploadProgress, setBackupUploadProgress] = useState(0);
   const [backups, setBackups] = useState<CloudinaryBackup[]>([]);
   const [driveBackups, setDriveBackups] = useState<GoogleDriveBackup[]>([]);
@@ -104,6 +107,11 @@ export default function GalleryScreen() {
 
   // ── MediaLibrary permission ──────────────────────────────────────
   const [mlPermission, requestMlPermission] = MediaLibrary.usePermissions();
+
+  useEffect(() => {
+    const subscription = addBackupZipProgressListener(setBackupZipProgress);
+    return () => subscription.remove();
+  }, []);
 
   const depthRef = React.useRef(depth);
   useEffect(() => { depthRef.current = depth; }, [depth]);
@@ -609,20 +617,26 @@ export default function GalleryScreen() {
     setBackingUp(false);
     setBackupStep('');
     setBackupZipReady(false);
+    setBackupZipProgress(0);
+    setBackupApkReady(false);
+    setBackupProjectDataReady(false);
     setBackupUploadProgress(0);
   };
 
   const showBackupFailure = (error: unknown) => {
     const reason = error instanceof Error ? error.message : String(error || 'Unknown backup error');
+    const zipIsAvailable = Boolean(pendingBackupRef.current);
     setBackingUp(false);
     setBackupStep('');
-    setBackupZipReady(Boolean(pendingBackupRef.current));
+    setBackupZipReady(zipIsAvailable);
     setBackupUploadProgress(0);
     Alert.alert(
       'Backup failed',
-      `${reason}\n\nZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது.`,
+      `Reason:\n${reason}\n\n${zipIsAvailable
+        ? 'ZIP பாதுகாப்பாக வைக்கப்பட்டுள்ளது. Retry செய்யலாம்.'
+        : 'ZIP உருவாக்கம் முடியவில்லை; Retry செய்து மீண்டும் முயற்சிக்கவும்.'}`,
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => { void discardPendingBackup(); } },
+        { text: 'Cancel', style: 'cancel' },
         { text: 'Retry', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
       ],
     );
@@ -708,6 +722,9 @@ export default function GalleryScreen() {
     cancelRequestedRef.current = false;
     setBackingUp(true);
     setBackupZipReady(true);
+    setBackupZipProgress(100);
+    setBackupApkReady(true);
+    setBackupProjectDataReady(true);
     const currentProgress = state && state.totalBytes > 0
       ? Math.round((state.uploadedBytes / state.totalBytes) * 100)
       : 0;
@@ -741,6 +758,9 @@ export default function GalleryScreen() {
     const uploaded = Number(state.uploadedBytes || 0);
     const percent = total > 0 ? Math.min(100, Math.round((uploaded / total) * 100)) : 0;
     setBackupZipReady(true);
+    setBackupZipProgress(100);
+    setBackupApkReady(true);
+    setBackupProjectDataReady(true);
     setBackupUploadProgress(percent);
 
     if (state.status === 'starting' || state.status === 'uploading') {
@@ -772,14 +792,10 @@ export default function GalleryScreen() {
       lastBackupNoticeRef.current = noticeKey;
       Alert.alert(
         state.status === 'paused' ? 'Backup paused' : 'Backup upload failed',
-        `${state.error || 'Upload stopped unexpectedly'}\n\n${percent}% வரை upload ஆனது.`,
+        `Reason:\n${state.error || 'Upload stopped unexpectedly'}\n\n${percent}% வரை upload ஆனது. ZIP பாதுகாப்பாக உள்ளது.`,
         [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => { void discardPendingBackup(); },
-          },
-          { text: 'Resume', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry', onPress: () => setTimeout(() => runProjectBackupRef.current(), 0) },
         ],
       );
     }
@@ -842,11 +858,16 @@ export default function GalleryScreen() {
     setBackingUp(true);
     setBackupStep('Creating Backup...');
     setBackupZipReady(false);
+    setBackupZipProgress(0);
+    setBackupApkReady(false);
+    setBackupProjectDataReady(false);
     setBackupUploadProgress(0);
     try {
       const apkInfo = await getInstalledApkInfo();
+      setBackupApkReady(true);
       setBackupStep('Collecting Projects data...');
       const collected = await collectProjectBackup();
+      setBackupProjectDataReady(true);
       const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
       const outputName = `MyDreamWoman_FullBackup_${stamp}.zip`;
       const backupInfo = {
@@ -867,6 +888,7 @@ export default function GalleryScreen() {
         projectDataJson: JSON.stringify(collected.projectData, null, 2),
         mediaFilesJson: JSON.stringify(collected.mediaFiles),
       });
+      setBackupZipProgress(100);
       pending = {
         zipPath: zip.path,
         outputName,
@@ -1124,12 +1146,12 @@ export default function GalleryScreen() {
       {backingUp && (
         <View style={s.backupProgressCard}>
           <Text style={s.backupProgressTitle}>Creating Backup</Text>
-          <Text style={s.backupProgressRow}>APK <Text style={s.backupDone}>✓</Text></Text>
-          <Text style={s.backupProgressRow}>Project Data <Text style={s.backupDone}>✓</Text></Text>
-          <Text style={s.backupProgressRow}>Creating ZIP <Text style={s.backupProgressValue}>{backupZipReady ? '68%' : '...'}</Text></Text>
+          <Text style={s.backupProgressRow}>APK <Text style={backupApkReady ? s.backupDone : s.backupProgressValue}>{backupApkReady ? '✓' : '...'}</Text></Text>
+          <Text style={s.backupProgressRow}>Project Data <Text style={backupProjectDataReady ? s.backupDone : s.backupProgressValue}>{backupProjectDataReady ? '✓' : '...'}</Text></Text>
+          <Text style={s.backupProgressRow}>Creating ZIP <Text style={s.backupProgressValue}>{backupZipReady ? '100%' : `${backupZipProgress}%`}</Text></Text>
           <Text style={s.backupProgressRow}>Uploading Backup <Text style={s.backupProgressValue}>{backupZipReady ? `${backupUploadProgress}%` : '0%'}</Text></Text>
           <View style={s.backupBarBg}>
-            <View style={[s.backupBarFill, { width: `${backupZipReady ? 68 + Math.round(backupUploadProgress * 0.32) : 18}%` as any }]} />
+            <View style={[s.backupBarFill, { width: `${backupZipReady ? 50 + Math.round(backupUploadProgress * 0.5) : Math.round(backupZipProgress * 0.5)}%` as any }]} />
           </View>
           {!!backupStep && <Text style={s.backupProgressHint}>{backupStep}</Text>}
           {backupZipReady && backupStep.startsWith('Uploading Backup') && (

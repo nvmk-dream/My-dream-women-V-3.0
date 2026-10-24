@@ -175,19 +175,40 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
     if (zipFile.exists()) zipFile.delete()
 
     ZipOutputStream(FileOutputStream(zipFile)).use { zip ->
-      addFile(zip, "APK/MyDreamWoman.apk", File(currentApplicationInfo().sourceDir))
-      addBytes(zip, "Projects/project-data.json", projectDataJson.toByteArray(Charsets.UTF_8))
-      addBytes(zip, "BackupInfo.json", backupInfoJson.toByteArray(Charsets.UTF_8))
-
       val mediaFiles = JSONArray(mediaFilesJson)
-      for (index in 0 until mediaFiles.length()) {
-        val item = mediaFiles.optJSONObject(index) ?: continue
+      val validMediaEntries = (0 until mediaFiles.length()).mapNotNull { index ->
+        val item = mediaFiles.optJSONObject(index) ?: return@mapNotNull null
         val url = item.optString("url")
         val entryPath = safeEntryPath(item.optString("path"))
-        if (url.isBlank() || entryPath.isBlank()) continue
-        downloadIntoZip(zip, entryPath, url)
+        if (url.isBlank() || entryPath.isBlank()) null else Triple(entryPath, url, item)
+      }
+      val totalWorkUnits = (3 + validMediaEntries.size).toDouble()
+      var completedWorkUnits = 0.0
+      fun reportProgress(currentUnitProgress: Double) {
+        val percent = (((completedWorkUnits + currentUnitProgress.coerceIn(0.0, 1.0)) / totalWorkUnits) * 100)
+          .toInt()
+          .coerceIn(0, 99)
+        emitZipProgress(percent)
+      }
+
+      emitZipProgress(0)
+      addFile(zip, "APK/MyDreamWoman.apk", File(currentApplicationInfo().sourceDir)) { reportProgress(it) }
+      completedWorkUnits += 1
+      reportProgress(0.0)
+      addBytes(zip, "Projects/project-data.json", projectDataJson.toByteArray(Charsets.UTF_8))
+      completedWorkUnits += 1
+      reportProgress(0.0)
+      addBytes(zip, "BackupInfo.json", backupInfoJson.toByteArray(Charsets.UTF_8))
+      completedWorkUnits += 1
+      reportProgress(0.0)
+
+      for ((entryPath, url, _) in validMediaEntries) {
+        downloadIntoZip(zip, entryPath, url) { reportProgress(it) }
+        completedWorkUnits += 1
+        reportProgress(0.0)
       }
     }
+    emitZipProgress(100)
 
     return Arguments.createMap().apply {
       putString("uri", zipFile.toURI().toString())
@@ -202,20 +223,34 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
     zip.closeEntry()
   }
 
-  private fun addFile(zip: ZipOutputStream, entryName: String, file: File) {
+  private fun addFile(
+    zip: ZipOutputStream,
+    entryName: String,
+    file: File,
+    onProgress: (Double) -> Unit = {},
+  ) {
     zip.putNextEntry(ZipEntry(entryName))
     BufferedInputStream(FileInputStream(file)).use { input ->
       val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+      val totalBytes = file.length().coerceAtLeast(1L)
+      var copiedBytes = 0L
       while (true) {
         val count = input.read(buffer)
         if (count <= 0) break
         zip.write(buffer, 0, count)
+        copiedBytes += count
+        onProgress(copiedBytes.toDouble() / totalBytes)
       }
     }
     zip.closeEntry()
   }
 
-  private fun downloadIntoZip(zip: ZipOutputStream, entryName: String, url: String) {
+  private fun downloadIntoZip(
+    zip: ZipOutputStream,
+    entryName: String,
+    url: String,
+    onProgress: (Double) -> Unit = {},
+  ) {
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
       connectTimeout = 30_000
       readTimeout = 120_000
@@ -226,13 +261,17 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
       if (connection.responseCode !in 200..299) {
         throw IllegalStateException("Cloudinary media download failed: HTTP ${connection.responseCode}")
       }
+      val expectedBytes = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
       zip.putNextEntry(ZipEntry(entryName))
       connection.inputStream.use { input ->
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var downloadedBytes = 0L
         while (true) {
           val count = input.read(buffer)
           if (count <= 0) break
           zip.write(buffer, 0, count)
+          downloadedBytes += count
+          if (expectedBytes > 0) onProgress(downloadedBytes.toDouble() / expectedBytes)
         }
       }
       zip.closeEntry()
@@ -245,5 +284,17 @@ class InstalledApkModule(private val reactContext: ReactApplicationContext) :
     val normalized = path.replace('\\', '/').trimStart('/')
     if (normalized.isBlank() || normalized.split('/').any { it == ".." || it.isBlank() }) return ""
     return normalized
+  }
+
+  private fun emitZipProgress(percent: Int) {
+    try {
+      reactContext
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        .emit("installedApkZipProgress", Arguments.createMap().apply {
+          putInt("percent", percent.coerceIn(0, 100))
+        })
+    } catch (_: Exception) {
+      // Progress is best-effort; archive creation still reports its own failures.
+    }
   }
 }

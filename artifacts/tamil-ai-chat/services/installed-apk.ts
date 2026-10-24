@@ -111,3 +111,10 @@ export function clearBackupUploadState(deleteFile = false) {
 export function addBackupUploadListener(listener: (state: NativeBackupUploadState) => void) {
   return DeviceEventEmitter.addListener('backupUploadState', listener);
 }
+
+export function addBackupZipProgressListener(listener: (percent: number) => void) {
+  return DeviceEventEmitter.addListener('installedApkZipProgress', event => {
+    const percent = Number(event?.percent ?? 0);
+    listener(Math.max(0, Math.min(100, Math.round(percent))));
+  });
+}
