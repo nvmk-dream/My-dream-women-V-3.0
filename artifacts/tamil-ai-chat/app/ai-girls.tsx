@@ -4,7 +4,7 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Modal, Pressable, Image,
   TextInput, ScrollView, ActivityIndicator, Alert,
-  StatusBar,
+  StatusBar, DeviceEventEmitter,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -14,6 +14,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ALL_PERSONAS, Persona } from '../constants/personas';
 import { ParamsStore } from '../context/params-store';
+import {
+  CHARACTER_SETTINGS_CHANGED_EVENT,
+  CHARACTER_VIEW_MODE_KEY,
+} from '../services/character-settings';
+import { playRingtone, RINGTONES } from '../services/notification-sounds';
 import { isModelCached, isWebGPUSupported } from '../services/webllm';
 import {
   subscribeToPush, unsubscribeFromPush,
@@ -49,51 +54,7 @@ const STYLE_TO_PROMPT: Record<string, string> = {
 };
 
 const INTERVALS = [10, 20, 30] as const;
-const CHARACTER_VIEW_MODE_KEY = 'ai_girls_character_view_mode';
 const AVATAR_RESTORE_RETRY_MS = 15 * 60 * 1000;
-
-// ── Ringtone definitions ───────────────────────────────────────────
-export const RINGTONES = [
-  { id: 'classic',   label: 'Classic Bell',   emoji: '🔔' },
-  { id: 'whatsapp',  label: 'WhatsApp Ping',  emoji: '💬' },
-  { id: 'melody',    label: 'Melody',         emoji: '🎵' },
-  { id: 'cute',      label: 'Cute Tune',      emoji: '🎶' },
-  { id: 'alert',     label: 'Sharp Alert',    emoji: '🎺' },
-  { id: 'silent',    label: 'Silent',         emoji: '🔕' },
-] as const;
-export type RingtoneId = typeof RINGTONES[number]['id'];
-
-export function playRingtone(id: string) {
-  if (id === 'silent' || typeof window === 'undefined') return;
-  try {
-    const ctx = new AudioContext();
-    const tone = (freq: number, start: number, dur: number, vol = 0.3, type: OscillatorType = 'sine') => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = type;
-      gain.gain.setValueAtTime(0, ctx.currentTime + start);
-      gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + start + 0.04);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + dur);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + dur + 0.05);
-    };
-    if (id === 'classic') {
-      tone(880, 0, 0.15); tone(1100, 0.18, 0.15); tone(880, 0.36, 0.15); tone(1100, 0.54, 0.2);
-    } else if (id === 'whatsapp') {
-      tone(1318, 0, 0.08, 0.25); tone(1318, 0.12, 0.08, 0.25);
-    } else if (id === 'melody') {
-      tone(523, 0, 0.12); tone(659, 0.15, 0.12); tone(784, 0.3, 0.12); tone(1047, 0.45, 0.2);
-    } else if (id === 'cute') {
-      tone(784, 0, 0.1); tone(988, 0.12, 0.1); tone(1175, 0.24, 0.1);
-      tone(988, 0.36, 0.1); tone(1175, 0.48, 0.18);
-    } else if (id === 'alert') {
-      tone(1480, 0, 0.08, 0.4, 'square'); tone(1480, 0.1, 0.08, 0.4, 'square');
-      tone(1976, 0.2, 0.15, 0.35, 'square');
-    }
-    setTimeout(() => ctx.close(), 1500);
-  } catch { /* audio blocked */ }
-}
 
 type PersonaWithExtra = Persona & { editedRelationship?: string };
 
@@ -456,8 +417,6 @@ AsyncStorage-ல் save ஆச்சு!`
         AsyncStorage.getItem('auto_msg_enabled'),
         AsyncStorage.getItem('app_pin'),
         AsyncStorage.getItem('user_profile_photo'),
-        AsyncStorage.getItem('user_normal_photo'),
-        AsyncStorage.getItem('user_prasana_photo'),
         AsyncStorage.getItem('ringtone'),
         AsyncStorage.getItem('user_name'),
         AsyncStorage.getItem('user_behaviour'),
@@ -538,6 +497,14 @@ AsyncStorage-ல் save ஆச்சு!`
     loadSettingsAndCheck();
     loadPhotoStyles();
   }, [loadPersonas, loadSettingsAndCheck, loadPhotoStyles]));
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      CHARACTER_SETTINGS_CHANGED_EVENT,
+      () => { void loadSettingsAndCheck(); },
+    );
+    return () => subscription.remove();
+  }, [loadSettingsAndCheck]);
 
   // ── Background auto-message timer (runs every 30s) ────────────
   const autoMsgEnabledRef = useRef(autoMsgEnabled);
@@ -1310,7 +1277,7 @@ Then write these prompts:
           >
             <Text style={s.headerAddCharTxt}>+</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
+          <TouchableOpacity onPress={() => router.push('/settings')} style={s.headerBtn}>
             <Text style={s.headerGear}>⚙️</Text>
           </TouchableOpacity>
         </View>
