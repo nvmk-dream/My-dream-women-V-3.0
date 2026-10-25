@@ -24,6 +24,8 @@ import {
 } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { Ionicons } from '@expo/vector-icons';
+import { cloudTheme as ct } from '../constants/cloud-theme';
 
 const CUSTOM_CHARS_KEY = 'cloud_custom_chars';
 
@@ -310,7 +312,7 @@ export default function AIGirlsCloudScreen() {
   const [selectedChar, setSelectedChar] = useState<{ id: string; name: string; color: string; letter: string } | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<{ id: string; label: string } | null>(null);
 
-  // Auto-select character when charId param provided (chat ☁️ shortcut)
+  // Auto-select character when charId param provided (chat shortcut)
   useEffect(() => {
     if (!charId) return;
     const persona = ALL_PERSONAS.find(p => p.id === charId);
@@ -319,7 +321,7 @@ export default function AIGirlsCloudScreen() {
       id: persona.id,
       name: persona.name,
       color: persona.avatarColor,
-      letter: (persona as any).avatarLetter || persona.emoji,
+      letter: (persona as any).avatarLetter || persona.name.charAt(0),
     });
     setDepth(1);
   }, [charId]);
@@ -392,6 +394,28 @@ export default function AIGirlsCloudScreen() {
   }));
 
   const personas = [...basePersonas, ...customChars];
+  const personaIdsKey = JSON.stringify(personas.map(persona => persona.id));
+  const [profilePhotoUris, setProfilePhotoUris] = useState<Record<string, string>>({});
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const ids: string[] = JSON.parse(personaIdsKey);
+    const refreshProfilePhotos = async () => {
+      const entries: Array<[string, string | null]> = await Promise.all(ids.map(async (id): Promise<[string, string | null]> => {
+        try {
+          const raw = await AsyncStorage.getItem(`persona_edit_${id}`);
+          const uri = raw ? JSON.parse(raw)?.avatarPhotoUri : null;
+          return [id, typeof uri === 'string' && uri ? uri : null];
+        } catch {
+          return [id, null];
+        }
+      }));
+      const next: Record<string, string> = {};
+      entries.forEach(([id, uri]) => { if (uri) next[id] = uri; });
+      if (active) setProfilePhotoUris(next);
+    };
+    void refreshProfilePhotos();
+    return () => { active = false; };
+  }, [personaIdsKey]));
   const photoStyles = masterStyles
     .filter(s => !hiddenStyles.has(s.id))
     .map(s => ({ ...s, id: s.folderName, label: s.name }));
@@ -587,21 +611,21 @@ export default function AIGirlsCloudScreen() {
       Alert.alert('Upload பிழை', `0/${total} upload ஆச்சு.` + reasonsText);
     } else if (action !== 'cut') {
       Alert.alert(
-        failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
+        failures.length ? 'Partial Upload' : 'Upload ஆச்சு!',
         `${done}/${total} photos "${styleLabel}" cloud folder-ல் save ஆச்சு.` +
           (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
       );
     } else if (cutDeletedCount === total && done === total) {
       // CUT success only when every selected file uploaded and its original deletion was verified.
       Alert.alert(
-        '✅ Upload ஆச்சு, Delete ஆச்சு!',
+        'Upload ஆச்சு, Delete ஆச்சு!',
         `${done}/${total} photos cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` +
           (failures.length ? `\n${failures.length} fail ஆச்சு.` : '') + reasonsText,
       );
     } else if (cutDeletedCount > 0) {
       // Partial CUT — never present the full success message for an incomplete batch.
       Alert.alert(
-        '⚠️ Partial Cut',
+        'Partial Cut',
         `${done}/${total} files cloud-ல் save ஆச்சு; ${cutDeletedCount}/${total} original files மட்டும் delete verify ஆச்சு.` +
           `\n\n${cutDeleteFailures.slice(0, 3).join('\n') || 'சில files upload அல்லது delete ஆகவில்லை.'}` +
           (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
@@ -609,7 +633,7 @@ export default function AIGirlsCloudScreen() {
     } else {
       // CUT — upload succeeded but no original deletion was verified.
       Alert.alert(
-        '⚠️ Upload ஆச்சு, Delete ஆகல',
+        'Upload ஆச்சு, Delete ஆகல',
         `${done}/${total} files cloud-ல் save ஆச்சு.\n\nOriginal media retain ஆச்சு; document delete confirm ஆகவில்லை:\n${cutDeleteFailures.slice(0, 3).join('\n') || 'Unknown error'}\n\nDocument provider delete permission அல்லது source file access-ஐ check பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.` +
           (failures.length ? `\n${failures.length} upload fail ஆச்சு.` : '') + reasonsText,
       );
@@ -683,11 +707,11 @@ export default function AIGirlsCloudScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: '📋 Copy  (Phone-ல் இருக்கும்)',
+          text: 'Copy  (Phone-ல் இருக்கும்)',
           onPress: () => doUpload(picked, charId, styleId, styleLabel, 'copy'),
         },
         {
-          text: '✂️ Cut  (Phone-ல் delete ஆகும்)',
+          text: 'Cut  (Phone-ல் delete ஆகும்)',
           style: 'destructive' as const,
           onPress: () => doUpload(picked, charId, styleId, styleLabel, 'cut'),
         },
@@ -747,7 +771,7 @@ export default function AIGirlsCloudScreen() {
       Alert.alert('Settings-ல் மட்டும் மாற்றலாம்', 'Photo Styles → Settings screen-ல் Add/Delete பண்ணுங்க.');
       return;
     }
-    Alert.alert('✅ Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
+    Alert.alert('Folder உருவாக்கப்பட்டது!', `"${name}" folder add ஆச்சு.`);
   };
 
   const loadPhotos = useCallback(async (charId: string, styleId: string) => {
@@ -878,7 +902,7 @@ export default function AIGirlsCloudScreen() {
       const { uri } = await FileSystem.downloadAsync(originalUrl, fileUri);
       await MediaLibrary.saveToLibraryAsync(uri);
       FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-      Alert.alert('✅ Saved!', 'Photo Gallery-ல் save ஆச்சு! 🎉');
+      Alert.alert('Saved!', 'Photo Gallery-ல் save ஆச்சு!');
     } catch (e: any) {
       Alert.alert('Error', 'Save பண்ண முடியல: ' + (e?.message || 'Unknown error'));
     } finally {
@@ -931,7 +955,7 @@ export default function AIGirlsCloudScreen() {
   const renderBreadcrumb = () => (
     <View style={s.breadcrumb}>
       <Text style={s.breadcrumbTxt}>
-        <Text style={s.breadcrumbHome}>🏠 Home</Text>
+        <Text style={s.breadcrumbHome}>Home</Text>
         <Text style={s.breadcrumbSep}> › </Text>
         <Text style={s.breadcrumbCur}>My AI Girls</Text>
         {selectedChar && (
@@ -956,22 +980,22 @@ export default function AIGirlsCloudScreen() {
       {depth === 2 ? (
         <TouchableOpacity style={s.uploadBtn} onPress={handleUpload} disabled={uploading}>
           {uploading
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.uploadBtnTxt}>⬆ Upload</Text>
+            ? <ActivityIndicator color={ct.text} size="small" />
+            : <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.background} /><Text style={s.uploadBtnTxt}>Upload</Text></View>
           }
         </TouchableOpacity>
       ) : (
-        <View style={[s.uploadBtn, { backgroundColor: '#ccc' }]}>
-          <Text style={[s.uploadBtnTxt, { color: '#888' }]}>⬆ Upload</Text>
+        <View style={[s.uploadBtn, s.disabledButton]}>
+          <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.muted} /><Text style={[s.uploadBtnTxt, { color: ct.muted }]}>Upload</Text></View>
         </View>
       )}
       {depth !== 2 ? (
         <TouchableOpacity style={s.newFolderBtn} onPress={handleNewFolder}>
-          <Text style={s.newFolderTxt}>📁 New Folder</Text>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.gold} /><Text style={s.newFolderTxt}>New Folder</Text></View>
         </TouchableOpacity>
       ) : (
-        <View style={[s.newFolderBtn, { backgroundColor: '#555' }]}>
-          <Text style={[s.newFolderTxt, { color: '#999' }]}>📁 New Folder</Text>
+        <View style={[s.newFolderBtn, { opacity: 0.45 }]}>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.muted} /><Text style={[s.newFolderTxt, { color: ct.muted }]}>New Folder</Text></View>
         </View>
       )}
     </View>
@@ -988,13 +1012,15 @@ export default function AIGirlsCloudScreen() {
         keyExtractor={p => p.id}
         renderItem={({ item }) => (
           <TouchableOpacity style={s.row} onPress={() => selectChar(item)} activeOpacity={0.7}>
-            <View style={[s.rowIcon, { backgroundColor: item.color }]}>
-              <Text style={s.rowIconTxt}>{item.letter}</Text>
+            <View style={s.rowIcon}>
+              {profilePhotoUris[item.id]
+                ? <Image source={{ uri: profilePhotoUris[item.id] }} style={s.profilePhoto} resizeMode="cover" />
+                : <Text style={s.rowIconTxt}>{item.letter}</Text>}
             </View>
             <Text style={s.rowName}>{item.name}</Text>
-            <Text style={s.rowArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color={ct.gold} style={s.rowArrow} />
             <TouchableOpacity style={s.trashBtn} onPress={() => handleDeleteFolder(item.id, item.name, 'char')}>
-              <Text style={s.trashIcon}>🗑</Text>
+              <Ionicons name="trash-outline" size={20} color={ct.cyan} />
             </TouchableOpacity>
           </TouchableOpacity>
         )}
@@ -1015,14 +1041,14 @@ export default function AIGirlsCloudScreen() {
         keyExtractor={p => p.id}
         renderItem={({ item }) => (
           <TouchableOpacity style={s.row} onPress={() => selectStyle(item)} activeOpacity={0.7}>
-            <Text style={s.styleIcon}>📷✨</Text>
+            <Image source={require('../assets/images/cloud-photo-placeholder.png')} style={s.styleThumb} resizeMode="cover" />
             <Text style={s.styleRowName}>{item.label}</Text>
             {selectedChar && (
               <TouchableOpacity
                 style={s.quickUploadBtn}
                 onPress={() => selectedChar && handleQuickUpload(selectedChar, item)}
               >
-                <Text style={s.quickUploadTxt}>⬆️</Text>
+                <Ionicons name="cloud-upload-outline" size={20} color={ct.cyan} />
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -1045,13 +1071,13 @@ export default function AIGirlsCloudScreen() {
         {renderActionBar()}
         {loadingPhotos ? (
           <View style={s.centerWrap}>
-            <ActivityIndicator size="large" color="#E67E22" />
+            <ActivityIndicator size="large" color={ct.cyan} />
             <Text style={s.loadingTxt}>Cloud-ல் இருந்து photos load பண்றேன்...</Text>
           </View>
         ) : photos.length === 0 ? (
           <View style={s.centerWrap}>
-            <Text style={s.emptyIcon}>☁️</Text>
-            <Text style={s.emptyTxt}>இந்த folder-ல் photos இல்லை{'\n'}⬆ Upload பண்ணுங்க</Text>
+            <Image source={require('../assets/images/cloud-photo-placeholder.png')} style={s.emptyArtwork} resizeMode="cover" />
+            <Text style={s.emptyTxt}>இந்த folder-ல் photos இல்லை{'\n'}Upload பண்ணுங்க</Text>
           </View>
         ) : (
           <>
@@ -1072,11 +1098,11 @@ export default function AIGirlsCloudScreen() {
                   {photoSelMode && photoSelIds.size > 0 && (
                     <View style={s.photoSelBar}>
                       <TouchableOpacity onPress={exitPhotoSel}>
-                        <Text style={s.photoSelCancel}>✕</Text>
+                        <Ionicons name="close" size={20} color={ct.muted} />
                       </TouchableOpacity>
                       <Text style={s.photoSelCount}>{photoSelIds.size} selected</Text>
                       <TouchableOpacity style={s.photoSelDeleteBtn} onPress={deleteSelectedPhotos}>
-                        <Text style={s.photoSelDeleteTxt}>🗑️ Delete</Text>
+                        <Text style={s.photoSelDeleteTxt}>Delete</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1094,7 +1120,7 @@ export default function AIGirlsCloudScreen() {
                     >
                       {failed ? (
                         <View style={s.photoWarningTile}>
-                          <Text style={s.photoWarningIcon}>⚠️</Text>
+                          <Ionicons name="alert-circle-outline" size={24} color={ct.gold} />
                           <Text style={s.photoWarningTxt}>Image load failed</Text>
                         </View>
                       ) : (
@@ -1112,13 +1138,13 @@ export default function AIGirlsCloudScreen() {
                       )}
                       {isSel && (
                         <View style={s.photoSelOverlay}>
-                          <Text style={s.photoSelCheck}>✓</Text>
+                          <Ionicons name="checkmark" size={24} color={ct.text} />
                         </View>
                       )}
                     </TouchableOpacity>
                     {!photoSelMode && (
                       <TouchableOpacity style={s.photoDelete} onPress={() => handleDeletePhoto(photo)}>
-                        <Text style={s.photoDeleteTxt}>🗑</Text>
+                          <Ionicons name="trash-outline" size={16} color={ct.gold} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1144,7 +1170,7 @@ export default function AIGirlsCloudScreen() {
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity onPress={goBack} style={s.backBtn}>
-          <Text style={s.backTxt}>‹</Text>
+          <Ionicons name="arrow-back" size={24} color={ct.gold} />
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
         <TouchableOpacity style={s.refreshBtn} onPress={() => {
@@ -1152,7 +1178,7 @@ export default function AIGirlsCloudScreen() {
             loadPhotos(selectedChar.id, selectedStyle.id);
           }
         }}>
-          <Text style={s.refreshTxt}>↻</Text>
+          <Ionicons name="refresh-outline" size={22} color={ct.cyan} />
         </TouchableOpacity>
       </View>
 
@@ -1167,15 +1193,15 @@ export default function AIGirlsCloudScreen() {
       {fullView && (
         <View style={s.fullViewBg}>
           <TouchableOpacity style={s.fullViewClose} onPress={() => setFullView(null)}>
-            <Text style={s.fullViewCloseTxt}>✕</Text>
+            <Ionicons name="close" size={24} color={ct.text} />
           </TouchableOpacity>
           <Image source={{ uri: fullView.originalUrl || fullView.url }} style={s.fullViewImg} resizeMode="contain" />
           <View style={s.fullViewActions}>
             <TouchableOpacity style={s.fullViewSave} onPress={() => handleSaveToGallery(fullView)} disabled={savingPhoto}>
-              <Text style={s.fullViewSaveTxt}>{savingPhoto ? '⏳ Saving...' : '⬇️ Gallery Save'}</Text>
+              <View style={s.buttonContent}><Ionicons name="download-outline" size={18} color={ct.text} /><Text style={s.fullViewSaveTxt}>{savingPhoto ? 'Saving...' : 'Gallery Save'}</Text></View>
             </TouchableOpacity>
             <TouchableOpacity style={s.fullViewDelete} onPress={() => { setFullView(null); handleDeletePhoto(fullView); }}>
-              <Text style={s.fullViewDeleteTxt}>🗑 Delete</Text>
+              <Text style={s.fullViewDeleteTxt}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1185,7 +1211,7 @@ export default function AIGirlsCloudScreen() {
       {deleteTarget && (
         <View style={s.confirmOverlay}>
           <View style={s.confirmBox}>
-            <Text style={s.confirmIcon}>🗑️</Text>
+            <Ionicons name="trash-outline" size={30} color={ct.gold} />
             <Text style={s.confirmTitle}>Delete பண்ணட்டுமா?</Text>
             <Text style={s.confirmSub}>இந்த photo Cloud-ல் இருந்து நிரந்தரமா delete ஆகும்.</Text>
             <View style={s.confirmBtns}>
@@ -1205,7 +1231,7 @@ export default function AIGirlsCloudScreen() {
       {uploading && uploadTotal > 0 && (
         <View style={s.confirmOverlay}>
           <View style={s.progressBox}>
-            <ActivityIndicator size="large" color="#E67E22" />
+            <ActivityIndicator size="large" color={ct.cyan} />
             <Text style={s.progressTitle}>Upload பண்றேன்...</Text>
             <Text style={s.progressCount}>{uploadProgress} / {uploadTotal} photos</Text>
             <View style={s.progressBarBg}>
@@ -1224,7 +1250,7 @@ export default function AIGirlsCloudScreen() {
       >
         <View style={s.confirmOverlay}>
           <View style={s.confirmBox}>
-            <Text style={s.confirmIcon}>🗑️</Text>
+            <Ionicons name="trash-outline" size={30} color={ct.gold} />
             <Text style={s.confirmTitle}>Folder Delete பண்ணட்டுமா?</Text>
             <Text style={s.confirmSub}>"{deleteFolderTarget?.name}" folder remove ஆகும்.</Text>
             <View style={s.confirmBtns}>
@@ -1243,14 +1269,14 @@ export default function AIGirlsCloudScreen() {
       <Modal visible={folderDialog} transparent animationType="fade" onRequestClose={() => setFolderDialog(false)}>
         <View style={s.dialogOverlay}>
           <View style={s.dialogBox}>
-            <Text style={s.dialogTitle}>📁 புதிய Folder</Text>
+            <Text style={s.dialogTitle}>புதிய Folder</Text>
             <Text style={s.dialogSub}>
               {depth === 0 ? 'புதிய character folder பெயர்:' : 'புதிய style folder பெயர்:'}
             </Text>
             <TextInput
               style={s.dialogInput}
               placeholder="Folder பெயர் உள்ளிடுங்க"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={ct.muted}
               value={folderName}
               onChangeText={setFolderName}
               autoFocus
@@ -1262,7 +1288,7 @@ export default function AIGirlsCloudScreen() {
                 <Text style={s.dialogCancelTxt}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.dialogOk} onPress={confirmNewFolder}>
-                <Text style={s.dialogOkTxt}>✅ உருவாக்கு</Text>
+                <Text style={s.dialogOkTxt}>உருவாக்கு</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1273,49 +1299,51 @@ export default function AIGirlsCloudScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: ct.background },
 
   // Header
   header: {
-    backgroundColor: '#1565C0',
+    backgroundColor: ct.surface,
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 14,
+    paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: ct.goldLine,
   },
-  backBtn: { padding: 8 },
-  backTxt: { color: '#fff', fontSize: 28, fontWeight: 'bold', lineHeight: 30 },
-  headerTitle: { flex: 1, color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 4 },
+  backBtn: { padding: 8, width: 42, alignItems: 'center' },
+  backTxt: { color: ct.gold, fontSize: 28, fontWeight: 'bold', lineHeight: 30 },
+  headerTitle: { flex: 1, color: ct.gold, fontSize: 19, fontWeight: 'bold', marginLeft: 4 },
   refreshBtn: { padding: 8 },
-  refreshTxt: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  refreshTxt: { color: ct.cyan, fontSize: 22, fontWeight: 'bold' },
 
   // Breadcrumb
   breadcrumb: {
-    backgroundColor: '#1a2340', paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: ct.surfaceRaised, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: ct.line,
   },
   breadcrumbTxt: { fontSize: 13 },
-  breadcrumbHome: { color: '#E67E22', fontWeight: '600' },
-  breadcrumbSep: { color: '#aaa' },
-  breadcrumbCur: { color: '#E67E22', fontWeight: '600' },
+  breadcrumbHome: { color: ct.cyan, fontWeight: '700' },
+  breadcrumbSep: { color: ct.muted },
+  breadcrumbCur: { color: ct.gold, fontWeight: '700' },
 
   // Action bar
   actionBar: {
     flexDirection: 'row', gap: 12,
-    padding: 14, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#eee',
+    paddingHorizontal: 14, paddingVertical: 14, backgroundColor: ct.background,
+    borderBottomWidth: 1, borderBottomColor: ct.line,
   },
   uploadBtn: {
-    flex: 1, backgroundColor: '#E67E22', borderRadius: 8,
+    flex: 1, backgroundColor: ct.cyan, borderRadius: 12,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
   },
-  uploadBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  uploadBtnTxt: { color: ct.background, fontWeight: '800', fontSize: 14 },
+  disabledButton: { backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.line, opacity: 0.55 },
   newFolderBtn: {
-    flex: 1, backgroundColor: '#1a2340', borderRadius: 8,
+    flex: 1, backgroundColor: ct.surface, borderRadius: 12, borderWidth: 1, borderColor: ct.gold,
     paddingVertical: 12, alignItems: 'center',
   },
-  newFolderTxt: { color: '#FFD700', fontWeight: '700', fontSize: 15 },
+  newFolderTxt: { color: ct.gold, fontWeight: '700', fontSize: 14 },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
 
   // Section label
   sectionLabel: {
-    fontSize: 12, fontWeight: '800', color: '#777',
+    fontSize: 11, fontWeight: '800', color: ct.gold,
     letterSpacing: 1.5, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
   },
 
@@ -1323,15 +1351,18 @@ const s = StyleSheet.create({
   content: { flex: 1 },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff',
+    marginHorizontal: 14, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: ct.surfaceRaised,
+    borderWidth: 1, borderColor: ct.goldLine, borderRadius: 14,
   },
   rowIcon: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 42, height: 42, borderRadius: 21, overflow: 'hidden', backgroundColor: ct.surfaceSoft,
+    borderWidth: 1, borderColor: ct.cyan,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  rowIconTxt: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  rowName: { flex: 1, fontSize: 15.5, color: '#E67E22', fontWeight: '600' },
-  rowArrow: { color: '#aaa', fontSize: 20, marginRight: 10 },
+  rowIconTxt: { color: ct.cyan, fontWeight: 'bold', fontSize: 15 },
+  profilePhoto: { width: '100%', height: '100%' },
+  rowName: { flex: 1, fontSize: 16, color: ct.text, fontWeight: '600' },
+  rowArrow: { marginRight: 8 },
   trashBtn: { padding: 6 },
   trashIcon: { fontSize: 18 },
   quickUploadBtn: { padding: 6, marginRight: 4 },
@@ -1339,50 +1370,52 @@ const s = StyleSheet.create({
 
   // Style row
   styleIcon: { fontSize: 20, marginRight: 14 },
-  styleRowName: { flex: 1, fontSize: 15.5, color: '#E91E63', fontWeight: '600' },
+  styleThumb: { width: 60, height: 48, borderRadius: 8, marginRight: 13, borderWidth: 1, borderColor: ct.gold },
+  styleRowName: { flex: 1, fontSize: 15.5, color: ct.text, fontWeight: '600' },
 
-  sep: { height: 1, backgroundColor: '#f0f0f0', marginLeft: 68 },
+  sep: { height: 9 },
 
   // Photo grid
-  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
-  loadingTxt: { color: '#888', fontSize: 14, textAlign: 'center', marginTop: 10 },
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 24, backgroundColor: ct.background },
+  loadingTxt: { color: ct.muted, fontSize: 14, textAlign: 'center', marginTop: 10 },
   emptyIcon: { fontSize: 60 },
-  emptyTxt: { color: '#888', fontSize: 15, textAlign: 'center', lineHeight: 26 },
+  emptyArtwork: { width: Math.min(width - 56, 300), height: Math.min(width - 56, 300), borderRadius: 20, borderWidth: 1, borderColor: ct.gold },
+  emptyTxt: { color: ct.gold, fontSize: 15, textAlign: 'center', lineHeight: 26, fontWeight: '700' },
   dateHeader: {
     paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8,
-    backgroundColor: '#111',
+     backgroundColor: ct.background,
   },
-  dateHeaderTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  dateHeaderSub: { color: '#aaa', fontSize: 12, marginTop: 2 },
-  photoList: { flex: 1, backgroundColor: '#111' },
-  photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: '#111' },
+   dateHeaderTxt: { color: ct.gold, fontSize: 15, fontWeight: '700' },
+   dateHeaderSub: { color: ct.muted, fontSize: 12, marginTop: 2 },
+   photoList: { flex: 1, backgroundColor: ct.background },
+   photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: ct.background },
   photoRow: { justifyContent: 'space-between', marginBottom: 2 },
   photoSelBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: ct.surfaceRaised,
     paddingHorizontal: 14, paddingVertical: 10, gap: 10,
   },
-  photoSelCancel: { color: '#aaa', fontSize: 18, fontWeight: 'bold' },
-  photoSelCount: { flex: 1, color: '#fff', fontWeight: '700', fontSize: 14 },
-  photoSelDeleteBtn: { backgroundColor: '#c62828', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  photoSelDeleteTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  photoSelCancel: { color: ct.muted, fontSize: 18, fontWeight: 'bold' },
+  photoSelCount: { flex: 1, color: ct.text, fontWeight: '700', fontSize: 14 },
+  photoSelDeleteBtn: { backgroundColor: ct.danger, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  photoSelDeleteTxt: { color: ct.background, fontWeight: 'bold', fontSize: 13 },
   photoWrap: { position: 'relative', width: PHOTO_SIZE },
   photoThumb: { width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 4 },
   photoWarningTile: {
     width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 4,
-    backgroundColor: '#3a2414', borderWidth: 1, borderColor: '#b56b2a',
+    backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.gold,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5,
   },
   photoWarningIcon: { fontSize: 22, marginBottom: 4 },
-  photoWarningTxt: { color: '#ffd7a0', fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  photoWarningTxt: { color: ct.gold, fontSize: 10, fontWeight: '700', textAlign: 'center' },
   photoSelOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(21,101,192,0.35)', borderRadius: 4,
+    backgroundColor: ct.selectionWash, borderRadius: 4,
     justifyContent: 'center', alignItems: 'center',
   },
-  photoSelCheck: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  photoSelCheck: { color: ct.text, fontSize: 26, fontWeight: 'bold' },
   photoDelete: {
     position: 'absolute', bottom: 4, right: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
+    backgroundColor: ct.deepScrim, borderRadius: 12,
     paddingHorizontal: 6, paddingVertical: 2,
   },
   photoDeleteTxt: { fontSize: 13 },
@@ -1390,11 +1423,11 @@ const s = StyleSheet.create({
   // Full view
   fullViewBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000', zIndex: 100,
+    backgroundColor: ct.overlay, zIndex: 100,
     justifyContent: 'center', alignItems: 'center',
   },
   fullViewClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
-  fullViewCloseTxt: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  fullViewCloseTxt: { color: ct.text, fontSize: 24, fontWeight: 'bold' },
   fullViewImg: { width, height: width * 1.3 },
   fullViewActions: {
     position: 'absolute', bottom: 50,
@@ -1402,103 +1435,104 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
   fullViewSave: {
-    flex: 1, backgroundColor: '#1B5E20', borderRadius: 12,
+    flex: 1, backgroundColor: ct.success, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
   },
-  fullViewSaveTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  fullViewSaveTxt: { color: ct.background, fontWeight: '700', fontSize: 15 },
   fullViewDelete: {
-    flex: 1, backgroundColor: '#C62828', borderRadius: 12,
+    flex: 1, backgroundColor: ct.danger, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
   },
-  fullViewDeleteTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  fullViewDeleteTxt: { color: ct.background, fontWeight: '700', fontSize: 15 },
 
   // New Folder dialog
   confirmOverlay: {
     ...StyleSheet.absoluteFillObject, zIndex: 200,
-    backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 30,
+    backgroundColor: ct.overlay, justifyContent: 'center', alignItems: 'center', padding: 24,
   },
-  confirmBox: { backgroundColor: '#1a2340', borderRadius: 18, padding: 24, width: '100%', alignItems: 'center' },
+  confirmBox: { backgroundColor: ct.surfaceRaised, borderRadius: 18, padding: 24, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: ct.goldLine },
   confirmIcon: { fontSize: 40, marginBottom: 10 },
-  confirmTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
-  confirmSub: { color: '#aaa', fontSize: 13, textAlign: 'center', marginBottom: 20 },
+  confirmTitle: { color: ct.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
+  confirmSub: { color: ct.muted, fontSize: 13, textAlign: 'center', marginBottom: 20 },
   confirmBtns: { flexDirection: 'row', gap: 12, width: '100%' },
-  confirmCancel: { flex: 1, backgroundColor: '#444', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  confirmCancelTxt: { color: '#ccc', fontWeight: '700', fontSize: 15 },
-  confirmDelete: { flex: 1, backgroundColor: '#c62828', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  confirmDeleteTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  confirmCancel: { flex: 1, backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.line, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  confirmCancelTxt: { color: ct.text, fontWeight: '700', fontSize: 15 },
+  confirmDelete: { flex: 1, backgroundColor: ct.danger, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  confirmDeleteTxt: { color: ct.background, fontWeight: '800', fontSize: 15 },
   dialogOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    flex: 1, backgroundColor: ct.overlay,
     justifyContent: 'center', alignItems: 'center', padding: 30,
   },
   dialogBox: {
-    backgroundColor: '#1a2340', borderRadius: 16,
-    padding: 24, width: '100%',
+    backgroundColor: ct.surfaceRaised, borderRadius: 16,
+    padding: 24, width: '100%', borderWidth: 1, borderColor: ct.goldLine,
   },
-  dialogTitle: { color: '#FFD700', fontSize: 20, fontWeight: '800', marginBottom: 8 },
-  dialogSub: { color: '#aaa', fontSize: 13, marginBottom: 16 },
+  dialogTitle: { color: ct.gold, fontSize: 20, fontWeight: '800', marginBottom: 8 },
+  dialogSub: { color: ct.muted, fontSize: 13, marginBottom: 16 },
   dialogInput: {
-    backgroundColor: '#fff', borderRadius: 10,
+    backgroundColor: ct.background, borderWidth: 1, borderColor: ct.line, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 16, color: '#111', marginBottom: 20,
+    fontSize: 16, color: ct.text, marginBottom: 20,
   },
   dialogBtns: { flexDirection: 'row', gap: 12 },
   dialogCancel: {
-    flex: 1, backgroundColor: '#444', borderRadius: 10,
+    flex: 1, backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.line, borderRadius: 10,
     paddingVertical: 13, alignItems: 'center',
   },
-  dialogCancelTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  dialogCancelTxt: { color: ct.text, fontWeight: '700', fontSize: 15 },
   dialogOk: {
-    flex: 2, backgroundColor: '#E67E22', borderRadius: 10,
+    flex: 2, backgroundColor: ct.cyanDeep, borderRadius: 10,
     paddingVertical: 13, alignItems: 'center',
   },
-  dialogOkTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  dialogOkTxt: { color: ct.text, fontWeight: '800', fontSize: 15 },
 
   // Upload progress
   progressBox: {
-    backgroundColor: '#1a2340', borderRadius: 18, padding: 30,
+    backgroundColor: ct.surfaceRaised, borderRadius: 18, padding: 30, borderWidth: 1, borderColor: ct.goldLine,
     width: '100%', alignItems: 'center', gap: 12,
   },
-  progressTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  progressCount: { color: '#E67E22', fontSize: 22, fontWeight: '800' },
+  progressTitle: { color: ct.text, fontSize: 18, fontWeight: '700' },
+  progressCount: { color: ct.gold, fontSize: 22, fontWeight: '800' },
   progressBarBg: {
-    width: '100%', height: 10, backgroundColor: '#333',
+    width: '100%', height: 10, backgroundColor: ct.surfaceSoft,
     borderRadius: 5, overflow: 'hidden',
   },
   progressBarFill: {
-    height: '100%', backgroundColor: '#E67E22', borderRadius: 5,
+    height: '100%', backgroundColor: ct.cyan, borderRadius: 5,
   },
 
   // ── Folder Browser styles ─────────────────────────────────────────────────
-  fbSafe: { flex: 1, backgroundColor: '#0d1117' },
+  fbSafe: { flex: 1, backgroundColor: ct.background },
   fbHeader: {
-    backgroundColor: '#1565C0', flexDirection: 'row', alignItems: 'center',
+    backgroundColor: ct.surface, flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 14, gap: 10,
   },
   fbBackBtn: { paddingHorizontal: 6, paddingVertical: 4 },
-  fbBackTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  fbBackTxt: { color: ct.gold, fontSize: 15, fontWeight: '700' },
   fbHeaderCenter: { flex: 1 },
-  fbHeaderTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  fbHeaderSub: { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 1 },
+  fbHeaderTitle: { color: ct.gold, fontSize: 17, fontWeight: '800' },
+  fbHeaderSub: { color: ct.muted, fontSize: 11, marginTop: 1 },
   fbSelCount: {
-    backgroundColor: '#E67E22', color: '#fff', fontWeight: '800',
+    backgroundColor: ct.cyanDeep, color: ct.text, fontWeight: '800',
     fontSize: 13, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
 
   // Albums list
   fbCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
-  fbLoadTxt: { color: '#aaa', fontSize: 14 },
+  fbLoadTxt: { color: ct.muted, fontSize: 14 },
   fbAlbumRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#111827',
+    marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.goldLine, borderRadius: 12,
   },
   fbAlbumThumbWrap: { marginRight: 14, position: 'relative' },
   fbAlbumThumb: { width: 60, height: 60, borderRadius: 8 },
-  fbFolderIconBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 1 },
+  fbFolderIconBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: ct.surface, borderRadius: 4, padding: 1 },
   fbAlbumInfo: { flex: 1 },
-  fbAlbumName: { color: '#e5e7eb', fontSize: 15, fontWeight: '600' },
-  fbAlbumCount: { color: '#6b7280', fontSize: 12, marginTop: 2 },
-  fbAlbumArrow: { color: '#6b7280', fontSize: 22 },
-  fbSep: { height: 1, backgroundColor: '#1f2937', marginLeft: 88 },
+  fbAlbumName: { color: ct.text, fontSize: 15, fontWeight: '600' },
+  fbAlbumCount: { color: ct.muted, fontSize: 12, marginTop: 2 },
+  fbAlbumArrow: { color: ct.gold, fontSize: 22 },
+  fbSep: { height: 8 },
 
   // Photos grid
   fbAssetWrap: {
@@ -1507,41 +1541,41 @@ const s = StyleSheet.create({
   fbAssetThumb: { width: '100%', height: '100%' },
   fbAssetOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(21,101,192,0.45)',
+    backgroundColor: ct.selectionWash,
     justifyContent: 'flex-start', alignItems: 'flex-end',
     padding: 5,
   },
   fbAssetCheck: {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: '#1565C0', borderWidth: 2, borderColor: '#fff',
+    backgroundColor: ct.cyanDeep, borderWidth: 2, borderColor: ct.gold,
     justifyContent: 'center', alignItems: 'center',
   },
-  fbAssetCheckTxt: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  fbAssetCheckTxt: { color: ct.text, fontSize: 13, fontWeight: 'bold' },
   fbAssetCheckEmpty: {
     position: 'absolute', top: 5, right: 5,
     width: 22, height: 22, borderRadius: 11,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 2, borderColor: ct.goldLine,
   },
 
   // Bottom Cut/Copy bar
   fbBottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 99,
-    backgroundColor: '#0f172a', borderTopWidth: 2, borderTopColor: '#E67E22',
+    backgroundColor: ct.surface, borderTopWidth: 2, borderTopColor: ct.gold,
     paddingHorizontal: 14, paddingVertical: 12, gap: 8,
   },
   fbBottomCount: {
-    color: '#e5e7eb', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 4,
+    color: ct.text, fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 4,
   },
   // CUT — big orange primary button
   fbCutBtnBig: {
-    backgroundColor: '#E67E22', borderRadius: 14,
+    backgroundColor: ct.cyanDeep, borderRadius: 14,
     paddingVertical: 16, alignItems: 'center',
   },
-  fbCutBtnBigTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  fbCutBtnBigTxt: { color: ct.text, fontSize: 15, fontWeight: '800' },
   // COPY — smaller secondary button
   fbCopyBtnSmall: {
-    backgroundColor: '#1f2937', borderRadius: 14, borderWidth: 1, borderColor: '#374151',
+    backgroundColor: ct.surfaceRaised, borderRadius: 14, borderWidth: 1, borderColor: ct.line,
     paddingVertical: 10, alignItems: 'center',
   },
-  fbCopyBtnSmallTxt: { color: '#9ca3af', fontSize: 13, fontWeight: '600' },
+  fbCopyBtnSmallTxt: { color: ct.muted, fontSize: 13, fontWeight: '600' },
 });

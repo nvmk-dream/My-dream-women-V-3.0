@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadToCloudinary, uploadUriToCloudinary, listCloudinaryImages, listCloudinaryVideos, listCloudinaryBackups, deleteFromCloudinary, trackCloudinaryUpload, CloudinaryBackup } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
+import { Ionicons } from '@expo/vector-icons';
+import { cloudTheme as ct } from '../constants/cloud-theme';
 
 const { width } = Dimensions.get('window');
 const THUMB = (width - 6) / 3;
@@ -76,13 +78,13 @@ export async function saveGeneratedImageToCloud(
 }
 
 const CATEGORIES = [
-  { key: 'all',      label: 'All',       icon: '🖼️' },
-  { key: 'ai',       label: 'AI',        icon: '🤖' },
-  { key: 'faceswap', label: 'Face Swap', icon: '🤳' },
-  { key: 'group',    label: 'Group',     icon: '👥' },
-  { key: 'videos',   label: 'Videos',    icon: '🎬' },
-  { key: 'app-icon', label: 'App Icon',  icon: '🎯' },
-  { key: 'zips',     label: 'ZIP Files', icon: '🗜️' },
+  { key: 'all',      label: 'All',       icon: 'images-outline' },
+  { key: 'ai',       label: 'AI',        icon: 'sparkles-outline' },
+  { key: 'faceswap', label: 'Face Swap', icon: 'people-outline' },
+  { key: 'group',    label: 'Group',     icon: 'people-circle-outline' },
+  { key: 'videos',   label: 'Videos',    icon: 'videocam-outline' },
+  { key: 'app-icon', label: 'App Icon',  icon: 'aperture-outline' },
+  { key: 'zips',     label: 'ZIP Files', icon: 'archive-outline' },
 ];
 
 const APP_ICON_KEY = 'my_girls_app_icons';
@@ -171,7 +173,7 @@ export default function CloudStorageScreen() {
       }));
       setSecretsSaved(true);
       setSecretsModal(false);
-      Alert.alert('✅ Saved!', 'Cloud secrets securely saved ஆனது!');
+      Alert.alert('Saved!', 'Cloud secrets securely saved ஆனது!');
     } catch {
       Alert.alert('பிழை', 'Save பண்ண முடியல');
     } finally {
@@ -184,7 +186,7 @@ export default function CloudStorageScreen() {
     setCloudName(''); setCloudApiKey(''); setCloudApiSecret('');
     setSecretsSaved(false);
     setSecretsModal(false);
-    Alert.alert('🗑️ Cleared', 'Cloud secrets delete ஆனது');
+    Alert.alert('Cleared', 'Cloud secrets delete ஆனது');
   }, []);
 
   const uploadAppIcon = useCallback(async () => {
@@ -211,7 +213,7 @@ export default function CloudStorageScreen() {
       list.unshift(newIcon);
       await AsyncStorage.setItem(APP_ICON_KEY, JSON.stringify(list.slice(0, 10)));
       setAppIcons(list.slice(0, 10));
-      Alert.alert('✅ Upload ஆச்சு!', 'App Icon Cloudinary-ல் save ஆனது.\nAPK build trigger பண்ணினா புது icon-ஓட APK கிடைக்கும்!');
+      Alert.alert('Upload ஆச்சு!', 'App Icon Cloudinary-ல் save ஆனது.\nAPK build trigger பண்ணினா புது icon-ஓட APK கிடைக்கும்!');
     } catch (e: any) {
       Alert.alert('Upload பிழை', e?.message || 'மீண்டும் try பண்ணுங்க');
     } finally {
@@ -260,7 +262,7 @@ export default function CloudStorageScreen() {
       await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(list.slice(0, 100)));
       setVideos(list.slice(0, 100));
       Alert.alert(
-        '✅ Video Upload ஆச்சு!',
+        'Video Upload ஆச்சு!',
         `"${selectedPersona}" folder-ல் save ஆனது!\n\nChat-ல் "video வேணும்" என்று type பண்ணினா இந்த video வரும்!`,
       );
     } catch (e: any) {
@@ -292,7 +294,7 @@ export default function CloudStorageScreen() {
       const updated = [zip, ...zipFiles.filter(z => z.public_id !== zip.public_id)];
       setZipFiles(updated);
       await AsyncStorage.setItem(LOCAL_ZIP_KEY, JSON.stringify(updated));
-      Alert.alert('✅ ZIP Upload ஆச்சு!', 'Projects folder-ல் save ஆனது.\n\n' + zip.fileName);
+      Alert.alert('ZIP Upload ஆச்சு!', 'Projects folder-ல் save ஆனது.\n\n' + zip.fileName);
     } catch (e: any) {
       Alert.alert('ZIP Upload பிழை', e?.message || 'ZIP upload முடியல. மீண்டும் try பண்ணுங்க');
     } finally {
@@ -322,7 +324,7 @@ export default function CloudStorageScreen() {
       }
       await AsyncStorage.setItem(LOCAL_VIDEO_KEY, JSON.stringify(allVideos.slice(0, 100)));
       setVideos(allVideos);
-      Alert.alert('✅ Sync ஆச்சு!', `${allVideos.length} videos found!`);
+      Alert.alert('Sync ஆச்சு!', `${allVideos.length} videos found!`);
     } catch (e: any) {
       Alert.alert('Sync பிழை', e?.message || 'Video sync முடியல');
     } finally {
@@ -365,11 +367,11 @@ export default function CloudStorageScreen() {
       const isServer = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('connect') || errMsg.includes('timeout');
       if (isServer) {
         Alert.alert(
-          '⚠️ Server Wake ஆகுது',
+          'Server Wake ஆகுது',
           `Render server sleep mode-ல் இருக்கு.\n\n⏳ 30-60 seconds காத்திரு, பிறகு Retry பண்ணு.\n\nSettings → Custom Server URL-ல் வேற server set பண்ணலாம்.`,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: '🔄 Retry (30s)', onPress: () => setTimeout(() => syncFromCloud(), 30000) },
+            { text: 'Retry (30s)', onPress: () => setTimeout(() => syncFromCloud(), 30000) },
           ]
         );
       } else {
@@ -454,21 +456,21 @@ export default function CloudStorageScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerCloud}>☁️</Text>
+          <Ionicons name="cloud-outline" size={25} color={ct.cyan} />
           <Text style={styles.headerTitle}>My Cloud</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.syncBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
             {fetchingCloud
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.syncBtnTxt}>🔄 Sync</Text>
+              ? <ActivityIndicator color={ct.text} size="small" />
+              : <View style={styles.iconLabel}><Ionicons name="sync-outline" size={16} color={ct.background} /><Text style={styles.syncBtnTxt}>Sync</Text></View>
             }
           </TouchableOpacity>
           <TouchableOpacity style={styles.secretBtn} onPress={() => setSecretsModal(true)}>
-            <Text style={styles.secretBtnTxt}>{secretsSaved ? '🔐' : '🔓'}</Text>
+            <Ionicons name={secretsSaved ? 'lock-closed-outline' : 'lock-open-outline'} size={19} color={ct.gold} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')}>
-            <Text style={styles.headerGear}>⚙️</Text>
+            <Ionicons name="settings-outline" size={22} color={ct.gold} />
           </TouchableOpacity>
         </View>
       </View>
@@ -479,15 +481,15 @@ export default function CloudStorageScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadLocalImages(); }}
-            tintColor="#6C63FF"
+            tintColor={ct.cyan}
           />
         }
       >
-        {/* ☁️ Cloud Secrets Card */}
+        {/* Cloud Secrets Card */}
         <View style={styles.secretsCard}>
           <View style={styles.secretsCardHeader}>
             <Text style={styles.secretsCardTitle}>
-              {secretsSaved ? '🔐' : '🔓'} Cloud Secrets
+              Cloud Secrets
             </Text>
             <TouchableOpacity style={styles.secretsEditBtn} onPress={() => setSecretsModal(true)}>
               <Text style={styles.secretsEditTxt}>{secretsSaved ? 'Edit' : '+ Add'}</Text>
@@ -498,46 +500,46 @@ export default function CloudStorageScreen() {
             <View style={styles.secretsChips}>
               <TouchableOpacity
                 style={styles.secretChip}
-                onPress={async () => { await Clipboard.setStringAsync(cloudName); Alert.alert('📋', 'Cloud Name copied!'); }}
+                onPress={async () => { await Clipboard.setStringAsync(cloudName); Alert.alert('Copied', 'Cloud Name copied!'); }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.secretChipIcon}>☁️</Text>
+                <Ionicons name="cloud-outline" size={19} color={ct.cyan} style={styles.secretChipIcon} />
                 <View style={styles.secretChipInfo}>
                   <Text style={styles.secretChipLabel}>CLOUD NAME</Text>
                   <Text style={styles.secretChipValue}>{cloudName}</Text>
                 </View>
-                <Text style={styles.secretChipCopy}>📋</Text>
+                <Ionicons name="copy-outline" size={18} color={ct.gold} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secretChip}
-                onPress={async () => { await Clipboard.setStringAsync(cloudApiKey); Alert.alert('📋', 'API Key copied!'); }}
+                onPress={async () => { await Clipboard.setStringAsync(cloudApiKey); Alert.alert('Copied', 'API Key copied!'); }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.secretChipIcon}>🔑</Text>
+                <Ionicons name="key-outline" size={19} color={ct.gold} style={styles.secretChipIcon} />
                 <View style={styles.secretChipInfo}>
                   <Text style={styles.secretChipLabel}>API KEY</Text>
                   <Text style={styles.secretChipValue}>{cloudApiKey.slice(0, 6)}{'●'.repeat(Math.max(0, cloudApiKey.length - 6))}</Text>
                 </View>
-                <Text style={styles.secretChipCopy}>📋</Text>
+                <Ionicons name="copy-outline" size={18} color={ct.gold} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secretChip}
-                onPress={async () => { await Clipboard.setStringAsync(cloudApiSecret); Alert.alert('📋', 'API Secret copied!'); }}
+                onPress={async () => { await Clipboard.setStringAsync(cloudApiSecret); Alert.alert('Copied', 'API Secret copied!'); }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.secretChipIcon}>🔒</Text>
+                <Ionicons name="lock-closed-outline" size={19} color={ct.cyan} style={styles.secretChipIcon} />
                 <View style={styles.secretChipInfo}>
                   <Text style={styles.secretChipLabel}>API SECRET</Text>
                   <Text style={styles.secretChipValue}>{'●'.repeat(Math.min(cloudApiSecret.length, 20))}</Text>
                 </View>
-                <Text style={styles.secretChipCopy}>📋</Text>
+                <Ionicons name="copy-outline" size={18} color={ct.gold} />
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity style={styles.secretsEmptyBtn} onPress={() => setSecretsModal(true)}>
-              <Text style={styles.secretsEmptyTxt}>🔓 Tap to add Cloudinary credentials</Text>
+              <Text style={styles.secretsEmptyTxt}>Tap to add Cloudinary credentials</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -551,7 +553,7 @@ export default function CloudStorageScreen() {
               style={[styles.catCard, activeCategory === cat.key && styles.catCardActive]}
               onPress={() => setActiveCategory(cat.key)}
             >
-              <Text style={styles.catIcon}>{cat.icon}</Text>
+              <Ionicons name={cat.icon as any} size={24} color={activeCategory === cat.key ? ct.gold : ct.cyan} style={styles.catIcon} />
               <Text style={[styles.catLabel, activeCategory === cat.key && styles.catLabelActive]}>
                 {cat.label}
               </Text>
@@ -566,7 +568,7 @@ export default function CloudStorageScreen() {
 
         <View style={styles.storageInfo}>
           <Text style={styles.storageTitle}>
-            {activeCategory === 'videos' ? '🎬 Videos — my-girls/videos/' : '☁️ Cloudinary — my-girls folder'}
+            {activeCategory === 'videos' ? 'Videos — my-girls/videos/' : 'Cloudinary — my-girls folder'}
           </Text>
           <Text style={styles.storageCount}>
             {activeCategory === 'videos' ? `${videos.length} videos` : `${images.length} images`}
@@ -586,10 +588,10 @@ export default function CloudStorageScreen() {
                   </TouchableOpacity>
                   <View style={styles.subfolderTitleWrap}>
                     <Text style={styles.subfolderTitle}>
-                      {(femalePersonas.find((p: any) => p.name === selectedVideoPersona) as any)?.emoji || '👩'} {selectedVideoPersona}
+                      {selectedVideoPersona}
                     </Text>
                     <Text style={styles.subfolderPath}>
-                      📁 my-girls/videos/{selectedVideoPersona.toLowerCase()}/
+                      my-girls/videos/{selectedVideoPersona.toLowerCase()}/
                     </Text>
                   </View>
                 </View>
@@ -601,8 +603,8 @@ export default function CloudStorageScreen() {
                   disabled={uploadingVideo}
                 >
                   {uploadingVideo
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.videoUploadBtnTxt}>📤 Video Upload பண்ணுங்கள்</Text>
+                    ? <ActivityIndicator color={ct.text} size="small" />
+                    : <Text style={styles.videoUploadBtnTxt}>Video Upload பண்ணுங்கள்</Text>
                   }
                 </TouchableOpacity>
 
@@ -613,15 +615,15 @@ export default function CloudStorageScreen() {
                   disabled={loadingVideos}
                 >
                   {loadingVideos
-                    ? <ActivityIndicator color="#6C63FF" size="small" />
-                    : <Text style={styles.syncVideosBtnTxt}>🔄 Cloud Sync</Text>
+                    ? <ActivityIndicator color={ct.cyan} size="small" />
+                    : <Text style={styles.syncVideosBtnTxt}>Cloud Sync</Text>
                   }
                 </TouchableOpacity>
 
                 {/* Video list for this character */}
                 {videos.filter(v => v.personaName === selectedVideoPersona).length === 0 ? (
                   <View style={styles.videoEmpty}>
-                    <Text style={styles.videoEmptyIcon}>🎬</Text>
+                    <Ionicons name="videocam-outline" size={44} color={ct.cyan} />
                     <Text style={styles.videoEmptyTitle}>Video இல்லை</Text>
                     <Text style={styles.videoEmptyHint}>
                       மேலே Upload பண்ணுங்கள்{'\n'}அல்லது Cloud Sync பண்ணுங்கள்
@@ -632,7 +634,7 @@ export default function CloudStorageScreen() {
                     {videos.filter(v => v.personaName === selectedVideoPersona).map((vid) => (
                       <View key={vid.public_id} style={styles.videoItem}>
                         <View style={styles.videoItemLeft}>
-                          <Text style={styles.videoItemIcon}>🎬</Text>
+                          <Ionicons name="videocam-outline" size={25} color={ct.cyan} style={styles.videoItemIcon} />
                           <View style={styles.videoItemInfo}>
                             <Text style={styles.videoItemPersona} numberOfLines={1}>
                               {vid.public_id.split('/').pop()}
@@ -658,7 +660,7 @@ export default function CloudStorageScreen() {
                               ])
                             }
                           >
-                            <Text style={styles.videoDeleteBtnTxt}>🗑️</Text>
+                            <Ionicons name="trash-outline" size={18} color={ct.gold} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -669,7 +671,7 @@ export default function CloudStorageScreen() {
             ) : (
               /* ── Character grid view ── */
               <View>
-                <Text style={styles.videoGridTitle}>👩 Girl தேர்வு செய்யுங்கள்</Text>
+                <Text style={styles.videoGridTitle}>Girl தேர்வு செய்யுங்கள்</Text>
                 <Text style={styles.videoGridHint}>
                   Girl card-ஐ tap பண்ணி video upload பண்ணுங்கள்.{'\n'}
                   Chat-ல் "video வேணும்" என்று கேட்டால் அந்த video வரும்!
@@ -682,8 +684,8 @@ export default function CloudStorageScreen() {
                   disabled={loadingVideos}
                 >
                   {loadingVideos
-                    ? <ActivityIndicator color="#6C63FF" size="small" />
-                    : <Text style={styles.syncVideosBtnTxt}>🔄 எல்லா Girls Videos Sync</Text>
+                    ? <ActivityIndicator color={ct.cyan} size="small" />
+                    : <Text style={styles.syncVideosBtnTxt}>எல்லா Girls Videos Sync</Text>
                   }
                 </TouchableOpacity>
 
@@ -698,8 +700,8 @@ export default function CloudStorageScreen() {
                         onPress={() => setSelectedVideoPersona(p.name)}
                         activeOpacity={0.75}
                       >
-                        <View style={[styles.characterAvatar, { backgroundColor: p.avatarColor }]}>
-                          <Text style={styles.characterAvatarTxt}>{p.emoji}</Text>
+                        <View style={styles.characterAvatar}>
+                          <Text style={styles.characterAvatarTxt}>{p.avatarLetter || p.name.charAt(0)}</Text>
                           {count > 0 && (
                             <View style={styles.videoBadge}>
                               <Text style={styles.videoBadgeTxt}>{count}</Text>
@@ -708,7 +710,7 @@ export default function CloudStorageScreen() {
                         </View>
                         <Text style={styles.characterName} numberOfLines={2}>{p.name}</Text>
                         <Text style={styles.characterVideoCount}>
-                          {count > 0 ? `🎬 ${count}` : 'tap to add'}
+                          {count > 0 ? `${count} videos` : 'tap to add'}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -721,20 +723,20 @@ export default function CloudStorageScreen() {
         ) : activeCategory === 'zips' ? (
           <View style={styles.appIconSection}>
             <View style={styles.appIconHeader}>
-              <View><Text style={styles.appIconTitle}>🗜️ Project ZIP Files</Text><Text style={styles.appIconSub}>Cloudinary: {ZIP_FOLDER}/ (including sub-folders)</Text></View>
+              <View><Text style={styles.appIconTitle}>Project ZIP Files</Text><Text style={styles.appIconSub}>Cloudinary: {ZIP_FOLDER}/ (including sub-folders)</Text></View>
               <TouchableOpacity style={[styles.appIconUploadBtn, uploadingZip && { opacity: 0.6 }]} onPress={uploadZip} disabled={uploadingZip}>
-                {uploadingZip ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.appIconUploadTxt}>📤 Upload ZIP</Text>}
+                {uploadingZip ? <ActivityIndicator color={ct.text} size="small" /> : <Text style={styles.appIconUploadTxt}>Upload ZIP</Text>}
               </TouchableOpacity>
             </View>
-            <View style={styles.appIconInfo}><Text style={styles.appIconInfoTxt}>📌 File Manager திறக்கும் → ZIP file select → Cloudinary raw folder-ல் save ஆகும்</Text></View>
-            {zipFiles.length === 0 ? <View style={styles.appIconEmpty}><Text style={styles.appIconEmptyIcon}>🗜️</Text><Text style={styles.appIconEmptyTxt}>ZIP files இல்லை</Text><Text style={styles.appIconEmptyHint}>மேலே Upload ZIP அழுத்துங்கள்</Text></View> :
-              <View>{zipFiles.map(zip => <View key={zip.public_id} style={{ backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}><Text style={{ fontSize: 28, marginRight: 12 }}>🗜️</Text><View style={{ flex: 1 }}><Text style={{ color: '#fff', fontWeight: '700' }} numberOfLines={1}>{zip.fileName}</Text><Text style={{ color: '#888', fontSize: 11, marginTop: 4 }}>{zip.format || 'zip'} · {zip.backupDate ? new Date(zip.backupDate).toLocaleDateString('ta-IN') : ''}</Text></View><TouchableOpacity onPress={() => Linking.openURL(zip.url)} style={{ backgroundColor: '#6C63FF', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}><Text style={{ color: '#fff', fontWeight: '700' }}>Open</Text></TouchableOpacity></View>)}</View>}
+            <View style={styles.appIconInfo}><Text style={styles.appIconInfoTxt}>File Manager திறக்கும் → ZIP file select → Cloudinary raw folder-ல் save ஆகும்</Text></View>
+            {zipFiles.length === 0 ? <View style={styles.appIconEmpty}><Ionicons name="archive-outline" size={42} color={ct.gold} /><Text style={styles.appIconEmptyTxt}>ZIP files இல்லை</Text><Text style={styles.appIconEmptyHint}>மேலே Upload ZIP அழுத்துங்கள்</Text></View> :
+              <View>{zipFiles.map(zip => <View key={zip.public_id} style={{ backgroundColor: ct.surfaceRaised, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}><Ionicons name="archive-outline" size={28} color={ct.gold} style={{ marginRight: 12 }} /><View style={{ flex: 1 }}><Text style={{ color: ct.text, fontWeight: '700' }} numberOfLines={1}>{zip.fileName}</Text><Text style={{ color: ct.muted, fontSize: 11, marginTop: 4 }}>{zip.format || 'zip'} · {zip.backupDate ? new Date(zip.backupDate).toLocaleDateString('ta-IN') : ''}</Text></View><TouchableOpacity onPress={() => Linking.openURL(zip.url)} style={{ backgroundColor: ct.cyanDeep, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}><Text style={{ color: ct.text, fontWeight: '700' }}>Open</Text></TouchableOpacity></View>)}</View>}
           </View>
         ) : activeCategory === 'app-icon' ? (
           <View style={styles.appIconSection}>
             <View style={styles.appIconHeader}>
               <View>
-                <Text style={styles.appIconTitle}>🎯 App Icon Folder</Text>
+                <Text style={styles.appIconTitle}>App Icon Folder</Text>
                 <Text style={styles.appIconSub}>Cloudinary: my-girls/app-icon/</Text>
               </View>
               <TouchableOpacity
@@ -743,22 +745,22 @@ export default function CloudStorageScreen() {
                 disabled={uploadingIcon}
               >
                 {uploadingIcon
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.appIconUploadTxt}>📤 Upload Icon</Text>
+                  ? <ActivityIndicator color={ct.text} size="small" />
+                  : <Text style={styles.appIconUploadTxt}>Upload Icon</Text>
                 }
               </TouchableOpacity>
             </View>
 
             <View style={styles.appIconInfo}>
               <Text style={styles.appIconInfoTxt}>
-                📌 File Manager திறக்கும் → Folder navigate → Image select → Cloudinary upload{'\n'}
-                🔨 APK build-ல் latest icon auto-fetch ஆகும்
+                File Manager திறக்கும் → Folder navigate → Image select → Cloudinary upload{'\n'}
+                APK build-ல் latest icon auto-fetch ஆகும்
               </Text>
             </View>
 
             {appIcons.length === 0 ? (
               <View style={styles.appIconEmpty}>
-                <Text style={styles.appIconEmptyIcon}>🎯</Text>
+                <Ionicons name="aperture-outline" size={42} color={ct.gold} />
                 <Text style={styles.appIconEmptyTxt}>Icon upload ஆகல</Text>
                 <Text style={styles.appIconEmptyHint}>Upload பண்ணினா APK-ல் உங்கள் icon வரும்!</Text>
               </View>
@@ -776,7 +778,7 @@ export default function CloudStorageScreen() {
                       style={styles.appIconDeleteBtn}
                       onPress={() => setDeleteConfirm(icon)}
                     >
-                      <Text style={styles.appIconDeleteTxt}>🗑️</Text>
+                      <Ionicons name="trash-outline" size={16} color={ct.gold} />
                     </TouchableOpacity>
                     <Text style={styles.appIconDate}>
                       {new Date(icon.createdAt).toLocaleDateString('ta-IN')}
@@ -787,7 +789,7 @@ export default function CloudStorageScreen() {
             )}
           </View>
         ) : loading ? (
-          <ActivityIndicator color="#6C63FF" size="large" style={{ marginTop: 60 }} />
+          <ActivityIndicator color={ct.cyan} size="large" style={{ marginTop: 60 }} />
         ) : (
           <>
             {images.length === 0 && (
@@ -795,12 +797,12 @@ export default function CloudStorageScreen() {
                 <Text style={styles.syncCardTitle}>Cloud-ல் images இல்லை</Text>
                 <Text style={styles.syncCardText}>
                   Chat-ல் AI image generate பண்ணா auto-save ஆகும்.{'\n'}
-                  🔄 Sync button tap பண்ணி Cloudinary-ல் உள்ள images fetch பண்ணலாம்.
+                  Sync button tap பண்ணி Cloudinary-ல் உள்ள images fetch பண்ணலாம்.
                 </Text>
                 <TouchableOpacity style={styles.syncCardBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
                   {fetchingCloud
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.syncCardBtnTxt}>🔄 Sync from Cloud</Text>
+                    ? <ActivityIndicator color={ct.text} size="small" />
+                    : <Text style={styles.syncCardBtnTxt}>Sync from Cloud</Text>
                   }
                 </TouchableOpacity>
               </View>
@@ -809,18 +811,18 @@ export default function CloudStorageScreen() {
             {selectionMode && selectedIds.size > 0 && (
               <View style={styles.selBar}>
                 <TouchableOpacity onPress={exitSelectionMode}>
-                  <Text style={styles.selBarCancel}>✕</Text>
+                  <Ionicons name="close" size={19} color={ct.muted} />
                 </TouchableOpacity>
                 <Text style={styles.selBarCount}>{selectedIds.size} selected</Text>
                 <TouchableOpacity style={styles.selBarDelete} onPress={deleteSelected}>
-                  <Text style={styles.selBarDeleteTxt}>🗑️ Delete</Text>
+                  <Text style={styles.selBarDeleteTxt}>Delete</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {filtered.length === 0 && images.length > 0 ? (
               <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔍</Text>
+                <Ionicons name="search-outline" size={42} color={ct.gold} />
                 <Text style={styles.emptyText}>{activeCategory} category-ல் images இல்லை</Text>
               </View>
             ) : (
@@ -837,7 +839,7 @@ export default function CloudStorageScreen() {
                       <Image source={{ uri: img.url }} style={[styles.thumb, isSel && { opacity: 0.6 }]} resizeMode="cover" />
                       {isSel && (
                         <View style={styles.thumbCheck}>
-                          <Text style={styles.thumbCheckTxt}>✓</Text>
+                          <Ionicons name="checkmark" size={20} color={ct.text} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -853,7 +855,7 @@ export default function CloudStorageScreen() {
         {preview && (
           <View style={styles.modalBg}>
             <TouchableOpacity style={styles.modalClose} onPress={() => setPreview(null)}>
-              <Text style={styles.modalCloseText}>✕</Text>
+              <Ionicons name="close" size={24} color={ct.text} />
             </TouchableOpacity>
             <Image source={{ uri: preview.url }} style={styles.fullImg} resizeMode="contain" />
             <View style={styles.modalActions}>
@@ -864,27 +866,27 @@ export default function CloudStorageScreen() {
                 </Text>
               </View>
               <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteImage(preview)}>
-                <Text style={styles.deleteBtnText}>🗑️ Delete</Text>
+                <Text style={styles.deleteBtnText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
       </Modal>
 
-      {/* ☁️ Cloud Secret Box Modal */}
+      {/* Cloud Secret Box Modal */}
       <Modal visible={secretsModal} transparent animationType="slide" onRequestClose={() => setSecretsModal(false)}>
         <View style={styles.secOverlay}>
           <View style={styles.secBox}>
             <View style={styles.secHeaderRow}>
-              <Text style={styles.secTitle}>☁️ Cloud Secret Box</Text>
+              <Text style={styles.secTitle}>Cloud Secret Box</Text>
               <TouchableOpacity onPress={() => setSecretsModal(false)}>
-                <Text style={styles.secClose}>✕</Text>
+                <Ionicons name="close" size={22} color={ct.text} />
               </TouchableOpacity>
             </View>
 
             {secretsSaved && (
               <View style={styles.secSavedBanner}>
-                <Text style={styles.secSavedTxt}>🔐 Secrets saved & ready!</Text>
+                <Text style={styles.secSavedTxt}>Secrets saved & ready!</Text>
               </View>
             )}
 
@@ -893,58 +895,58 @@ export default function CloudStorageScreen() {
               cloudinary.com → Dashboard-ல் பார்க்கலாம்.
             </Text>
 
-            <Text style={styles.secLabel}>☁️ Cloud Name</Text>
+            <Text style={styles.secLabel}>Cloud Name</Text>
             <View style={styles.secInputRow}>
               <TextInput
                 style={styles.secInput}
                 value={cloudName}
                 onChangeText={setCloudName}
                 placeholder="e.g. dazmrxsyc"
-                placeholderTextColor="#555"
+                placeholderTextColor={ct.muted}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
               {cloudName.length > 0 && (
-                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudName); Alert.alert('📋 Copied!', 'Cloud Name copied'); }}>
-                  <Text style={styles.secCopyTxt}>📋</Text>
+                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudName); Alert.alert('Copied!', 'Cloud Name copied'); }}>
+                  <Ionicons name="copy-outline" size={18} color={ct.gold} />
                 </TouchableOpacity>
               )}
             </View>
 
-            <Text style={styles.secLabel}>🔑 API Key</Text>
+            <Text style={styles.secLabel}>API Key</Text>
             <View style={styles.secInputRow}>
               <TextInput
                 style={styles.secInput}
                 value={cloudApiKey}
                 onChangeText={setCloudApiKey}
                 placeholder="123456789012345"
-                placeholderTextColor="#555"
+                placeholderTextColor={ct.muted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="numeric"
               />
               {cloudApiKey.length > 0 && (
-                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudApiKey); Alert.alert('📋 Copied!', 'API Key copied'); }}>
-                  <Text style={styles.secCopyTxt}>📋</Text>
+                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudApiKey); Alert.alert('Copied!', 'API Key copied'); }}>
+                  <Ionicons name="copy-outline" size={18} color={ct.gold} />
                 </TouchableOpacity>
               )}
             </View>
 
-            <Text style={styles.secLabel}>🔒 API Secret</Text>
+            <Text style={styles.secLabel}>API Secret</Text>
             <View style={styles.secInputRow}>
               <TextInput
                 style={styles.secInput}
                 value={cloudApiSecret}
                 onChangeText={setCloudApiSecret}
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxx"
-                placeholderTextColor="#555"
+                placeholderTextColor={ct.muted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry
               />
               {cloudApiSecret.length > 0 && (
-                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudApiSecret); Alert.alert('📋 Copied!', 'API Secret copied'); }}>
-                  <Text style={styles.secCopyTxt}>📋</Text>
+                <TouchableOpacity style={styles.secCopyBtn} onPress={async () => { await Clipboard.setStringAsync(cloudApiSecret); Alert.alert('Copied!', 'API Secret copied'); }}>
+                  <Ionicons name="copy-outline" size={18} color={ct.gold} />
                 </TouchableOpacity>
               )}
             </View>
@@ -952,13 +954,13 @@ export default function CloudStorageScreen() {
             <View style={styles.secBtns}>
               {secretsSaved && (
                 <TouchableOpacity style={styles.secClearBtn} onPress={() => Alert.alert('Delete?', 'Secrets delete பண்ணட்டுமா?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: clearSecrets }])}>
-                  <Text style={styles.secClearTxt}>🗑 Clear</Text>
+                  <Text style={styles.secClearTxt}>Clear</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.secSaveBtn} onPress={saveSecrets} disabled={savingSecrets}>
                 {savingSecrets
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.secSaveTxt}>💾 Save Secrets</Text>
+                  ? <ActivityIndicator color={ct.text} size="small" />
+                  : <Text style={styles.secSaveTxt}>Save Secrets</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -970,7 +972,7 @@ export default function CloudStorageScreen() {
       {deleteConfirm && (
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
-            <Text style={styles.confirmIcon}>🗑️</Text>
+            <Ionicons name="trash-outline" size={30} color={ct.gold} />
             <Text style={styles.confirmTitle}>Delete பண்ணட்டுமா?</Text>
             <Text style={styles.confirmSub}>Cloud-லயும் local-லயும் remove ஆகும்</Text>
             <View style={styles.confirmBtns}>
@@ -989,24 +991,26 @@ export default function CloudStorageScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1a1a2e' },
+  safe: { flex: 1, backgroundColor: ct.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#16213e',
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: ct.surface,
+    borderBottomWidth: 1, borderBottomColor: ct.goldLine,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerCloud: { fontSize: 24 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  headerTitle: { color: ct.gold, fontSize: 21, fontWeight: 'bold' },
   headerGear: { fontSize: 22 },
   syncBtn: {
-    backgroundColor: '#6C63FF', borderRadius: 8,
+    backgroundColor: ct.cyan, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 6, minWidth: 70, alignItems: 'center',
   },
-  syncBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  syncBtnTxt: { color: ct.background, fontSize: 13, fontWeight: '800' },
+  iconLabel: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   scroll: { flex: 1 },
   sectionLabel: {
-    color: '#aaa', fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
+    color: ct.gold, fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
     paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10,
   },
   catWrap: {
@@ -1016,324 +1020,325 @@ const styles = StyleSheet.create({
   catCard: {
     width: (width - 56) / 3,
     alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4,
-    backgroundColor: '#16213e', borderRadius: 16, borderWidth: 1.5, borderColor: '#2a2a4a',
+    backgroundColor: ct.surfaceRaised, borderRadius: 15, borderWidth: 1, borderColor: ct.line,
   },
-  catCardActive: { borderColor: '#6C63FF', backgroundColor: '#2d2b55' },
-  catIcon: { fontSize: 28, marginBottom: 6 },
-  catLabel: { color: '#aaa', fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  catLabelActive: { color: '#6C63FF' },
+  catCardActive: { borderColor: ct.gold, backgroundColor: ct.surfaceSoft },
+  catIcon: { marginBottom: 6 },
+  catLabel: { color: ct.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  catLabelActive: { color: ct.gold },
   catBadge: {
-    position: 'absolute', top: 6, right: 6, backgroundColor: '#6C63FF',
+    position: 'absolute', top: 6, right: 6, backgroundColor: ct.cyanDeep,
     borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
   },
-  catBadgeText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
+  catBadgeText: { color: ct.text, fontSize: 9, fontWeight: 'bold' },
   storageInfo: {
-    margin: 16, padding: 14, backgroundColor: '#16213e', borderRadius: 12,
-    borderWidth: 1, borderColor: '#2a2a4a',
+    margin: 16, padding: 14, backgroundColor: ct.surfaceRaised, borderRadius: 14,
+    borderWidth: 1, borderColor: ct.goldLine,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  storageTitle: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  storageCount: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold' },
+  storageTitle: { color: ct.text, fontSize: 13, fontWeight: '600' },
+  storageCount: { color: ct.cyan, fontSize: 13, fontWeight: 'bold' },
 
   // ── Video styles ──────────────────────────────────────────
   videoSection: { paddingHorizontal: 14, paddingBottom: 30 },
   videoUploadCard: {
-    backgroundColor: '#0d1b2a', borderRadius: 16, padding: 18,
-    borderWidth: 1.5, borderColor: '#1565C0', marginBottom: 14,
+    backgroundColor: ct.surfaceRaised, borderRadius: 16, padding: 18,
+    borderWidth: 1.5, borderColor: ct.line, marginBottom: 14,
   },
-  videoUploadTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
-  videoUploadHint: { color: '#aaa', fontSize: 12, lineHeight: 18, marginBottom: 14 },
-  videoPersonaLabel: { color: '#60a5fa', fontSize: 13, fontWeight: '700', marginBottom: 10 },
+  videoUploadTitle: { color: ct.text, fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
+  videoUploadHint: { color: ct.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 },
+  videoPersonaLabel: { color: ct.cyan, fontSize: 13, fontWeight: '700', marginBottom: 10 },
   personaRow: { flexDirection: 'row', gap: 10 },
   personaChip: {
     alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14,
-    backgroundColor: '#16213e', borderRadius: 14, borderWidth: 1.5, borderColor: '#2a2a4a',
+    backgroundColor: ct.surfaceRaised, borderRadius: 14, borderWidth: 1.5, borderColor: ct.line,
   },
-  personaChipActive: { borderColor: '#6C63FF', backgroundColor: '#2d2b55' },
+  personaChipActive: { borderColor: ct.gold, backgroundColor: ct.surfaceSoft },
   personaChipEmoji: { fontSize: 22, marginBottom: 4 },
-  personaChipName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
-  personaChipNameActive: { color: '#6C63FF' },
+  personaChipName: { color: ct.muted, fontSize: 11, fontWeight: '600' },
+  personaChipNameActive: { color: ct.gold },
   selectedPersonaBox: {
-    backgroundColor: '#0a2540', borderRadius: 10, padding: 10, marginBottom: 14,
-    borderWidth: 1, borderColor: '#1565C0',
+    backgroundColor: ct.surfaceRaised, borderRadius: 10, padding: 10, marginBottom: 14,
+    borderWidth: 1, borderColor: ct.line,
   },
-  selectedPersonaText: { color: '#60a5fa', fontSize: 12, fontFamily: 'monospace' },
+  selectedPersonaText: { color: ct.cyan, fontSize: 12, fontFamily: 'monospace' },
   videoUploadBtn: {
-    backgroundColor: '#1565C0', borderRadius: 12,
+    backgroundColor: ct.cyanDeep, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
   },
-  videoUploadBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  videoUploadBtnTxt: { color: ct.text, fontSize: 15, fontWeight: 'bold' },
   syncVideosBtn: {
-    backgroundColor: '#374151', borderRadius: 12, paddingVertical: 13,
+    backgroundColor: ct.surfaceRaised, borderRadius: 12, paddingVertical: 13,
     alignItems: 'center', marginBottom: 14,
-    borderWidth: 1, borderColor: '#6C63FF',
+    borderWidth: 1, borderColor: ct.goldLine,
   },
-  syncVideosBtnTxt: { color: '#6C63FF', fontSize: 14, fontWeight: '700' },
+  syncVideosBtnTxt: { color: ct.cyan, fontSize: 14, fontWeight: '700' },
   videoEmpty: { alignItems: 'center', paddingTop: 40, paddingBottom: 30 },
   videoEmptyIcon: { fontSize: 56, marginBottom: 12 },
-  videoEmptyTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  videoEmptyHint: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  videoEmptyTitle: { color: ct.text, fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
+  videoEmptyHint: { color: ct.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   videoList: { gap: 10 },
   videoItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#16213e', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: ct.surfaceRaised, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: ct.line,
   },
   videoItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   videoItemIcon: { fontSize: 28, marginRight: 12 },
   videoItemInfo: { flex: 1 },
-  videoItemPersona: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  videoItemDate: { color: '#aaa', fontSize: 11 },
-  videoItemId: { color: '#555', fontSize: 10, marginTop: 2 },
+  videoItemPersona: { color: ct.text, fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  videoItemDate: { color: ct.muted, fontSize: 11 },
+  videoItemId: { color: ct.muted, fontSize: 10, marginTop: 2 },
   videoItemBtns: { flexDirection: 'row', gap: 8 },
   videoPlayBtn: {
-    backgroundColor: '#1565C0', borderRadius: 10,
+    backgroundColor: ct.cyanDeep, borderRadius: 10,
     width: 38, height: 38, justifyContent: 'center', alignItems: 'center',
   },
-  videoPlayBtnTxt: { color: '#fff', fontSize: 16 },
+  videoPlayBtnTxt: { color: ct.text, fontSize: 16 },
   videoDeleteBtn: {
-    backgroundColor: '#2a1a1a', borderRadius: 10,
+    backgroundColor: ct.surface, borderWidth: 1, borderColor: ct.danger, borderRadius: 10,
     width: 38, height: 38, justifyContent: 'center', alignItems: 'center',
   },
   videoDeleteBtnTxt: { fontSize: 16 },
 
   syncCard: {
-    margin: 16, padding: 20, backgroundColor: '#16213e',
-    borderRadius: 16, borderWidth: 1, borderColor: '#2a2a4a', alignItems: 'center',
+    margin: 16, padding: 20, backgroundColor: ct.surfaceRaised,
+    borderRadius: 16, borderWidth: 1, borderColor: ct.goldLine, alignItems: 'center',
   },
-  syncCardTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
-  syncCardText: { color: '#aaa', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  syncCardTitle: { color: ct.text, fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
+  syncCardText: { color: ct.muted, fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   syncCardBtn: {
-    backgroundColor: '#6C63FF', borderRadius: 10,
+    backgroundColor: ct.cyanDeep, borderRadius: 10,
     paddingHorizontal: 24, paddingVertical: 12,
   },
-  syncCardBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  syncCardBtnTxt: { color: ct.text, fontWeight: 'bold', fontSize: 14 },
   selBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a4a',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: ct.surfaceRaised,
     paddingHorizontal: 14, paddingVertical: 10, gap: 10,
   },
-  selBarCancel: { color: '#aaa', fontSize: 18, fontWeight: 'bold', paddingRight: 4 },
-  selBarCount: { flex: 1, color: '#fff', fontWeight: '700', fontSize: 14 },
-  selBarDelete: { backgroundColor: '#c62828', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  selBarDeleteTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  selBarCancel: { color: ct.muted, fontSize: 18, fontWeight: 'bold', paddingRight: 4 },
+  selBarCount: { flex: 1, color: ct.text, fontWeight: '700', fontSize: 14 },
+  selBarDelete: { backgroundColor: ct.danger, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  selBarDeleteTxt: { color: ct.background, fontWeight: 'bold', fontSize: 13 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
-  thumb: { width: THUMB, height: THUMB, backgroundColor: '#2a2a4a' },
+  thumb: { width: THUMB, height: THUMB, backgroundColor: ct.surfaceSoft },
   thumbCheck: {
     position: 'absolute', inset: 0,
-    backgroundColor: 'rgba(21,101,192,0.35)',
+    backgroundColor: ct.selectionWash,
     justifyContent: 'center', alignItems: 'center',
   },
-  thumbCheckTxt: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
+  thumbCheckTxt: { color: ct.text, fontSize: 28, fontWeight: 'bold' },
   empty: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { color: '#888', fontSize: 15, textAlign: 'center' },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
+  emptyText: { color: ct.muted, fontSize: 15, textAlign: 'center' },
+  modalBg: { flex: 1, backgroundColor: ct.overlay, justifyContent: 'center' },
   modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
-  modalCloseText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  modalCloseText: { color: ct.text, fontSize: 22, fontWeight: 'bold' },
   fullImg: { width, height: width, alignSelf: 'center' },
   modalActions: {
     position: 'absolute', bottom: 60, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingHorizontal: 20,
   },
-  modalCat: { color: '#6C63FF', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  modalDate: { color: '#aaa', fontSize: 12, marginTop: 2 },
-  deleteBtn: { backgroundColor: '#c62828', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  deleteBtnText: { color: '#fff', fontWeight: 'bold' },
+  modalCat: { color: ct.cyan, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  modalDate: { color: ct.muted, fontSize: 12, marginTop: 2 },
+  deleteBtn: { backgroundColor: ct.danger, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  deleteBtnText: { color: ct.background, fontWeight: 'bold' },
   confirmOverlay: {
     ...StyleSheet.absoluteFillObject, zIndex: 200,
-    backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 30,
+    backgroundColor: ct.overlay, justifyContent: 'center', alignItems: 'center', padding: 30,
   },
-  confirmBox: { backgroundColor: '#1f2937', borderRadius: 18, padding: 24, width: '100%', alignItems: 'center' },
+  confirmBox: { backgroundColor: ct.surfaceRaised, borderRadius: 18, padding: 24, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: ct.goldLine },
   confirmIcon: { fontSize: 40, marginBottom: 10 },
-  confirmTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
-  confirmSub: { color: '#aaa', fontSize: 13, textAlign: 'center', marginBottom: 20 },
+  confirmTitle: { color: ct.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
+  confirmSub: { color: ct.muted, fontSize: 13, textAlign: 'center', marginBottom: 20 },
   confirmBtns: { flexDirection: 'row', gap: 12, width: '100%' },
-  confirmCancel: { flex: 1, backgroundColor: '#374151', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  confirmCancelTxt: { color: '#ccc', fontWeight: '700', fontSize: 15 },
-  confirmDelete: { flex: 1, backgroundColor: '#c62828', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  confirmDeleteTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  confirmCancel: { flex: 1, backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.line, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  confirmCancelTxt: { color: ct.text, fontWeight: '700', fontSize: 15 },
+  confirmDelete: { flex: 1, backgroundColor: ct.danger, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  confirmDeleteTxt: { color: ct.background, fontWeight: '800', fontSize: 15 },
 
   appIconSection: { margin: 14 },
   appIconHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: '#6C63FF',
+    backgroundColor: ct.surfaceRaised, borderRadius: 14, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: ct.goldLine,
   },
-  appIconTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  appIconSub: { color: '#6C63FF', fontSize: 11, marginTop: 3 },
+  appIconTitle: { color: ct.gold, fontSize: 16, fontWeight: 'bold' },
+  appIconSub: { color: ct.cyan, fontSize: 11, marginTop: 3 },
   appIconUploadBtn: {
-    backgroundColor: '#6C63FF', borderRadius: 10,
+    backgroundColor: ct.cyanDeep, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 10, minWidth: 100, alignItems: 'center',
   },
-  appIconUploadTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  appIconUploadTxt: { color: ct.text, fontWeight: 'bold', fontSize: 13 },
   appIconInfo: {
-    backgroundColor: '#0d2137', borderRadius: 12, padding: 12, marginBottom: 14,
-    borderWidth: 1, borderColor: '#1565C0',
+    backgroundColor: ct.surfaceRaised, borderRadius: 12, padding: 12, marginBottom: 14,
+    borderWidth: 1, borderColor: ct.line,
   },
-  appIconInfoTxt: { color: '#58a6ff', fontSize: 12, lineHeight: 20 },
+  appIconInfoTxt: { color: ct.muted, fontSize: 12, lineHeight: 20 },
   appIconEmpty: { alignItems: 'center', paddingVertical: 50 },
   appIconEmptyIcon: { fontSize: 56, marginBottom: 12 },
-  appIconEmptyTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
-  appIconEmptyHint: { color: '#aaa', fontSize: 13, textAlign: 'center' },
+  appIconEmptyTxt: { color: ct.text, fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  appIconEmptyHint: { color: ct.muted, fontSize: 13, textAlign: 'center' },
   appIconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   appIconItem: { width: (width - 52) / 3, alignItems: 'center' },
   appIconThumb: {
     width: (width - 52) / 3, height: (width - 52) / 3,
-    borderRadius: 16, backgroundColor: '#2a2a4a',
-    borderWidth: 2, borderColor: '#6C63FF',
+    borderRadius: 16, backgroundColor: ct.surfaceSoft,
+    borderWidth: 2, borderColor: ct.cyan,
   },
   appIconLatestBadge: {
     position: 'absolute', top: 6, left: 0, right: 0,
     alignItems: 'center',
   },
   appIconLatestTxt: {
-    backgroundColor: '#00C853', color: '#fff', fontSize: 9,
+    backgroundColor: ct.success, color: ct.background, fontSize: 9,
     fontWeight: 'bold', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
   },
   appIconDeleteBtn: {
-    marginTop: 6, backgroundColor: '#c62828', borderRadius: 8,
+    marginTop: 6, backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.danger, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 4,
   },
   appIconDeleteTxt: { fontSize: 13 },
-  appIconDate: { color: '#888', fontSize: 10, marginTop: 4, textAlign: 'center' },
+  appIconDate: { color: ct.muted, fontSize: 10, marginTop: 4, textAlign: 'center' },
 
   secretBtn: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.goldLine,
     justifyContent: 'center', alignItems: 'center',
   },
   secretBtnTxt: { fontSize: 20 },
 
   secretsCard: {
     marginHorizontal: 14, marginTop: 14, marginBottom: 4,
-    backgroundColor: '#0d1b2a', borderRadius: 16,
-    borderWidth: 1.5, borderColor: '#1e3a5f',
+    backgroundColor: ct.surfaceRaised, borderRadius: 16,
+    borderWidth: 1, borderColor: ct.goldLine,
     overflow: 'hidden',
   },
   secretsCardHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1e3a5f',
+    borderBottomWidth: 1, borderBottomColor: ct.line,
   },
-  secretsCardTitle: { color: '#e2e8f0', fontSize: 15, fontWeight: '700' },
+  secretsCardTitle: { color: ct.gold, fontSize: 15, fontWeight: '700' },
   secretsEditBtn: {
-    backgroundColor: '#1e3a5f', borderRadius: 8,
+    backgroundColor: ct.surfaceSoft, borderRadius: 8, borderWidth: 1, borderColor: ct.line,
     paddingHorizontal: 12, paddingVertical: 5,
   },
-  secretsEditTxt: { color: '#60a5fa', fontSize: 12, fontWeight: '700' },
+  secretsEditTxt: { color: ct.cyan, fontSize: 12, fontWeight: '700' },
   secretsChips: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   secretChip: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#111e2e', borderRadius: 12,
-    borderWidth: 1, borderColor: '#1e3a5f',
+    backgroundColor: ct.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: ct.line,
     paddingHorizontal: 14, paddingVertical: 11,
     marginBottom: 6,
   },
   secretChipIcon: { fontSize: 18, marginRight: 12 },
   secretChipInfo: { flex: 1 },
   secretChipLabel: {
-    color: '#64748b', fontSize: 10, fontWeight: '800',
+    color: ct.muted, fontSize: 10, fontWeight: '800',
     letterSpacing: 1, marginBottom: 3,
   },
-  secretChipValue: { color: '#94a3b8', fontSize: 13, fontFamily: 'monospace' },
+  secretChipValue: { color: ct.text, fontSize: 13, fontFamily: 'monospace' },
   secretChipCopy: { fontSize: 18, marginLeft: 8 },
   secretsEmptyBtn: {
-    margin: 12, backgroundColor: '#111e2e', borderRadius: 12,
+    margin: 12, backgroundColor: ct.surface, borderRadius: 12,
     paddingVertical: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: '#1e3a5f', borderStyle: 'dashed',
+    borderWidth: 1, borderColor: ct.goldLine, borderStyle: 'dashed',
   },
-  secretsEmptyTxt: { color: '#64748b', fontSize: 13 },
+  secretsEmptyTxt: { color: ct.muted, fontSize: 13 },
 
   secOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+    flex: 1, backgroundColor: ct.overlay,
     justifyContent: 'flex-end',
   },
   secBox: {
-    backgroundColor: '#111827', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: ct.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24, paddingBottom: 40,
   },
   secHeaderRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 14,
   },
-  secTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  secClose: { color: '#9ca3af', fontSize: 22, fontWeight: 'bold', padding: 4 },
+  secTitle: { color: ct.gold, fontSize: 20, fontWeight: 'bold' },
+  secClose: { color: ct.muted, fontSize: 22, fontWeight: 'bold', padding: 4 },
   secSavedBanner: {
-    backgroundColor: '#064e3b', borderRadius: 10,
+    backgroundColor: ct.surfaceRaised, borderRadius: 10,
     paddingVertical: 8, paddingHorizontal: 14,
-    marginBottom: 14, borderWidth: 1, borderColor: '#10b981',
+    marginBottom: 14, borderWidth: 1, borderColor: ct.success,
   },
-  secSavedTxt: { color: '#10b981', fontWeight: '700', fontSize: 13 },
+  secSavedTxt: { color: ct.success, fontWeight: '700', fontSize: 13 },
   secInfo: {
-    color: '#6b7280', fontSize: 12, lineHeight: 18,
-    marginBottom: 18, backgroundColor: '#1f2937',
+    color: ct.muted, fontSize: 12, lineHeight: 18,
+    marginBottom: 18, backgroundColor: ct.surfaceRaised,
     borderRadius: 10, padding: 12,
   },
-  secLabel: { color: '#9ca3af', fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
+  secLabel: { color: ct.gold, fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
   secInputRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1f2937', borderRadius: 12,
-    borderWidth: 1, borderColor: '#374151',
+    backgroundColor: ct.surfaceRaised, borderRadius: 12,
+    borderWidth: 1, borderColor: ct.line,
     marginBottom: 14,
   },
   secInput: {
-    flex: 1, color: '#e5e7eb', fontSize: 14,
+    flex: 1, color: ct.text, fontSize: 14,
     paddingHorizontal: 14, paddingVertical: 13,
     fontFamily: 'monospace',
   },
   secCopyBtn: {
     paddingHorizontal: 12, paddingVertical: 10,
-    borderLeftWidth: 1, borderLeftColor: '#374151',
+    borderLeftWidth: 1, borderLeftColor: ct.line,
   },
   secCopyTxt: { fontSize: 18 },
   secBtns: { flexDirection: 'row', gap: 12, marginTop: 6 },
   secClearBtn: {
-    flex: 1, backgroundColor: '#374151', borderRadius: 12,
+    flex: 1, backgroundColor: ct.surfaceRaised, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
-    borderWidth: 1, borderColor: '#c62828',
+    borderWidth: 1, borderColor: ct.danger,
   },
-  secClearTxt: { color: '#f87171', fontWeight: '700', fontSize: 14 },
+  secClearTxt: { color: ct.danger, fontWeight: '700', fontSize: 14 },
   secSaveBtn: {
-    flex: 2, backgroundColor: '#0d6e7a', borderRadius: 12,
+    flex: 2, backgroundColor: ct.cyanDeep, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
   },
-  secSaveTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  secSaveTxt: { color: ct.text, fontWeight: '800', fontSize: 15 },
 
   // ── Video subfolder & character grid styles ──
   subfolderHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#16213e', borderRadius: 14, padding: 14,
-    marginBottom: 14, borderWidth: 1, borderColor: '#6C63FF',
+    backgroundColor: ct.surfaceRaised, borderRadius: 14, padding: 14,
+    marginBottom: 14, borderWidth: 1, borderColor: ct.goldLine,
   },
   backBtn: {
-    backgroundColor: '#6C63FF', borderRadius: 10,
+    backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.cyan, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 8,
   },
-  backBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  backBtnTxt: { color: ct.cyan, fontWeight: '700', fontSize: 13 },
   subfolderTitleWrap: { flex: 1 },
-  subfolderTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 3 },
-  subfolderPath: { color: '#6C63FF', fontSize: 10, fontFamily: 'monospace' },
-  videoGridTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold', marginBottom: 6, paddingHorizontal: 2 },
-  videoGridHint: { color: '#aaa', fontSize: 12, lineHeight: 18, marginBottom: 14, paddingHorizontal: 2 },
+  subfolderTitle: { color: ct.gold, fontSize: 15, fontWeight: 'bold', marginBottom: 3 },
+  subfolderPath: { color: ct.cyan, fontSize: 10, fontFamily: 'monospace' },
+  videoGridTitle: { color: ct.gold, fontSize: 17, fontWeight: 'bold', marginBottom: 6, paddingHorizontal: 2 },
+  videoGridHint: { color: ct.muted, fontSize: 12, lineHeight: 18, marginBottom: 14, paddingHorizontal: 2 },
   characterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 30 },
   characterCard: {
     width: (width - 68) / 3,
-    backgroundColor: '#16213e', borderRadius: 16, padding: 12,
-    alignItems: 'center', borderWidth: 1.5, borderColor: '#2a2a4a',
+    backgroundColor: ct.surfaceRaised, borderRadius: 16, padding: 12,
+    alignItems: 'center', borderWidth: 1.5, borderColor: ct.line,
   },
   characterAvatar: {
     width: 54, height: 54, borderRadius: 27,
+    backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.cyan,
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
-  characterAvatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  characterAvatarTxt: { color: ct.text, fontSize: 18, fontWeight: 'bold' },
   videoBadge: {
     position: 'absolute', top: -4, right: -4,
-    backgroundColor: '#6C63FF', borderRadius: 10,
+    backgroundColor: ct.cyanDeep, borderRadius: 10,
     minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#16213e',
+    borderWidth: 2, borderColor: ct.surface,
   },
-  videoBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
-  characterName: { color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center', marginBottom: 3 },
-  characterVideoCount: { color: '#888', fontSize: 9, textAlign: 'center' },
+  videoBadgeTxt: { color: ct.text, fontSize: 9, fontWeight: 'bold' },
+  characterName: { color: ct.text, fontSize: 10, fontWeight: '700', textAlign: 'center', marginBottom: 3 },
+  characterVideoCount: { color: ct.muted, fontSize: 9, textAlign: 'center' },
 });
