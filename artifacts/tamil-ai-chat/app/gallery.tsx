@@ -15,6 +15,8 @@ import { uploadUriToCloudinary, listCloudinaryImages, listCloudinaryBackups, lis
 import { createBackupZip, getInstalledApkInfo, startBackupUpload, getBackupUploadState, cancelBackupUpload, clearBackupUploadState, addBackupUploadListener, addBackupZipProgressListener, type NativeBackupUploadState } from '../services/installed-apk';
 import { ParamsStore } from '../context/params-store';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { cloudTheme as ct } from '../constants/cloud-theme';
 
 const { width } = Dimensions.get('window');
 const COLS = 3;
@@ -32,16 +34,16 @@ type PendingBackup = {
 
 interface SubFolder  { id: string; label: string }
 
-const ALBUM_META: Record<string, { label: string; emoji: string; color: string; mediaType: MediaLibrary.MediaTypeValue[] }> = {
-  pictures:    { label: 'Pictures',    emoji: '🖼️',  color: '#4A90D9', mediaType: [MediaLibrary.MediaType.photo] },
-  camera:      { label: 'Camera',      emoji: '📷',  color: '#E8821A', mediaType: [MediaLibrary.MediaType.photo] },
-  movies:      { label: 'Movies',      emoji: '🎬',  color: '#C0392B', mediaType: [MediaLibrary.MediaType.video] },
-  screenshots: { label: 'Screenshots', emoji: '📱',  color: '#27AE60', mediaType: [MediaLibrary.MediaType.photo] },
-  downloads:   { label: 'Downloads',   emoji: '⬇️',  color: '#8E6BBE', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
-  documents:   { label: 'Documents',   emoji: '📄',  color: '#3498DB', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
-  music:       { label: 'Music',       emoji: '🎵',  color: '#9B59B6', mediaType: [MediaLibrary.MediaType.audio] },
-  icons:       { label: 'Icons',       emoji: '🎨',  color: '#FF6B35', mediaType: [MediaLibrary.MediaType.photo] },
-  projects:    { label: 'Projects',    emoji: '💼',  color: '#8E44AD', mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
+const ALBUM_META: Record<string, { label: string; mediaType: MediaLibrary.MediaTypeValue[] }> = {
+  pictures:    { label: 'Pictures',    mediaType: [MediaLibrary.MediaType.photo] },
+  camera:      { label: 'Camera',      mediaType: [MediaLibrary.MediaType.photo] },
+  movies:      { label: 'Movies',      mediaType: [MediaLibrary.MediaType.video] },
+  screenshots: { label: 'Screenshots', mediaType: [MediaLibrary.MediaType.photo] },
+  downloads:   { label: 'Downloads',   mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
+  documents:   { label: 'Documents',   mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
+  music:       { label: 'Music',       mediaType: [MediaLibrary.MediaType.audio] },
+  icons:       { label: 'Icons',       mediaType: [MediaLibrary.MediaType.photo] },
+  projects:    { label: 'Projects',    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video] },
 };
 
 function foldersKey(album: string)           { return `storage_folders_${album}`; }
@@ -274,11 +276,11 @@ export default function GalleryScreen() {
       setUploadProgress(1);
 
       Alert.alert(
-        '✅ Icon Upload ஆச்சு!',
+        'Icon Upload ஆச்சு!',
         '1:1 crop பண்ணி Icons folder-ல் save ஆச்சு.\n\nSettings-ல் இந்த icon-ஐ App Icon-ஆ set பண்ணி Build trigger பண்ணலாம்.',
         [
           { text: 'OK', style: 'cancel' },
-          { text: '⚙️ Settings-க்கு போ', onPress: () => router.push('/settings') },
+          { text: 'Settings-க்கு போ', onPress: () => router.push('/settings') },
         ],
       );
     } catch (e: any) {
@@ -359,9 +361,9 @@ export default function GalleryScreen() {
 
       if (albumKey === 'projects') {
         if (failures.length) {
-          Alert.alert('⚠️ Drive Upload', `${selected.length - failures.length}/${selected.length} file(s) Google Drive-ல் save ஆச்சு.\n\n${failures[0]}`);
+          Alert.alert('Drive Upload', `${selected.length - failures.length}/${selected.length} file(s) Google Drive-ல் save ஆச்சு.\n\n${failures[0]}`);
         } else {
-          Alert.alert('✅ Drive Upload', `${selected.length} file(s) Google Drive backup folder-ல் save ஆச்சு.`);
+          Alert.alert('Drive Upload', `${selected.length} file(s) Google Drive backup folder-ல் save ஆச்சு.`);
         }
         return;
       }
@@ -385,14 +387,14 @@ export default function GalleryScreen() {
             ],
           );
         } else {
-          Alert.alert('⚠️ Partial Upload', `${uploaded.length}/${selected.length} files Cloudinary-ல் save ஆச்சு.\n\n${failures[0]}`);
+          Alert.alert('Partial Upload', `${uploaded.length}/${selected.length} files Cloudinary-ல் save ஆச்சு.\n\n${failures[0]}`);
         }
       } else {
         if (isBackupZip) {
           setBackupFileUploadProgress(100);
           await new Promise(resolve => setTimeout(resolve, 350));
         }
-        Alert.alert('✅ Upload ஆச்சு', `${uploaded.length} file(s) Projects folder-ல் Cloudinary-ல் save ஆச்சு.`);
+        Alert.alert('Upload ஆச்சு', `${uploaded.length} file(s) Projects folder-ல் Cloudinary-ல் save ஆச்சு.`);
       }
     } finally {
       setUploading(false);
@@ -531,9 +533,9 @@ export default function GalleryScreen() {
       'Cloud-ல் எப்படி save பண்ணணும்?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: '📋 Copy  (Phone-ல் இருக்கும்)',
+        { text: 'Copy  (Phone-ல் இருக்கும்)',
           onPress: () => { setShowAssets(false); setShowAlbums(false); doMediaUpload('copy'); } },
-        { text: '✂️ Cut  (Phone-ல் delete ஆகும்)', style: 'destructive',
+        { text: 'Cut  (Phone-ல் delete ஆகும்)', style: 'destructive',
           onPress: () => { setShowAssets(false); setShowAlbums(false); doMediaUpload('cut'); } },
       ],
     );
@@ -702,7 +704,7 @@ export default function GalleryScreen() {
       lastBackupNoticeRef.current = '';
       setBackupStep('Backup completed');
       Alert.alert(
-        '✅ Backup completed',
+        'Backup completed',
         `${pending.outputName}\n\nAPK + Projects data + ${String(pending.backupInfo['mediaCount'] ?? 0)} media file(s) Cloudinary-ல் save ஆச்சு.` +
         (driveSaved ? '\nGoogle Drive-லும் save ஆச்சு.' : '\nGoogle Drive upload ஆகவில்லை; Cloudinary backup பாதுகாப்பாக உள்ளது.'),
       );
@@ -1030,8 +1032,8 @@ export default function GalleryScreen() {
       }
       if (cutDeleteFailed) {
         Alert.alert(
-          '⚠️ Delete பண்ண முடியல',
-          'Upload ஆச்சு ✅ ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.',
+          'Delete பண்ண முடியல',
+          'Upload ஆச்சு ஆனா phone-ல் delete ஆகல. Delete confirm popup-ல "Allow" press பண்ணி மீண்டும் முயற்சி செய்யுங்கள்.',
         );
       }
     }
@@ -1045,20 +1047,20 @@ export default function GalleryScreen() {
       ? '\n\nFail reasons:\n' + failures.slice(0, 3).map(f => `• ${f.name}: ${f.reason}`).join('\n')
       : '';
     if (uploaded.length === 0 && total > 0) {
-      Alert.alert('❌ Upload பிழை', `0/${total} files saved.` + reasonsText);
+      Alert.alert('Upload பிழை', `0/${total} files saved.` + reasonsText);
     } else if (!(mode === 'cut')) {
       Alert.alert(
-        failures.length ? '⚠️ Partial Upload' : '✅ Upload ஆச்சு!',
+        failures.length ? 'Partial Upload' : 'Upload ஆச்சு!',
         `${uploaded.length}/${total} files cloud-ல் save ஆச்சு.` + reasonsText,
       );
     } else if (uploaded.length > 0 && !cutDeleteFailed) {
       Alert.alert(
-        failures.length ? '⚠️ Partial Cut' : '✅ Cut & Upload ஆச்சு!',
+        failures.length ? 'Partial Cut' : 'Cut & Upload ஆச்சு!',
         `${uploaded.length}/${total} files cloud-ல் save ஆச்சு, phone-ல் delete ஆச்சு.` + reasonsText,
       );
     } else if (uploaded.length > 0 && cutDeleteFailed) {
       Alert.alert(
-        '⚠️ Upload ஆச்சு, ஆனா Delete ஆகல',
+        'Upload ஆச்சு, ஆனா Delete ஆகல',
         `${uploaded.length}/${total} files cloud-ல் save ஆச்சு. Phone-ல் இன்னும் இருக்கும்.` + reasonsText,
       );
     }
@@ -1078,7 +1080,7 @@ export default function GalleryScreen() {
     setFolderDialog(false);
     setFolderName('');
     Alert.alert(
-      cloudCreated ? '✅' : '⚠️ Folder saved locally',
+      cloudCreated ? 'Folder created' : 'Folder saved locally',
       cloudCreated
         ? `"${name}" folder Cloudinary-ல் உருவாக்கப்பட்டது!`
         : `"${name}" folder app-ல் save ஆச்சு, ஆனால் Cloudinary folder உருவாகவில்லை. Server credentials check பண்ணுங்க.`,
@@ -1104,8 +1106,8 @@ export default function GalleryScreen() {
   // RENDER
   // ─────────────────────────────────────────────────────────────────
   const headerTitle = depth === 1 && currentFolder
-    ? `${meta.emoji} ${currentFolder.label}`
-    : isChatSelectMode ? '📂 Select Photo / Video' : `${meta.emoji} ${meta.label}`;
+    ? currentFolder.label
+    : isChatSelectMode ? 'Select Photo / Video' : meta.label;
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
@@ -1113,31 +1115,51 @@ export default function GalleryScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
+      <View style={[s.header, { backgroundColor: ct.surface, paddingTop: insets.top + 14 }]}>
         <TouchableOpacity onPress={depth === 1 ? goUp : () => router.back()} style={s.backBtn}>
-          <Text style={s.backTxt}>{depth === 1 ? '‹ Back' : '‹'}</Text>
+          <MaterialCommunityIcons name="chevron-left" size={24} color={ct.cyan} />
+          <Text style={s.backTxt}>Back</Text>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
         {cloudSelMode
           ? <TouchableOpacity onPress={() => { setCloudSelMode(false); setCloudSelIds(new Set()); }} style={s.backBtn}>
-              <Text style={s.backTxt}>✕</Text>
+              <MaterialCommunityIcons name="close" size={22} color={ct.gold} />
             </TouchableOpacity>
           : <View style={{ width: 60 }} />}
       </View>
+
+      {!isChatSelectMode && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.breadcrumbs}>
+          <TouchableOpacity onPress={() => router.replace('/')} style={s.breadcrumbItem}>
+            <MaterialCommunityIcons name="home-outline" size={16} color={ct.cyan} />
+            <Text style={s.breadcrumbText}>Home</Text>
+          </TouchableOpacity>
+          <MaterialCommunityIcons name="chevron-right" size={17} color={ct.gold} />
+          <TouchableOpacity disabled={depth === 0} onPress={goUp} style={s.breadcrumbItem}>
+            <Text style={[s.breadcrumbText, depth === 0 && s.breadcrumbCurrent]}>{meta.label}</Text>
+          </TouchableOpacity>
+          {depth === 1 && currentFolder && (
+            <>
+              <MaterialCommunityIcons name="chevron-right" size={17} color={ct.gold} />
+              <Text style={[s.breadcrumbText, s.breadcrumbCurrent]} numberOfLines={1}>{currentFolder.label}</Text>
+            </>
+          )}
+        </ScrollView>
+      )}
 
       {/* Upload progress */}
       {uploading && (
         <View style={s.uploadBar}>
           {backupFileUploadProgress !== null ? (
             <>
-              <Text style={s.uploadBarTxt}>📦 Backup Uploading... {backupFileUploadProgress}%</Text>
+              <Text style={s.uploadBarTxt}>Backup Uploading... {backupFileUploadProgress}%</Text>
               <View style={s.backupFileBarBg}>
                 <View style={[s.backupFileBarFill, { width: `${backupFileUploadProgress}%` as any }]} />
               </View>
             </>
           ) : (
             <>
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={ct.text} size="small" />
               <Text style={s.uploadBarTxt}>Upload பண்றேன்... {uploadProgress}/{uploadTotal}</Text>
             </>
           )}
@@ -1156,7 +1178,8 @@ export default function GalleryScreen() {
           {!!backupStep && <Text style={s.backupProgressHint}>{backupStep}</Text>}
           {backupZipReady && backupStep.startsWith('Uploading Backup') && (
             <TouchableOpacity style={s.backupCancelBtn} onPress={cancelProjectBackup}>
-              <Text style={s.backupCancelTxt}>✕ Cancel Backup</Text>
+              <MaterialCommunityIcons name="close" size={16} color={ct.text} />
+              <Text style={s.backupCancelTxt}>Cancel Backup</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1167,18 +1190,19 @@ export default function GalleryScreen() {
         <View style={s.selBar}>
           <Text style={s.selCount}>{cloudSelIds.size} selected</Text>
           <TouchableOpacity style={s.selDelBtn} onPress={deleteCloudSelected}>
-            <Text style={s.selDelTxt}>🗑️ Delete</Text>
+            <MaterialCommunityIcons name="delete-outline" size={18} color={ct.text} />
+            <Text style={s.selDelTxt}>Delete</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <ScrollView style={{ flex: 1, backgroundColor: '#111' }} contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView style={{ flex: 1, backgroundColor: ct.background }} contentContainerStyle={{ paddingBottom: 24 }}>
 
         {/* Action buttons */}
         {!isChatSelectMode && (
           <View style={s.actionRow}>
             <TouchableOpacity
-              style={[s.uploadBtn, albumKey === 'icons' && { backgroundColor: '#FF6B35' }]}
+              style={s.uploadBtn}
               onPress={albumKey === 'icons'
                 ? pickIconWithCrop
                 : albumKey === 'projects'
@@ -1186,16 +1210,23 @@ export default function GalleryScreen() {
                 : openFolderBrowser}
               disabled={uploading || backingUp}
             >
-              <Text style={s.uploadBtnTxt}>
-                {albumKey === 'icons' ? '🎨 Icon Upload (1:1)' : '⬆ Upload'}
-              </Text>
+              <View style={s.actionContent}>
+                <MaterialCommunityIcons name={albumKey === 'icons' ? 'crop-square' : 'cloud-upload-outline'} size={20} color={ct.background} />
+                <Text style={s.uploadBtnTxt}>{albumKey === 'icons' ? 'Icon Upload (1:1)' : 'Upload'}</Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity style={s.newFolderBtn} disabled={uploading || backingUp} onPress={() => { setFolderName(''); setFolderDialog(true); }}>
-              <Text style={s.newFolderTxt}>📁 New Folder</Text>
+              <View style={s.actionContent}>
+                <MaterialCommunityIcons name="folder-plus-outline" size={20} color={ct.gold} />
+                <Text style={s.newFolderTxt}>New Folder</Text>
+              </View>
             </TouchableOpacity>
             {albumKey === 'projects' && depth === 0 && (
               <TouchableOpacity style={s.backupBtn} disabled={uploading || backingUp} onPress={confirmProjectBackup}>
-                <Text style={s.backupBtnTxt}>💾 Backup</Text>
+                <View style={s.actionContent}>
+                  <MaterialCommunityIcons name="content-save-outline" size={20} color={ct.background} />
+                  <Text style={s.backupBtnTxt}>Backup</Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
@@ -1206,7 +1237,7 @@ export default function GalleryScreen() {
           <View style={s.foldersRow}>
             {subFolders.map(folder => (
               <TouchableOpacity key={folder.id} style={s.folderChip} onPress={() => goIntoFolder(folder)}>
-                <Text style={s.folderChipEmoji}>📁</Text>
+                <MaterialCommunityIcons name="folder-outline" size={18} color={ct.cyan} />
                 <Text style={s.folderChipLabel} numberOfLines={1}>{folder.label}</Text>
               </TouchableOpacity>
             ))}
@@ -1216,7 +1247,10 @@ export default function GalleryScreen() {
         {albumKey === 'projects' && depth === 0 && (
           <View style={s.backupsSection}>
             <View style={s.backupsHeader}>
-              <Text style={s.backupsTitle}>☁️ Cloudinary backups</Text>
+              <View style={s.backupTitleRow}>
+                <MaterialCommunityIcons name="cloud-outline" size={18} color={ct.cyan} />
+                <Text style={s.backupsTitle}>Cloudinary backups</Text>
+              </View>
               <Text style={s.backupsCount}>{backups.length}</Text>
             </View>
             {backups.map(backup => {
@@ -1246,7 +1280,10 @@ export default function GalleryScreen() {
         {albumKey === 'projects' && depth === 0 && (
           <View style={s.driveSection}>
             <View style={s.backupsHeader}>
-              <Text style={s.backupsTitle}>📁 Google Drive backups</Text>
+              <View style={s.backupTitleRow}>
+                <MaterialCommunityIcons name="folder-outline" size={18} color={ct.gold} />
+                <Text style={s.backupsTitle}>Google Drive backups</Text>
+              </View>
               <TouchableOpacity onPress={() => Linking.openURL(GOOGLE_DRIVE_BACKUP_FOLDER_URL).catch(() => Alert.alert('Open error', 'Google Drive folder திறக்கவில்லை'))}>
                 <Text style={s.driveFolderLink}>Open folder ↗</Text>
               </TouchableOpacity>
@@ -1256,7 +1293,7 @@ export default function GalleryScreen() {
               <Text style={s.driveConnection}>✓ {driveStatus.authMode === 'oauth' ? 'OAuth' : 'Service Account'} · {driveStatus.accountEmail}
                 {'\n'}{driveStatus.folderName} · upload access verified</Text>
             )}
-            {driveLoading && <ActivityIndicator color="#60a5fa" size="small" />}
+            {driveLoading && <ActivityIndicator color={ct.cyan} size="small" />}
             {!driveLoading && driveBackups.length === 0 && (
               <Text style={s.driveHint}>
                 {driveError || 'இந்த folder-ல் APK backup files இன்னும் இல்லை.'}
@@ -1289,15 +1326,15 @@ export default function GalleryScreen() {
         {/* Cloud files grid */}
         {loading ? (
           <View style={s.center}>
-            <ActivityIndicator color={meta.color} size="large" />
+            <ActivityIndicator color={ct.cyan} size="large" />
             <Text style={s.loadingTxt}>Cloud-ல் இருந்து load பண்றேன்...</Text>
           </View>
         ) : files.length === 0 ? (
           <View style={s.center}>
-            <Text style={s.emptyEmoji}>{meta.emoji}</Text>
+            <MaterialCommunityIcons name="image-multiple-outline" size={52} color={ct.cyan} />
             <Text style={s.emptyTxt}>
               {depth === 1 ? `${currentFolder?.label} empty` : `${meta.label} empty`}
-              {'\n'}⬆ Upload பண்ணுங்க
+              {'\n'}Upload பண்ணுங்க
             </Text>
           </View>
         ) : (
@@ -1311,11 +1348,11 @@ export default function GalleryScreen() {
                   onLongPress={() => { setCloudSelMode(true); setCloudSelIds(new Set([file.public_id])); }}
                   activeOpacity={0.85}>
                   {file.isRaw
-                    ? <View style={[s.thumbImg, { backgroundColor: '#20233a', alignItems: 'center', justifyContent: 'center', padding: 6 }]}><Text style={{ color: '#f6c453', fontWeight: '800', fontSize: 18 }}>{(file.format || file.fileName?.split('.').pop() || 'FILE').toUpperCase().slice(0, 5)}</Text><Text style={{ color: '#aaa', fontSize: 9, marginTop: 4 }}>RAW FILE</Text></View>
+                    ? <View style={[s.thumbImg, s.rawThumb]}><MaterialCommunityIcons name="file-outline" size={24} color={ct.gold} /><Text style={s.rawFileType}>{(file.format || file.fileName?.split('.').pop() || 'FILE').toUpperCase().slice(0, 5)}</Text><Text style={s.rawFileLabel}>RAW FILE</Text></View>
                     : file.isVideo
-                    ? <View style={[s.thumbImg, s.videoThumb]}><Text style={s.videoPlay}>▶</Text></View>
+                    ? <View style={[s.thumbImg, s.videoThumb]}><MaterialCommunityIcons name="play-circle-outline" size={38} color={ct.cyan} /></View>
                     : <Image source={{ uri: file.url }} style={s.thumbImg} resizeMode="cover" />}
-                  {isSel && <View style={s.checkOverlay}><Text style={s.checkTxt}>✓</Text></View>}
+                  {isSel && <View style={s.checkOverlay}><MaterialCommunityIcons name="check-circle" size={32} color={ct.cyan} /></View>}
                 </TouchableOpacity>
               );
             })}
@@ -1325,18 +1362,18 @@ export default function GalleryScreen() {
 
       {/* ── MODAL 1: Phone Albums browser ───────────────────────── */}
       <Modal visible={showAlbums} animationType="slide" onRequestClose={() => { setShowAlbums(false); if (isChatSelectMode) router.back(); }}>
-        <SafeAreaView style={[s.safe, { backgroundColor: '#1a1a1a' }]} edges={['bottom']}>
+        <SafeAreaView style={s.safe} edges={['bottom']}>
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <View style={[s.header, { backgroundColor: meta.color, paddingTop: insets.top + 14 }]}>
+          <View style={[s.header, { backgroundColor: ct.surface, paddingTop: insets.top + 14 }]}>
             <TouchableOpacity onPress={() => { setShowAlbums(false); if (isChatSelectMode) router.back(); }} style={s.backBtn}>
-              <Text style={s.backTxt}>✕</Text>
+              <MaterialCommunityIcons name="close" size={22} color={ct.gold} />
             </TouchableOpacity>
-            <Text style={s.headerTitle}>{isChatSelectMode ? '📂 Choose a folder' : '📂 Phone Folders'}</Text>
+            <Text style={s.headerTitle}>{isChatSelectMode ? 'Choose a folder' : 'Phone Folders'}</Text>
             <View style={{ width: 60 }} />
           </View>
           {loadingAlbums ? (
             <View style={s.center}>
-              <ActivityIndicator color={meta.color} size="large" />
+              <ActivityIndicator color={ct.cyan} size="large" />
               <Text style={s.loadingTxt}>Folders load பண்றேன்...</Text>
             </View>
           ) : (
@@ -1346,7 +1383,7 @@ export default function GalleryScreen() {
               contentContainerStyle={{ paddingVertical: 8 }}
               renderItem={({ item }) => (
                 <TouchableOpacity style={s.albumRow} onPress={() => openAlbumAssets(item)}>
-                  <Text style={s.albumIcon}>📁</Text>
+                  <MaterialCommunityIcons name="folder-outline" size={26} color={ct.cyan} style={s.albumIcon} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.albumName}>{item.title}</Text>
                     <Text style={s.albumCount}>{item.assetCount ?? 0} files</Text>
@@ -1357,18 +1394,21 @@ export default function GalleryScreen() {
               ItemSeparatorComponent={() => <View style={s.sep} />}
             ListEmptyComponent={
               <View style={s.center}>
-                <Text style={s.emptyEmoji}>📭</Text>
+                <MaterialCommunityIcons name="folder-search-outline" size={48} color={ct.gold} />
                 <Text style={[s.emptyTxt, { paddingHorizontal: 24 }]}>
                   {'Folders கிடைக்கல.\n\nSettings → Apps → My Girls →\nPermissions → Files & Media → Allow all\n\nபிறகு App close செய்து மீண்டும் திறங்க.'}
                 </Text>
                 <TouchableOpacity
-                  style={[s.doneBtn, { backgroundColor: meta.color, marginTop: 24, minWidth: 140, paddingVertical: 12 }]}
+                  style={[s.doneBtn, { backgroundColor: ct.cyanDeep, marginTop: 24, minWidth: 140, paddingVertical: 12 }]}
                   onPress={() => { setShowAlbums(false); setTimeout(() => openFolderBrowser(), 400); }}
                 >
-                  <Text style={s.doneBtnTxt}>🔄 Retry</Text>
+                  <View style={s.actionContent}>
+                    <MaterialCommunityIcons name="refresh" size={18} color={ct.text} />
+                    <Text style={s.doneBtnTxt}>Retry</Text>
+                  </View>
                 </TouchableOpacity>
                 {!isChatSelectMode && <TouchableOpacity
-                  style={[s.doneBtn, { backgroundColor: '#444', marginTop: 12, minWidth: 140, paddingVertical: 12 }]}
+                  style={[s.doneBtn, { backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.line, marginTop: 12, minWidth: 140, paddingVertical: 12 }]}
                   onPress={async () => {
                     setShowAlbums(false);
                     setTimeout(async () => {
@@ -1407,7 +1447,7 @@ export default function GalleryScreen() {
                             const updated = [...uploaded, ...prev.filter(f => !uploaded.some(u => u.public_id === f.public_id))];
                             await AsyncStorage.setItem(key, JSON.stringify(updated));
                             setFiles(updated);
-                            Alert.alert('✅ Upload ஆச்சு!', `${uploaded.length} file${uploaded.length > 1 ? 's' : ''} Cloud-ல் save ஆனது.`);
+                            Alert.alert('Upload ஆச்சு!', `${uploaded.length} file${uploaded.length > 1 ? 's' : ''} Cloud-ல் save ஆனது.`);
                           }
                           setUploading(false);
                         }
@@ -1418,7 +1458,10 @@ export default function GalleryScreen() {
                     }, 300);
                   }}
                 >
-                  <Text style={s.doneBtnTxt}>🖼️ Gallery திற</Text>
+                  <View style={s.actionContent}>
+                    <MaterialCommunityIcons name="image-multiple-outline" size={18} color={ct.text} />
+                    <Text style={s.doneBtnTxt}>Gallery திற</Text>
+                  </View>
                 </TouchableOpacity>}
               </View>
             }
@@ -1429,16 +1472,17 @@ export default function GalleryScreen() {
 
       {/* ── MODAL 2: Files in selected album ────────────────────── */}
       <Modal visible={showAssets} animationType="slide" onRequestClose={() => setShowAssets(false)}>
-        <SafeAreaView style={[s.safe, { backgroundColor: '#111' }]} edges={['top','bottom']}>
-          <View style={[s.header, { backgroundColor: meta.color }]}>
+        <SafeAreaView style={s.safe} edges={['top','bottom']}>
+          <View style={[s.header, { backgroundColor: ct.surface }]}>
             <TouchableOpacity onPress={() => setShowAssets(false)} style={s.backBtn}>
-              <Text style={s.backTxt}>‹ Back</Text>
+              <MaterialCommunityIcons name="chevron-left" size={24} color={ct.cyan} />
+              <Text style={s.backTxt}>Back</Text>
             </TouchableOpacity>
             <Text style={s.headerTitle} numberOfLines={1}>
               {selectedAlbumLib?.title ?? 'Files'}
             </Text>
             {pickerSel.size > 0 ? (
-              <TouchableOpacity onPress={confirmSelection} style={[s.doneBtn, { backgroundColor: meta.color }]}>
+              <TouchableOpacity onPress={confirmSelection} style={[s.doneBtn, { backgroundColor: ct.cyanDeep }]}>
                 <Text style={s.doneBtnTxt}>{isChatSelectMode ? 'Use this' : `Done (${pickerSel.size})`}</Text>
               </TouchableOpacity>
             ) : <View style={{ width: 80 }} />}
@@ -1447,20 +1491,21 @@ export default function GalleryScreen() {
           {pickerSel.size > 0 && (
             <View style={s.pickerSelBar}>
               <Text style={s.pickerSelTxt}>{pickerSel.size} file{pickerSel.size > 1 ? 's' : ''} select ஆச்சு</Text>
-              <TouchableOpacity style={[s.selDelBtn, { backgroundColor: meta.color }]} onPress={confirmSelection}>
-                <Text style={s.selDelTxt}>{isChatSelectMode ? 'Use this' : '⬆ Upload'}</Text>
+              <TouchableOpacity style={[s.selDelBtn, { backgroundColor: ct.cyanDeep }]} onPress={confirmSelection}>
+                <MaterialCommunityIcons name={isChatSelectMode ? 'check' : 'cloud-upload-outline'} size={18} color={ct.text} />
+                <Text style={s.selDelTxt}>{isChatSelectMode ? 'Use this' : 'Upload'}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {loadingAssets ? (
             <View style={s.center}>
-              <ActivityIndicator color={meta.color} size="large" />
+              <ActivityIndicator color={ct.cyan} size="large" />
               <Text style={s.loadingTxt}>Files load பண்றேன்...</Text>
             </View>
           ) : phoneAssets.length === 0 ? (
             <View style={s.center}>
-              <Text style={s.emptyEmoji}>📭</Text>
+              <MaterialCommunityIcons name="image-off-outline" size={48} color={ct.gold} />
               <Text style={s.emptyTxt}>இந்த folder-ல் files இல்லை</Text>
             </View>
           ) : (
@@ -1485,9 +1530,9 @@ export default function GalleryScreen() {
                     activeOpacity={0.8}>
                     <Image source={{ uri: item.uri }} style={s.thumbImg} resizeMode="cover" />
                     {item.mediaType === 'video' && (
-                      <View style={s.videoTag}><Text style={s.videoTagTxt}>▶</Text></View>
+                      <View style={s.videoTag}><MaterialCommunityIcons name="play" size={13} color={ct.text} /></View>
                     )}
-                    {isSel && <View style={s.checkOverlay}><Text style={s.checkTxt}>✓</Text></View>}
+                    {isSel && <View style={s.checkOverlay}><MaterialCommunityIcons name="check-circle" size={32} color={ct.cyan} /></View>}
                   </TouchableOpacity>
                 );
               }}
@@ -1501,12 +1546,12 @@ export default function GalleryScreen() {
         {fullView && (
           <View style={s.previewBg}>
             <TouchableOpacity style={s.previewClose} onPress={() => setFullView(null)}>
-              <Text style={s.previewCloseTxt}>✕</Text>
+              <MaterialCommunityIcons name="close-circle-outline" size={30} color={ct.gold} />
             </TouchableOpacity>
             {fullView.isRaw
-              ? <View style={{ alignItems: 'center', padding: 24 }}><Text style={{ fontSize: 64 }}>📄</Text><Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 14, textAlign: 'center' }}>{fullView.fileName || fullView.public_id.split('/').pop()}</Text><TouchableOpacity style={{ backgroundColor: '#6C63FF', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12, marginTop: 18 }} onPress={() => Linking.openURL(fullView.url).catch(() => Alert.alert('Download error', 'File open ஆகவில்லை'))}><Text style={{ color: '#fff', fontWeight: '700' }}>Open / Download</Text></TouchableOpacity></View>
+              ? <View style={{ alignItems: 'center', padding: 24 }}><MaterialCommunityIcons name="file-outline" size={56} color={ct.gold} /><Text style={s.previewFileName}>{fullView.fileName || fullView.public_id.split('/').pop()}</Text><TouchableOpacity style={s.previewAction} onPress={() => Linking.openURL(fullView.url).catch(() => Alert.alert('Download error', 'File open ஆகவில்லை'))}><MaterialCommunityIcons name="download-outline" size={18} color={ct.background} /><Text style={s.previewActionTxt}>Open / Download</Text></TouchableOpacity></View>
               : fullView.isVideo
-              ? <View style={s.videoPreview}><Text style={{ fontSize: 64 }}>▶</Text></View>
+              ? <View style={s.videoPreview}><MaterialCommunityIcons name="play-circle-outline" size={72} color={ct.cyan} /></View>
               : <Image source={{ uri: fullView.url }} style={s.previewImg} resizeMode="contain" />}
           </View>
         )}
@@ -1516,14 +1561,14 @@ export default function GalleryScreen() {
       <Modal visible={folderDialog} transparent animationType="fade" onRequestClose={() => setFolderDialog(false)}>
         <View style={s.dialogOverlay}>
           <View style={s.dialog}>
-            <Text style={s.dialogTitle}>📁 New Folder</Text>
-            <TextInput style={s.dialogInput} placeholder="Folder பெயர்..." placeholderTextColor="#aaa"
+            <Text style={s.dialogTitle}>New Folder</Text>
+            <TextInput style={s.dialogInput} placeholder="Folder பெயர்..." placeholderTextColor={ct.muted}
               value={folderName} onChangeText={setFolderName} autoFocus onSubmitEditing={confirmNewFolder} />
             <View style={s.dialogBtns}>
               <TouchableOpacity style={s.dialogCancel} onPress={() => setFolderDialog(false)}>
                 <Text style={s.dialogCancelTxt}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.dialogOk, { backgroundColor: meta.color }]} onPress={confirmNewFolder}>
+              <TouchableOpacity style={[s.dialogOk, { backgroundColor: ct.cyanDeep }]} onPress={confirmNewFolder}>
                 <Text style={s.dialogOkTxt}>உருவாக்கு</Text>
               </TouchableOpacity>
             </View>
@@ -1535,94 +1580,106 @@ export default function GalleryScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:           { flex: 1, backgroundColor: '#111' },
-  header:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12 },
-  backBtn:        { minWidth: 60 },
-  backTxt:        { color: '#fff', fontSize: 17, fontWeight: '600' },
-  headerTitle:    { flex: 1, color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  safe:           { flex: 1, backgroundColor: ct.background },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: ct.goldLine },
+  backBtn:        { minWidth: 68, flexDirection: 'row', alignItems: 'center' },
+  backTxt:        { color: ct.text, fontSize: 14, fontWeight: '600' },
+  headerTitle:    { flex: 1, color: ct.gold, fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  breadcrumbs:    { maxHeight: 42, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: ct.surface, borderBottomWidth: 1, borderBottomColor: ct.line },
+  breadcrumbItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  breadcrumbText: { color: ct.cyan, fontSize: 12, fontWeight: '600' },
+  breadcrumbCurrent: { color: ct.gold },
   doneBtn:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, minWidth: 80, alignItems: 'center' },
-  doneBtnTxt:     { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  uploadBar:      { flexDirection: 'row', backgroundColor: '#1565C0', padding: 10, gap: 10, alignItems: 'center' },
-  uploadBarTxt:   { color: '#fff', fontSize: 14 },
-  backupFileBarBg: { height: 6, flex: 1, minWidth: 90, marginLeft: 8, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
-  backupFileBarFill: { height: '100%', borderRadius: 3, backgroundColor: '#7CFFB2' },
-  backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: '#f3f3f3', borderRadius: 18, borderWidth: 1, borderColor: '#ddd' },
-  backupProgressTitle: { color: '#222', fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  backupProgressRow: { color: '#222', fontSize: 14, marginBottom: 7 },
-  backupDone: { color: '#111', fontSize: 18, fontWeight: '800', marginLeft: 8 },
-  backupProgressValue: { color: '#222', marginLeft: 18 },
-  backupBarBg: { height: 12, backgroundColor: '#ddd', borderRadius: 6, overflow: 'hidden', marginTop: 10 },
-  backupBarFill: { height: '100%', backgroundColor: '#111', borderRadius: 6 },
-  backupProgressHint: { color: '#666', fontSize: 12, marginTop: 9 },
-  backupCancelBtn: { marginTop: 12, backgroundColor: '#7f1d1d', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  backupCancelTxt: { color: '#fecaca', fontSize: 13, fontWeight: '800' },
-  backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#1a2340', borderRadius: 14 },
-  driveSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: '#10243d', borderRadius: 14, borderWidth: 1, borderColor: '#245a91' },
+  doneBtnTxt:     { color: ct.text, fontSize: 14, fontWeight: 'bold' },
+  uploadBar:      { flexDirection: 'row', backgroundColor: ct.cyanDeep, padding: 10, gap: 10, alignItems: 'center' },
+  uploadBarTxt:   { color: ct.text, fontSize: 14 },
+  backupFileBarBg: { height: 6, flex: 1, minWidth: 90, marginLeft: 8, borderRadius: 3, backgroundColor: ct.surfaceSoft, overflow: 'hidden' },
+  backupFileBarFill: { height: '100%', borderRadius: 3, backgroundColor: ct.cyan },
+  backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: ct.surfaceRaised, borderRadius: 18, borderWidth: 1, borderColor: ct.goldLine },
+  backupProgressTitle: { color: ct.gold, fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  backupProgressRow: { color: ct.text, fontSize: 14, marginBottom: 7 },
+  backupDone: { color: ct.success, fontSize: 18, fontWeight: '800', marginLeft: 8 },
+  backupProgressValue: { color: ct.cyan, marginLeft: 18 },
+  backupBarBg: { height: 12, backgroundColor: ct.surfaceSoft, borderRadius: 6, overflow: 'hidden', marginTop: 10 },
+  backupBarFill: { height: '100%', backgroundColor: ct.cyan, borderRadius: 6 },
+  backupProgressHint: { color: ct.muted, fontSize: 12, marginTop: 9 },
+  backupCancelBtn: { marginTop: 12, backgroundColor: ct.surfaceSoft, borderRadius: 10, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: ct.danger },
+  backupCancelTxt: { color: ct.text, fontSize: 13, fontWeight: '800' },
+  backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: ct.surface, borderRadius: 14, borderWidth: 1, borderColor: ct.line },
+  driveSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: ct.surface, borderRadius: 14, borderWidth: 1, borderColor: ct.goldLine },
   backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  backupsTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  backupsCount: { color: '#FFD700', fontWeight: '800' },
-  driveFolderLink: { color: '#60a5fa', fontSize: 12, fontWeight: '700' },
-  driveFolderPath: { color: '#93c5fd', fontSize: 11, marginBottom: 4 },
-  backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 10, padding: 10, marginTop: 7 },
-  backupFileIcon: { color: '#FFD700', fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: '#FFD700', borderRadius: 5, padding: 5, marginRight: 10 },
-  driveFileIcon: { color: '#60a5fa', fontSize: 9, fontWeight: '900', borderWidth: 1, borderColor: '#60a5fa', borderRadius: 5, padding: 5, marginRight: 10 },
+  backupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  backupsTitle: { color: ct.gold, fontSize: 15, fontWeight: '800' },
+  backupsCount: { color: ct.gold, fontWeight: '800' },
+  driveFolderLink: { color: ct.cyan, fontSize: 12, fontWeight: '700' },
+  driveFolderPath: { color: ct.muted, fontSize: 11, marginBottom: 4 },
+  backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: ct.surfaceRaised, borderRadius: 10, padding: 10, marginTop: 7, borderWidth: 1, borderColor: ct.line },
+  backupFileIcon: { color: ct.gold, fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: ct.goldLine, borderRadius: 5, padding: 5, marginRight: 10 },
+  driveFileIcon: { color: ct.cyan, fontSize: 9, fontWeight: '900', borderWidth: 1, borderColor: ct.line, borderRadius: 5, padding: 5, marginRight: 10 },
   backupFileInfo: { flex: 1 },
-  backupFileName: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  backupFileMeta: { color: '#9ca3af', fontSize: 10, marginTop: 3 },
-  backupDownload: { color: '#60a5fa', fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
-  driveHint: { color: '#9ca3af', fontSize: 12, lineHeight: 18, marginTop: 4 },
-  driveConnection: { color: '#86efac', fontSize: 11, lineHeight: 16, marginBottom: 4 },
-  selBar:         { flexDirection: 'row', backgroundColor: '#333', padding: 10, alignItems: 'center', gap: 12 },
-  selCount:       { color: '#fff', fontSize: 14, flex: 1 },
-  selDelBtn:      { backgroundColor: '#c62828', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  selDelTxt:      { color: '#fff', fontSize: 13, fontWeight: '600' },
-  pickerSelBar:   { flexDirection: 'row', backgroundColor: '#222', padding: 10, alignItems: 'center', gap: 12 },
-  pickerSelTxt:   { color: '#fff', fontSize: 14, flex: 1 },
+  backupFileName: { color: ct.text, fontSize: 13, fontWeight: '700' },
+  backupFileMeta: { color: ct.muted, fontSize: 10, marginTop: 3 },
+  backupDownload: { color: ct.cyan, fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
+  driveHint: { color: ct.muted, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  driveConnection: { color: ct.success, fontSize: 11, lineHeight: 16, marginBottom: 4 },
+  selBar:         { flexDirection: 'row', backgroundColor: ct.surface, padding: 10, alignItems: 'center', gap: 12 },
+  selCount:       { color: ct.text, fontSize: 14, flex: 1 },
+  selDelBtn:      { backgroundColor: ct.danger, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  selDelTxt:      { color: ct.text, fontSize: 13, fontWeight: '600' },
+  pickerSelBar:   { flexDirection: 'row', backgroundColor: ct.surface, padding: 10, alignItems: 'center', gap: 12 },
+  pickerSelTxt:   { color: ct.text, fontSize: 14, flex: 1 },
   actionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
-  uploadBtn:      { flex: 1, backgroundColor: '#E8821A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  uploadBtnTxt:   { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  newFolderBtn:   { flex: 1, backgroundColor: '#444', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  backupBtn:      { width: '100%', backgroundColor: '#5E35B1', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  backupBtnTxt:   { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#FF6B35', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  iconCropBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  newFolderTxt:   { color: '#ccc', fontSize: 16, fontWeight: '600' },
+  uploadBtn:      { flex: 1, backgroundColor: ct.cyan, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.gold },
+  uploadBtnTxt:   { color: ct.background, fontSize: 15, fontWeight: 'bold' },
+  newFolderBtn:   { flex: 1, backgroundColor: ct.surfaceRaised, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.goldLine },
+  backupBtn:      { width: '100%', backgroundColor: ct.gold, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  backupBtnTxt:   { color: ct.background, fontSize: 16, fontWeight: 'bold' },
+  iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: ct.cyanDeep, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  iconCropBtnTxt: { color: ct.text, fontSize: 14, fontWeight: '800' },
+  newFolderTxt:   { color: ct.gold, fontSize: 15, fontWeight: '600' },
+  actionContent:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   foldersRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
-  folderChip:     { backgroundColor: '#2a2a2a', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  folderChip:     { backgroundColor: ct.surfaceRaised, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: ct.goldLine },
   folderChipEmoji:{ fontSize: 18 },
-  folderChipLabel:{ color: '#ddd', fontSize: 13, fontWeight: '500' },
+  folderChipLabel:{ color: ct.text, fontSize: 13, fontWeight: '500' },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
   thumb:          { width: THUMB, height: THUMB, overflow: 'hidden' },
   thumbSel:       { opacity: 0.55 },
   thumbImg:       { width: THUMB, height: THUMB },
-  videoThumb:     { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' },
-  videoPlay:      { fontSize: 32, color: '#fff' },
-  videoTag:       { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: 2 },
-  videoTagTxt:    { color: '#fff', fontSize: 10 },
-  checkOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  videoThumb:     { backgroundColor: ct.surfaceRaised, justifyContent: 'center', alignItems: 'center' },
+  videoPlay:      { fontSize: 32, color: ct.text },
+  rawThumb:       { alignItems: 'center', justifyContent: 'center', padding: 6, backgroundColor: ct.surfaceRaised },
+  rawFileType:    { color: ct.gold, fontWeight: '800', fontSize: 12, marginTop: 4 },
+  rawFileLabel:   { color: ct.muted, fontSize: 9, marginTop: 3 },
+  videoTag:       { position: 'absolute', bottom: 4, right: 4, backgroundColor: ct.deepScrim, borderRadius: 4, padding: 3 },
+  videoTagTxt:    { color: ct.text, fontSize: 10 },
+  checkOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: ct.selectionWash, justifyContent: 'center', alignItems: 'center' },
   checkTxt:       { color: '#fff', fontSize: 28, fontWeight: 'bold' },
   center:         { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  loadingTxt:     { color: '#aaa', marginTop: 14, fontSize: 14 },
+  loadingTxt:     { color: ct.muted, marginTop: 14, fontSize: 14 },
   emptyEmoji:     { fontSize: 56, marginBottom: 12 },
-  emptyTxt:       { color: '#888', fontSize: 15, textAlign: 'center', lineHeight: 24 },
-  albumRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#1e1e1e' },
-  albumIcon:      { fontSize: 28, marginRight: 12 },
-  albumName:      { color: '#fff', fontSize: 16, fontWeight: '600' },
-  albumCount:     { color: '#888', fontSize: 12, marginTop: 2 },
-  albumArrow:     { color: '#888', fontSize: 24 },
-  sep:            { height: 1, backgroundColor: '#2a2a2a' },
-  previewBg:      { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  emptyTxt:       { color: ct.muted, fontSize: 15, textAlign: 'center', lineHeight: 24 },
+  albumRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: ct.surfaceRaised },
+  albumIcon:      { marginRight: 12 },
+  albumName:      { color: ct.text, fontSize: 16, fontWeight: '600' },
+  albumCount:     { color: ct.muted, fontSize: 12, marginTop: 2 },
+  albumArrow:     { color: ct.gold, fontSize: 24 },
+  sep:            { height: 1, backgroundColor: ct.line },
+  previewBg:      { flex: 1, backgroundColor: ct.background, justifyContent: 'center', alignItems: 'center' },
   previewClose:   { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
-  previewCloseTxt:{ color: '#fff', fontSize: 24 },
+  previewCloseTxt:{ color: ct.gold, fontSize: 24 },
   previewImg:     { width: '100%', height: '80%' },
   videoPreview:   { alignItems: 'center', justifyContent: 'center' },
-  dialogOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  dialog:         { backgroundColor: '#222', borderRadius: 16, padding: 24, width: '100%' },
-  dialogTitle:    { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  dialogInput:    { backgroundColor: '#333', color: '#fff', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
+  previewFileName: { color: ct.text, fontSize: 18, fontWeight: '700', marginTop: 14, textAlign: 'center' },
+  previewAction:  { backgroundColor: ct.cyan, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewActionTxt: { color: ct.background, fontWeight: '700' },
+  dialogOverlay:  { flex: 1, backgroundColor: ct.deepScrim, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dialog:         { backgroundColor: ct.surface, borderRadius: 16, padding: 24, width: '100%', maxWidth: 440, borderWidth: 1, borderColor: ct.goldLine },
+  dialogTitle:    { color: ct.gold, fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  dialogInput:    { backgroundColor: ct.surfaceRaised, color: ct.text, borderColor: ct.line, borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
   dialogBtns:     { flexDirection: 'row', gap: 12 },
-  dialogCancel:   { flex: 1, backgroundColor: '#444', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  dialogCancelTxt:{ color: '#ccc', fontSize: 15 },
+  dialogCancel:   { flex: 1, backgroundColor: ct.surfaceSoft, borderWidth: 1, borderColor: ct.goldLine, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  dialogCancelTxt:{ color: ct.gold, fontSize: 15 },
   dialogOk:       { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  dialogOkTxt:    { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  dialogOkTxt:    { color: ct.text, fontSize: 15, fontWeight: 'bold' },
 });
