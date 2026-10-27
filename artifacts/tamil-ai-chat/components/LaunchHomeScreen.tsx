@@ -209,7 +209,6 @@ export default function LaunchHomeScreen() {
       style={styles.safe}
       resizeMode="cover"
     >
-      <View style={styles.ambientOverlay}>
         <SafeAreaView style={styles.safeInner} edges={['top', 'left', 'right', 'bottom']}>
           <StatusBar backgroundColor="#E8EEFB" barStyle="dark-content" />
           <Stack.Screen options={{ headerShown: false }} />
@@ -340,17 +339,9 @@ export default function LaunchHomeScreen() {
               accessibilityRole="button"
               accessibilityLabel={feature.title + ', ' + feature.subtitle}
               accessibilityState={{ disabled: !feature.route }}
-              activeOpacity={0.82}
+              activeOpacity={0.84}
               disabled={!feature.route}
-              style={[
-                styles.featureCard,
-                {
-                  width: tileWidth,
-                  height: cardHeight,
-                  borderColor: feature.color,
-                  shadowColor: feature.color,
-                },
-              ]}
+              style={[styles.featureCard, { width: tileWidth, height: cardHeight }]}
               onPress={feature.route ? () => {
                 if (feature.launchIntent) {
                   router.push({ pathname: '/ai-girls', params: { launch: feature.launchIntent } });
@@ -359,58 +350,21 @@ export default function LaunchHomeScreen() {
                 router.push(feature.route as any);
               } : undefined}
             >
-              <ImageBackground
+              <Image
                 source={feature.bgImage}
-                style={styles.cardBgImage}
-                imageStyle={styles.cardImageStyle}
-                resizeMode="cover"
-              >
-                <View style={[styles.cardIconBadge, { borderColor: feature.color, shadowColor: feature.color }]}>
-                  <Ionicons name={feature.icon as any} size={Math.round(iconRingSize * 0.45)} color={feature.color} />
-                </View>
-                <LinearGradient
-                  colors={['transparent', 'rgba(4, 9, 26, 0.72)', 'rgba(4, 9, 26, 0.96)']}
-                  style={styles.cardTextGradient}
-                >
-                  <Text
-                    numberOfLines={smallText ? 1 : 2}
-                    style={[
-                      styles.featureTitle,
-                      {
-                        fontSize: smallText ? 11 : 13,
-                        lineHeight: smallText ? 14 : 17,
-                      },
-                    ]}
-                  >
-                    {feature.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.featureSubtitle,
-                      {
-                        fontSize: smallText ? 9 : 11,
-                        lineHeight: smallText ? 12 : 14,
-                        marginTop: smallText ? 1 : 2,
-                      },
-                    ]}
-                  >
-                    {feature.subtitle}
-                  </Text>
-                </LinearGradient>
-              </ImageBackground>
+                style={styles.cardImage}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
           ))}
         </View>
       </View>
-        </SafeAreaView>
-      </View>
-    </ImageBackground>
+    </SafeAreaView>
+  </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#070A1B' },
   page: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4 },
   webPage: { paddingTop: 67, paddingBottom: 34 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -441,69 +395,19 @@ const styles = StyleSheet.create({
   startChatText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   changeBackgroundButton: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(2,8,24,0.72)' },
   changeBackgroundText: { color: '#FFFFFF', fontWeight: '700' },
-  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  safe: { flex: 1, backgroundColor: '#E8EEFB' },
   safeInner: { flex: 1 },
-  ambientOverlay: { flex: 1 },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   featureCard: {
     borderRadius: 22,
-    borderWidth: 1.8,
     overflow: 'hidden',
-    backgroundColor: '#090F24',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.42,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  cardBgImage: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'space-between',
-  },
-  cardImageStyle: {
-    borderRadius: 20,
-  },
-  cardIconBadge: {
-    position: 'absolute',
-    top: 7,
-    left: 7,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    backgroundColor: 'rgba(4, 9, 26, 0.78)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 2,
   },
-  cardTextGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 7,
-    paddingTop: 18,
-    paddingBottom: 6,
-    alignItems: 'flex-start',
-    justifyContent: 'flex-end',
-  },
-  featureTitle: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    textAlign: 'left',
-    textShadowColor: 'rgba(0, 0, 0, 0.95)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  featureSubtitle: {
-    color: '#C8D3EC',
-    fontWeight: '600',
-    textAlign: 'left',
-    textShadowColor: 'rgba(0, 0, 0, 0.95)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
   },
 });
