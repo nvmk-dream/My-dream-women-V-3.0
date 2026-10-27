@@ -580,7 +580,7 @@ export default function EditCharacterScreen() {
   if (!persona) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={theme.brightGold} />
+        <ActivityIndicator  />
       </View>
     );
   }
@@ -775,14 +775,14 @@ export default function EditCharacterScreen() {
           icon="📖"
           title="இன்றைய கதை"
           subtitle="Today's Story"
-          color={theme.gold}
+          
           openSections={openSections}
           onToggle={toggleSection}
           headerExtra={persona?.id === 'kallaatam' ? (
             <TouchableOpacity
               onPress={handleStorySave}
               disabled={storySaving}
-            style={{ backgroundColor: theme.gold, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
+            style={{ backgroundColor: '#7C3AED', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
             >
               {storySaving
                 ? <ActivityIndicator size="small" color={theme.background} style={{ marginRight: 4 }} />
@@ -812,21 +812,21 @@ export default function EditCharacterScreen() {
 
         {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
         {persona?.id === 'kallaatam' && (
-          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}
+          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்"  openSections={openSections} onToggle={toggleSection}
 >
 
             {/* Tasks */}
-            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: theme.goldLine }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#7C3AED'Line }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={{ fontSize: 15, marginRight: 6 }}>✅</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brightGold }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#C084FC' }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Switch value={kTaskContinue} onValueChange={setKTaskContinue} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+                <Switch value={kTaskContinue} onValueChange={setKTaskContinue} trackColor={{ true: '#7C3AED' }} thumbColor="#fff" />
                 <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, flex: 1 }}>கொடுக்கப்பட்ட கதையை தொடரவும்.</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Switch value={kTaskOutline} onValueChange={setKTaskOutline} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+                <Switch value={kTaskOutline} onValueChange={setKTaskOutline} trackColor={{ true: '#7C3AED' }} thumbColor="#fff" />
                 <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, flex: 1 }}>Out Line வைத்து கொண்டு புது Screen play செய்யவும்.</Text>
               </View>
             </View>
@@ -834,7 +834,7 @@ export default function EditCharacterScreen() {
             {/* Outline Box */}
             <View style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brightGold }}>📋 Story Outline</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#C084FC' }}>📋 Story Outline</Text>
 
               </View>
               <TextInput
@@ -852,15 +852,15 @@ export default function EditCharacterScreen() {
             <View style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ fontSize: 16, marginRight: 6 }}>🎭</Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.brightGold }}>Character Details:</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#C084FC' }}>Character Details:</Text>
               </View>
               {/* Table header */}
               <View style={{ flexDirection: 'row', backgroundColor: theme.surfaceSoft, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6, marginBottom: 4, borderWidth: 1, borderColor: theme.line }}>
-                <Text style={{ width: 28, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>#</Text>
-                <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: theme.brightGold }}>👤 பெயர்</Text>
-                <Text style={{ flex: 1.4, fontSize: 10, fontWeight: '700', color: theme.brightGold }}>📋 கதாபாத்திரம்</Text>
-                <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>🎭 by</Text>
-                <Text style={{ width: 36, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>Avtar</Text>
+                <Text style={{ width: 28, fontSize: 10, fontWeight: '700', color: '#C084FC', textAlign: 'center' }}>#</Text>
+                <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: '#C084FC' }}>👤 பெயர்</Text>
+                <Text style={{ flex: 1.4, fontSize: 10, fontWeight: '700', color: '#C084FC' }}>📋 கதாபாத்திரம்</Text>
+                <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: '#C084FC', textAlign: 'center' }}>🎭 by</Text>
+                <Text style={{ width: 36, fontSize: 10, fontWeight: '700', color: '#C084FC', textAlign: 'center' }}>Avtar</Text>
               </View>
               {kChars.map((ch, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 4, borderWidth: 1, borderColor: theme.line }}>
@@ -884,7 +884,7 @@ export default function EditCharacterScreen() {
                   <Switch
                     value={ch.aiPlay}
                     onValueChange={v => { const arr = [...kChars]; arr[i] = {...arr[i], aiPlay: v}; setKChars(arr); }}
-                    trackColor={{ true: theme.gold, false: '#555' }}
+                    trackColor={{ true: '#7C3AED', false: '#555' }}
                     thumbColor="#fff"
                     style={{ width: 44 }}
                   />
@@ -894,19 +894,19 @@ export default function EditCharacterScreen() {
             </View>
 
             {/* Master toggle */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: theme.goldLine }}>
-              <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+              <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: '#7C3AED' }} thumbColor="#fff" />
               <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, fontWeight: '600', flex: 1 }}>அனைத்து character உம் AI roleplay செய்ய வேண்டும்.</Text>
             </View>
 
           </SectionCard>
         )}
 
-        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்"  openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.fieldHint}>ஒவ்வொரு mode-லயும் user எப்படி பேசுவாரு, எப்படி feel ஆவாரு என்று சொல்லுங்க — AI அதுக்கு ஏத்த மாதிரி character react பண்ணும்.</Text>
 
           {/* WhatsApp mode */}
-          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 12, marginBottom: 4 }]}>💬 WhatsApp Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 12, marginBottom: 4 }]}>💬 WhatsApp Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userWhatsappBeh}
@@ -918,7 +918,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* Normal mode */}
-          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>😇 Normal Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 10, marginBottom: 4 }]}>😇 Normal Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userNormalBeh}
@@ -930,7 +930,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* Presana mode */}
-          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>😈 Presana Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 10, marginBottom: 4 }]}>😈 Presana Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userPresanaBeh}
@@ -942,7 +942,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* User body description */}
-          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>🧍 User உருவம் / Body Description</Text>
+          <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 10, marginBottom: 4 }]}>🧍 User உருவம் / Body Description</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 72 }]}
             value={userBodyDesc}
@@ -955,7 +955,7 @@ export default function EditCharacterScreen() {
 
           {/* ── Character Message Font Style ── */}
           <View style={styles.divider} />
-          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
+          <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
           <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 10 }}>Character reply messages-ல் font color & size set பண்ணுங்க.</Text>
 
           <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>🖌️ Font Color</Text>
@@ -982,7 +982,7 @@ export default function EditCharacterScreen() {
                   backgroundColor: color,
                   alignItems: 'center', justifyContent: 'center',
                   borderWidth: charFontColor === color ? 3 : 1.5,
-                  borderColor: charFontColor === color ? theme.gold : theme.line,
+                  borderColor: charFontColor === color ? '#7C3AED' : theme.line,
                 }}
               >
                 {charFontColor === color && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✓</Text>}
@@ -1005,18 +1005,18 @@ export default function EditCharacterScreen() {
                   flex: 1, paddingVertical: 10, borderRadius: 10,
                   alignItems: 'center',
                   borderWidth: 1.5,
-                  borderColor: charFontSize === size ? theme.gold : theme.line,
-                  backgroundColor: charFontSize === size ? theme.goldWash : theme.surfaceRaised,
+                  borderColor: charFontSize === size ? '#7C3AED' : theme.line,
+                  backgroundColor: charFontSize === size ? '#7C3AED'Wash : theme.surfaceRaised,
                 }}
               >
-                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? theme.brightGold : theme.secondaryText }}>{label}</Text>
+                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? '#C084FC' : theme.secondaryText }}>{label}</Text>
                 <Text style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>{size}px</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {(!!charFontColor || charFontSize > 0) && (
-            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.goldLine }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#7C3AED'Line }}>
               <Text style={{ fontSize: 10, color: theme.muted, marginBottom: 4 }}>👀 Preview:</Text>
               <Text style={{ fontSize: charFontSize || 15, color: charFontColor || theme.text, fontWeight: '500' }}>
                 நான் உன்னை ரொம்ப miss பண்றேன்! 💕
@@ -1025,7 +1025,7 @@ export default function EditCharacterScreen() {
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு"  openSections={openSections} onToggle={toggleSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ color: theme.secondaryText, fontSize: 11, lineHeight: 17 }}>
@@ -1035,7 +1035,7 @@ export default function EditCharacterScreen() {
             <Switch
               value={avatarReflectionEnabled}
               onValueChange={setAvatarReflectionEnabled}
-              trackColor={{ false: '#555', true: theme.gold }}
+              trackColor={{ false: '#555', true: '#7C3AED' }}
               thumbColor="#fff"
             />
           </View>
@@ -1043,17 +1043,17 @@ export default function EditCharacterScreen() {
             <View>
           {/* User Prasana Photo inside Avatar Reflection */}
           <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.line }}>
-            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>📸 உன் Photo (Prasana Mode)</Text>
+            <Text style={[styles.sectionLabel, { color: '#C084FC', marginBottom: 4 }]}>📸 உன் Photo (Prasana Mode)</Text>
             <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 10 }}>இந்த character-கிட்ட Prasana mode-ல் chat பண்ணும்போது AI உன் தோற்றம் mention பண்ண இந்த photo use ஆகும்.</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {uploadingUserPrasanaPhoto
-                ? <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.gold, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color={theme.brightGold} /></View>
+                ? <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: '#7C3AED', justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator  /></View>
                 : userPrasanaPhotoUri
                   ? <TouchableOpacity onPress={pickUserPrasanaPhoto}>
                       <Image source={{ uri: userPrasanaPhotoUri }} style={{ width: 70, height: 70, borderRadius: 35 }} />
                     </TouchableOpacity>
                   : <TouchableOpacity onPress={pickUserPrasanaPhoto}
-                      style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.gold, justifyContent: 'center', alignItems: 'center' }}>
+                      style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: '#7C3AED', justifyContent: 'center', alignItems: 'center' }}>
                       <Text style={{ fontSize: 28 }}>😈</Text>
                     </TouchableOpacity>
               }
@@ -1076,7 +1076,7 @@ export default function EditCharacterScreen() {
             </View>
           </View>
 
-              <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 8, marginBottom: 4 }]}>✏️ Reflection Instruction (திருத்தலாம்)</Text>
+              <Text style={[styles.sectionLabel, { color: '#C084FC', marginTop: 8, marginBottom: 4 }]}>✏️ Reflection Instruction (திருத்தலாம்)</Text>
               <Text style={{ color: theme.muted, fontSize: 10, marginBottom: 6 }}>
                 {'Empty-ஆ விட்டால் default instruction use ஆகும். Custom instruction போட்டால் அது use ஆகும்.'}
               </Text>
@@ -1093,13 +1093,13 @@ export default function EditCharacterScreen() {
                 onPress={() => setAvatarReflectionPrompt('')}
                 style={{ marginTop: 8, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 10, alignSelf: 'flex-start' }}
               >
-                <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
+                <Text style={{ color: '#C084FC', fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
               </TouchableOpacity>
             </View>
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்"  openSections={openSections} onToggle={toggleSection}>
           <View style={styles.moodRow}>
             <View style={styles.moodInfo}>
               <Text style={styles.moodTitle}>
@@ -1114,7 +1114,7 @@ export default function EditCharacterScreen() {
             <Switch
               value={normalMode}
               onValueChange={toggleNormalMode}
-              trackColor={{ false: theme.danger, true: theme.gold }}
+              trackColor={{ false: theme.danger, true: '#7C3AED' }}
               thumbColor="#fff"
             />
           </View>
@@ -1135,7 +1135,7 @@ export default function EditCharacterScreen() {
 
           {/* Presana behaviour — visible */}
           <View style={{ marginTop: 14 }}>
-            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>😈 PRESANA MODE — BEHAVIOUR TEXT</Text>
+            <Text style={[styles.sectionLabel, { color: '#C084FC', marginBottom: 4 }]}>😈 PRESANA MODE — BEHAVIOUR TEXT</Text>
             <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 6 }}>இந்த character presana mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
@@ -1151,7 +1151,7 @@ export default function EditCharacterScreen() {
 
           {/* Normal behaviour — visible */}
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>😇 NORMAL MODE — BEHAVIOUR TEXT</Text>
+            <Text style={[styles.sectionLabel, { color: '#C084FC', marginBottom: 4 }]}>😇 NORMAL MODE — BEHAVIOUR TEXT</Text>
             <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 6 }}>Normal mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
@@ -1180,36 +1180,36 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்"  openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: theme.secondaryText, fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: theme.goldLine }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#7C3AED'Line }}>
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.gold }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: theme.brightGold }}>B</Text>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#C084FC' }}>B</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.goldLine }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brightGold }}>{l}</Text>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED'Line }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#C084FC' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => baseRulesEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: theme.goldLine }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#7C3AED'Line }} />
             ))}
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setForeColor('#111111')}
               style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
-              <Text style={{ fontSize: 10, color: theme.brightGold }}>↺</Text>
+              <Text style={{ fontSize: 10, color: '#C084FC' }}>↺</Text>
             </TouchableOpacity>
           </View>
           <RichEditor
             ref={baseRulesEditorRef}
             initialContentHTML={basePromptEdit}
             onChange={(html) => setBasePromptEdit(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#7C3AED'Line, backgroundColor: theme.surfaceRaised }}
             editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 13 }}
             useContainer={false}
             autoCorrect={false}
@@ -1218,54 +1218,54 @@ export default function EditCharacterScreen() {
             onPress={() => setBasePromptEdit(BASE_PROMPT)}
             style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 12, alignSelf: 'flex-start' }}
           >
-            <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
+            <Text style={{ color: '#C084FC', fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
           </TouchableOpacity>
         </SectionCard>
 
-        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt"  openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: theme.secondaryText, fontSize: 10, marginBottom: 8 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
             <TouchableOpacity
               onPress={saveDefaultPrompt}
-              style={{ backgroundColor: theme.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
+              style={{ backgroundColor: '#7C3AED', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
             >
               <Text style={{ color: theme.background, fontSize: 10, fontWeight: '700' }}>⭐ Default Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={loadDefaultPrompt}
-              style={{ backgroundColor: defaultPromptExists ? theme.surfaceRaised : '#555', borderWidth: 1, borderColor: theme.goldLine, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
+              style={{ backgroundColor: defaultPromptExists ? theme.surfaceRaised : '#555', borderWidth: 1, borderColor: '#7C3AED'Line, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
             >
-              <Text style={{ color: theme.brightGold, fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
+              <Text style={{ color: '#C084FC', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: theme.goldLine }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#7C3AED'Line }}>
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.gold }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: theme.brightGold }}>B</Text>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#C084FC' }}>B</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.goldLine }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brightGold }}>{l}</Text>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED'Line }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#C084FC' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => charPromptEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: theme.goldLine }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#7C3AED'Line }} />
             ))}
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.setForeColor('#111111')}
               style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
-              <Text style={{ fontSize: 10, color: theme.brightGold }}>↺</Text>
+              <Text style={{ fontSize: 10, color: '#C084FC' }}>↺</Text>
             </TouchableOpacity>
           </View>
           <RichEditor
             ref={charPromptEditorRef}
             initialContentHTML={charOnly}
             onChange={(html) => setCharOnly(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#7C3AED'Line, backgroundColor: theme.surfaceRaised }}
             editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
             useContainer={false}
@@ -1273,8 +1273,8 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: theme.brightGold, fontSize: 10, marginBottom: 8 }}>
+        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt"  openSections={openSections} onToggle={toggleSection}>
+          <Text style={{ color: '#C084FC', fontSize: 10, marginBottom: 8 }}>
             {'Photo/Video அனுப்பும்போது இந்த prompt மட்டும் use ஆகும். Empty விட்டால் character-ஓட default prompt use ஆகும்.'}
           </Text>
           <TextInput
@@ -1295,40 +1295,40 @@ export default function EditCharacterScreen() {
               onPress={() => setImageVideoPrompt('')}
               style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 10, alignSelf: 'flex-start' }}
             >
-              <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Clear (Default-க்கு)</Text>
+              <Text style={{ color: '#C084FC', fontSize: 11, fontWeight: '600' }}>↺ Clear (Default-க்கு)</Text>
             </TouchableOpacity>
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு"  openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 8 }]}>😈 PRESANA</Text>
+            <Text style={[styles.sectionLabel, { color: '#C084FC', marginBottom: 8 }]}>😈 PRESANA</Text>
             <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
               {presanaAvatarUri
                 ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
                 : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
                     <Text style={{ fontSize: 28 }}>😈</Text>
-                    <Text style={{ fontSize: 10, color: theme.brightGold, marginTop: 4 }}>Tap to set</Text>
+                    <Text style={{ fontSize: 10, color: '#C084FC', marginTop: 4 }}>Tap to set</Text>
                   </View>
               }
             </TouchableOpacity>
             {presanaAvatarUri && (
               <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
-                <Text style={{ color: theme.brightGold, fontSize: 12 }}>🗑️ Remove</Text>
+                <Text style={{ color: '#C084FC', fontSize: 12 }}>🗑️ Remove</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, borderRadius: 12 }}
+              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: '#7C3AED'Line, borderRadius: 12 }}
               onPress={() => { setModeCloudInput(''); setShowModeCloud('presana'); }}
             >
-              <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
+              <Text style={{ color: '#C084FC', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           {analyzingFields && (
-            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:theme.surfaceRaised, borderWidth:1, borderColor:theme.goldLine, borderRadius:8 }}>
-              <ActivityIndicator size="small" color={theme.brightGold} style={{ marginRight:8 }} />
+            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:theme.surfaceRaised, borderWidth:1, borderColor:'#7C3AED'Line, borderRadius:8 }}>
+              <ActivityIndicator size="small"  style={{ marginRight:8 }} />
               <Text style={{ color:theme.secondaryText, fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
             </View>
           )}

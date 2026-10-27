@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ImageBackground,
@@ -2015,7 +2016,7 @@ export default function ChatScreen() {
           )}
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
-              <ActivityIndicator color={theme.brightGold} size="small" />
+              <ActivityIndicator color="#7C3AED" size="small" />
               {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle], styles.messageLink, openChatUrl)}
             </View>
           ) : item.imageUrl ? (
@@ -2128,78 +2129,94 @@ export default function ChatScreen() {
     ? (presanaAvatarUri || avatarUri)
     : (normalAvatarUri || avatarUri);
 
+  const headerLeft = () => (
+    <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+      <Ionicons name="arrow-back" size={20} color="#4338CA" />
+    </TouchableOpacity>
+  );
+
   const headerTitle = () => (
-    <TouchableOpacity style={styles.headerTitleWrap} onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}>
-      {avatarUri
-        ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
-        : persona
-          ? <View style={[styles.headerAvatar, { backgroundColor: persona.avatarColor }]}>
-              <Text style={styles.headerAvatarText}>{persona.avatarLetter || persona.emoji}</Text>
-            </View>
-          : null
-      }
-      <View>
-        <Text style={styles.headerName}>{persona?.name ?? '...'}</Text>
+    <View style={styles.headerTitleWrap}>
+      <TouchableOpacity
+        style={styles.headerAvatarWrap}
+        onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}
+      >
+        <LinearGradient
+          colors={['#C084FC', '#818CF8', '#E879F9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerAvatarRing}
+        >
+          {activeAvatarUri
+            ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
+            : persona
+              ? <View style={[styles.headerAvatar, { backgroundColor: persona.avatarColor }]}>
+                  <Text style={styles.headerAvatarText}>{persona.avatarLetter || persona.emoji}</Text>
+                </View>
+              : null
+          }
+        </LinearGradient>
+        <View style={styles.headerOnlineDot} />
+      </TouchableOpacity>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={styles.headerName}>{(persona?.name ?? '...') + ' 👑'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {/* Mood badge */}
+          <View style={styles.onlineBadge}>
+            <View style={styles.onlineInnerDot} />
+            <Text style={styles.onlineText}>Online</Text>
+          </View>
           <TouchableOpacity onPress={toggleMood} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Text style={[styles.headerMoodBadge, moodMode !== 'presana' && styles.headerMoodNormal]}>
-              {moodMode === 'normal' ? '😇 Normal' : moodMode === 'whatsapp' ? '💬 WA' : moodMode === 'story' ? '📖 Story' : '😈 Presana'} ⇄
+            <Text style={styles.headerMoodPill}>
+              {moodMode === 'normal' ? '😇' : moodMode === 'whatsapp' ? '💬' : moodMode === 'story' ? '📖' : '😈'}
             </Text>
           </TouchableOpacity>
-          {/* Dialect badge */}
-          {dialectLabel && (
-            <>
-              <Text style={{ color: '#4db6ac', fontSize: 10 }}>·</Text>
-              <TouchableOpacity onPress={toggleDialect} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Text style={[styles.headerDialectBadge, !dialectMode && { color: '#80cbc4' }]}>{dialectLabel} ⇄</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {personaId === 'kiruthika' && (
-            <TouchableOpacity
-              onPress={() => { setKiruthikaDetailsDraft(kiruthikaUserDetails); setShowKiruthikaDetails(true); }}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Text style={{ fontSize: 10, color: theme.brightGold, fontWeight: '700', backgroundColor: theme.goldWash, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>📝 Details</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   const headerRight = () => (
     <View style={styles.headerBtns}>
-
-      <TouchableOpacity style={styles.headerBtn} onPress={() => setShowStyleSheet(true)}>
-        <Text style={styles.headerBtnIcon}>🎨</Text>
+      <TouchableOpacity style={styles.headerActionItem} onPress={() => setShowStyleSheet(true)}>
+        <Text style={styles.headerActionIcon}>🎨</Text>
+        <Text style={styles.headerActionLabel}>Theme</Text>
       </TouchableOpacity>
       {persona && (
-        <TouchableOpacity style={styles.headerBtn} onPress={() => {
+        <TouchableOpacity style={styles.headerActionItem} onPress={() => {
           ParamsStore.setEditPersonaId(persona.id);
           router.push('/edit-character');
         }}>
-          <Text style={styles.headerBtnIcon}>✏️</Text>
+          <Text style={styles.headerActionIcon}>✏️</Text>
+          <Text style={styles.headerActionLabel}>Edit</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={styles.headerBtn} onPress={clearChat}>
-        <Text style={styles.headerBtnIcon}>🗑️</Text>
+      <TouchableOpacity style={styles.headerActionItem} onPress={clearChat}>
+        <Text style={styles.headerActionIcon}>🗑️</Text>
+        <Text style={styles.headerActionLabel}>Delete</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.headerActionItem} onPress={() => setShowStyleSheet(true)}>
+        <Ionicons name="ellipsis-vertical" size={18} color="#4338CA" />
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: wallpaperBg }]}>
-      <StatusBar backgroundColor={theme.gold} barStyle="dark-content" />
+    <ImageBackground
+      source={require('../assets/images/chat_rose_bg.png')}
+      style={styles.bgContainer}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+        <StatusBar backgroundColor="#FDF2F8" barStyle="dark-content" />
       {avatarAsBg && activeAvatarUri ? (
         <Image source={{ uri: activeAvatarUri }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.12 }} blurRadius={6} resizeMode="cover" />
       ) : null}
       <Stack.Screen options={{
+        headerLeft,
         headerTitle,
         headerRight,
-        headerStyle: { backgroundColor: theme.gold },
-        headerTintColor: theme.background,
+        headerStyle: { backgroundColor: 'rgba(253, 242, 248, 0.94)' },
+        headerShadowVisible: false,
       }} />
 
       {/* Offline status banner — status only, settings via ⚙️ gear icon */}
@@ -2245,7 +2262,7 @@ export default function ChatScreen() {
         {loading && (
           <View style={styles.loadingRow}>
             <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color={theme.brightGold} />
+              <ActivityIndicator size="small" color="#7C3AED" />
               <Text style={styles.loadingText}>
                 {persona ? `${persona.name} பதில் அளிக்கிறார்...` : 'பதில் தயாராகிறது...'}
               </Text>
@@ -2262,69 +2279,78 @@ export default function ChatScreen() {
           </TouchableOpacity>
         )}
         <View style={{ position: 'relative' }}>
-          {/* Floating action buttons — absolute right side, above input bar */}
+          {/* Floating action buttons — 3D glossy style with labels */}
           <View style={styles.chatFabs}>
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={[styles.chatFab3D, { backgroundColor: '#F5EEFD', borderColor: '#D8B4FE' }]}
+                onPress={() => setShowGenModal(true)}
+                disabled={generatingPhoto}
+              >
+                {generatingPhoto
+                  ? <ActivityIndicator color="#7C3AED" size="small" />
+                  : <Ionicons name="camera" size={22} color="#334155" />
+                }
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Camera</Text></View>
+            </View>
 
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: theme.gold }]}
-              onPress={() => setShowGenModal(true)}
-              disabled={generatingPhoto}
-            >
-              {generatingPhoto
-                ? <ActivityIndicator color={theme.brightGold} size="small" />
-                : <Text style={styles.cameraIcon}>📷</Text>
-              }
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: theme.surfaceRaised }]}
-              onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
-            >
-              <Text style={styles.cameraIcon}>☁️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: theme.surfaceRaised }]}
-              onPress={() => handleTranslate(input)}
-              disabled={translateLoading}
-            >
-              {translateLoading
-                ? <ActivityIndicator color={theme.brightGold} size="small" />
-                : <Text style={styles.cameraIcon}>🔤</Text>
-              }
-            </TouchableOpacity>
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={[styles.chatFab3D, { backgroundColor: '#E0F2FE', borderColor: '#7DD3FC' }]}
+                onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
+              >
+                <Ionicons name="cloud" size={22} color="#0284C7" />
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Cloud</Text></View>
+            </View>
 
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={[styles.chatFab3D, { backgroundColor: '#FDF2F8', borderColor: '#F472B6' }]}
+                onPress={() => handleTranslate(input)}
+                disabled={translateLoading}
+              >
+                {translateLoading
+                  ? <ActivityIndicator color="#DB2777" size="small" />
+                  : <Ionicons name="language" size={22} color="#1E293B" />
+                }
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Translate</Text></View>
+            </View>
           </View>
-          {/* Compact input bar — WhatsApp style */}
+          {/* Elegant White-Lavender Pill input bar (No smiley on left, attach on right) */}
           <View style={styles.inputBar}>
-            {/* Input wrapper: TextInput + attach icon inside RIGHT */}
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
                 value={input}
                 onChangeText={setInput}
                 placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
-                placeholderTextColor={theme.muted}
+                placeholderTextColor="#94A3B8"
                 multiline
                 maxLength={1000}
               />
-              {/* Attach button — inside text box, right side */}
               <TouchableOpacity
                 style={styles.attachBtn}
                 onPress={handleFileAttach}
                 disabled={fileLoading || loading}
               >
                 {fileLoading
-                  ? <ActivityIndicator color={theme.brightGold} size="small" />
-                  : <Text style={{ fontSize: 20, color: theme.brightGold }}>📎</Text>
+                  ? <ActivityIndicator color="#7C3AED" size="small" />
+                  : <Ionicons name="attach" size={22} color="#7C3AED" />
                 }
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim() || loading}
-            >
-              <Text style={styles.sendIcon}>➤</Text>
-            </TouchableOpacity>
+            {!!input.trim() && (
+              <TouchableOpacity
+                style={[styles.sendBtn, loading && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={loading}
+              >
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -2500,7 +2526,7 @@ export default function ChatScreen() {
             </View>
             {promptLoading ? (
               <View style={styles.promptLoading}>
-                <ActivityIndicator size="large" color={theme.brightGold} />
+                <ActivityIndicator size="large" color="#7C3AED" />
                 <Text style={styles.promptLoadingTxt}>AI image-ஐ analyze பண்றது... ⏳</Text>
               </View>
             ) : (
@@ -2529,7 +2555,7 @@ export default function ChatScreen() {
             </View>
             {translateLoading ? (
               <View style={styles.promptLoading}>
-                <ActivityIndicator size="large" color={theme.brightGold} />
+                <ActivityIndicator size="large" color="#7C3AED" />
                 <Text style={styles.promptLoadingTxt}>Translate பண்றேன்... ⏳</Text>
               </View>
             ) : (
@@ -2811,7 +2837,7 @@ export default function ChatScreen() {
         <Modal visible={showKiruthikaDetails} transparent animationType="slide" onRequestClose={() => setShowKiruthikaDetails(false)}>
           <TouchableOpacity style={{ flex: 1, backgroundColor: '#00000066' }} activeOpacity={1} onPress={() => setShowKiruthikaDetails(false)}>
             <TouchableOpacity activeOpacity={1} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, borderWidth: 1, borderColor: theme.goldLine }}>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.brightGold, marginBottom: 6 }}>📝 என்னோட Details — கிருத்திகா-க்கு</Text>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: "#7C3AED", marginBottom: 6 }}>📝 என்னோட Details — கிருத்திகா-க்கு</Text>
               <Text style={{ fontSize: 12, color: theme.secondaryText, marginBottom: 12, lineHeight: 18 }}>{"உன்னோட உண்மையான details இங்க type பண்ணு. கிருத்திகா நினைவில் வச்சு பேசுவா. (பெயர், ஊர், job, family, health — எல்லாம் சொல்லலாம்)"}</Text>
               <TextInput
                 style={{ borderWidth: 1.5, borderColor: theme.goldLine, borderRadius: 12, padding: 14, fontSize: 14, minHeight: 130, textAlignVertical: 'top', color: theme.text, backgroundColor: theme.surfaceRaised, lineHeight: 20 }}
@@ -2880,7 +2906,7 @@ export default function ChatScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 10 }}>
               <Text style={{ color: theme.secondaryText, fontSize: 12 }}>
                 தற்போதைய நேரம்:{' '}
-                <Text style={{ color: theme.brightGold, fontWeight: '700' }}>{fmtSec(trimCurrentSec)}</Text>
+                <Text style={{ color: "#7C3AED", fontWeight: '700' }}>{fmtSec(trimCurrentSec)}</Text>
                 {' '}/ {trimPending ? fmtSec(trimPending.durationSec) : '00:00'}
               </Text>
             </View>
@@ -2889,14 +2915,14 @@ export default function ChatScreen() {
                 onPress={() => setTrimStartSec(Math.min(trimCurrentSec, trimEndSec - 1))}
                 style={{ flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: theme.brightGold, fontWeight: '700', fontSize: 13 }}>▶ Start இங்கே வை</Text>
+                <Text style={{ color: "#7C3AED", fontWeight: '700', fontSize: 13 }}>▶ Start இங்கே வை</Text>
                 <Text style={{ color: theme.secondaryText, fontSize: 11, marginTop: 2 }}>{fmtSec(trimStartSec)}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setTrimEndSec(Math.max(trimCurrentSec, trimStartSec + 1))}
                 style={{ flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: theme.brightGold, fontWeight: '700', fontSize: 13 }}>⏹ End இங்கே வை</Text>
+                <Text style={{ color: "#7C3AED", fontWeight: '700', fontSize: 13 }}>⏹ End இங்கே வை</Text>
                 <Text style={{ color: theme.secondaryText, fontSize: 11, marginTop: 2 }}>{fmtSec(trimEndSec)}</Text>
               </TouchableOpacity>
             </View>
@@ -2906,7 +2932,7 @@ export default function ChatScreen() {
             }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
                 {fmtSec(trimStartSec)} → {fmtSec(trimEndSec)}
-                {'  '}<Text style={{ color: theme.brightGold }}>({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)</Text>
+                {'  '}<Text style={{ color: "#7C3AED" }}>({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)</Text>
               </Text>
               <Text style={{ color: theme.muted, fontSize: 11, marginTop: 4 }}>
                 Video play பண்ணி சரியான நேரத்தில் ▶ Start / ⏹ End press பண்ணுங்க
@@ -2953,7 +2979,7 @@ export default function ChatScreen() {
           <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, borderWidth: 1, borderColor: theme.goldLine }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.line }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.brightGold }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: "#7C3AED" }}>
                 {stagingMedia?.isVideo ? '🎬 Video Preview' : '📷 Photo Preview'}
               </Text>
               <TouchableOpacity onPress={() => { setStagingMedia(null); setStagingCaption(''); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -3009,7 +3035,7 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
             {stagingUploading && (
-              <Text style={{ textAlign: 'center', color: theme.brightGold, fontSize: 12, marginTop: 8, fontWeight: '600' }}>
+              <Text style={{ textAlign: 'center', color: "#7C3AED", fontSize: 12, marginTop: 8, fontWeight: '600' }}>
                 ☁️ Cloudinary upload → AI analyze பண்றோம்…
               </Text>
             )}
@@ -3025,10 +3051,28 @@ export default function ChatScreen() {
 
 
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  bgContainer: { flex: 1 },
+  headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  headerAvatarWrap: { position: 'relative' },
+  headerAvatarRing: { width: 44, height: 44, borderRadius: 22, padding: 2.5, justifyContent: 'center', alignItems: 'center' },
+  headerOnlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#FFFFFF' },
+  onlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  onlineInnerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22C55E' },
+  onlineText: { fontSize: 12, fontWeight: '600', color: '#0D9488' },
+  headerMoodPill: { fontSize: 12, backgroundColor: 'rgba(216, 180, 254, 0.3)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 },
+  headerBackBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, marginRight: 8 },
+  headerActionItem: { alignItems: 'center', justifyContent: 'center', minWidth: 38 },
+  headerActionIcon: { fontSize: 18 },
+  headerActionLabel: { fontSize: 9.5, fontWeight: '600', color: '#4338CA', marginTop: 1 },
+  fabWithLabel: { alignItems: 'center', gap: 3 },
+  chatFab3D: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, elevation: 4, shadowColor: '#7C3AED', shadowOpacity: 0.2, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
+  fabPillBadge: { backgroundColor: 'rgba(15, 23, 42, 0.85)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+  fabPillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
   container: { flex: 1, backgroundColor: theme.background },
   flex: { flex: 1 },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -3059,14 +3103,14 @@ const styles = StyleSheet.create({
   generatedImg: { width: 220, height: 280, borderRadius: 8, marginBottom: 4 },
   bubble: { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, elevation: 2, overflow: 'hidden' },
   userBubble: { backgroundColor: '#6366F1', borderTopRightRadius: 4, borderWidth: 1, borderColor: 'rgba(199, 210, 254, 0.4)' },
-  aiBubble: { backgroundColor: 'rgba(255, 255, 255, 0.94)', borderTopLeftRadius: 4, borderWidth: 1.2, borderColor: 'rgba(216, 180, 254, 0.7)', elevation: 2, shadowColor: '#C084FC', shadowOpacity: 0.1, shadowRadius: 5 },
+  aiBubble: { backgroundColor: '#FFFFFF', borderRadius: 20, borderTopLeftRadius: 6, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.6)', elevation: 3, shadowColor: '#C084FC', shadowOpacity: 0.12, shadowRadius: 6, paddingHorizontal: 16, paddingVertical: 12 },
   galleryBubble: { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0 },
   msgText: { fontSize: 15, lineHeight: 22, color: '#1E1B4B' },
   messageLink: { color: '#6366F1', textDecorationLine: 'underline' },
   timeText: { fontSize: 10, color: '#64748B', alignSelf: 'flex-end', marginTop: 3 },
   loadingRow: { flexDirection: 'row', padding: 8, paddingLeft: 14 },
   loadingBubble: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.goldLine },
-  loadingText: { color: theme.brightGold, fontSize: 13 },
+  loadingText: { color: "#7C3AED", fontSize: 13 },
   chatFabs: {
     position: 'absolute', right: 10, bottom: 74,
     alignItems: 'center', gap: 10, zIndex: 100,
@@ -3104,7 +3148,7 @@ const styles = StyleSheet.create({
   pickerSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine },
   pickerHandle: { width: 40, height: 4, backgroundColor: theme.goldSoft, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.line },
-  pickerTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold },
+  pickerTitle: { fontSize: 17, fontWeight: 'bold', color: "#7C3AED" },
   pickerClose: { fontSize: 20, color: theme.secondaryText, padding: 4 },
   pickerCharInfo: { backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: theme.goldLine },
   pickerCharText: { color: theme.secondaryText, fontSize: 13 },
@@ -3114,7 +3158,7 @@ const styles = StyleSheet.create({
   styleRadioSelected: { borderColor: theme.gold },
   styleRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.brightGold },
   styleLabel: { fontSize: 14.5, color: theme.secondaryText, flex: 1 },
-  styleLabelSelected: { color: theme.brightGold, fontWeight: '600' },
+  styleLabelSelected: { color: "#7C3AED", fontWeight: '600' },
 
   // New split layout
   styleListFull: { maxHeight: 340 },
@@ -3125,7 +3169,7 @@ const styles = StyleSheet.create({
   // Generate collapsible
   generateSection: { borderTopWidth: 1, borderTopColor: theme.line, marginTop: 4 },
   generateToggle: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.surfaceRaised },
-  generateToggleTxt: { color: theme.brightGold, fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  generateToggleTxt: { color: "#7C3AED", fontWeight: '700', fontSize: 14, textAlign: 'center' },
   generateInner: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   hfBadge: { backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
   hfBadgeTxt: { color: theme.secondaryText, fontSize: 12, textAlign: 'center' },
@@ -3156,7 +3200,7 @@ const styles = StyleSheet.create({
   browserTitle: { color: theme.background, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   browserCount: { color: '#39300F', fontSize: 13, marginTop: 2 },
   browserSendBtn: { backgroundColor: theme.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  browserSendTxt: { color: theme.brightGold, fontSize: 12, fontWeight: '700' },
+  browserSendTxt: { color: "#7C3AED", fontSize: 12, fontWeight: '700' },
   browserPhotoWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   browserCenter: { alignItems: 'center', gap: 16 },
   browserLoadingTxt: { color: theme.secondaryText, fontSize: 14, textAlign: 'center', marginTop: 12 },
@@ -3172,7 +3216,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10,
   },
   navBtnDisabled: { opacity: 0.3 },
-  navBtnTxt: { color: theme.brightGold, fontWeight: '700', fontSize: 14 },
+  navBtnTxt: { color: "#7C3AED", fontWeight: '700', fontSize: 14 },
   dotsWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, flex: 1, justifyContent: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#555' },
   dotActive: { backgroundColor: theme.brightGold, width: 12, height: 12, borderRadius: 6 },
@@ -3197,9 +3241,9 @@ const styles = StyleSheet.create({
     padding: 20, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine,
   },
   gemmaDivider: { height: 1, backgroundColor: theme.line, marginVertical: 20 },
-  gemmaTitle: { fontSize: 16, fontWeight: 'bold', color: theme.brightGold, marginBottom: 10 },
+  gemmaTitle: { fontSize: 16, fontWeight: 'bold', color: "#7C3AED", marginBottom: 10 },
   gemmaDesc: { fontSize: 13, color: theme.secondaryText, lineHeight: 20, marginBottom: 14 },
-  gemmaPortHint: { fontWeight: 'bold', color: theme.brightGold },
+  gemmaPortHint: { fontWeight: 'bold', color: "#7C3AED" },
   gemmaPortLabel: { fontSize: 13, fontWeight: '600', color: theme.secondaryText, marginBottom: 6 },
   gemmaPortInput: {
     borderWidth: 1, borderColor: theme.goldLine, borderRadius: 10, backgroundColor: theme.surfaceRaised,
@@ -3221,12 +3265,12 @@ const styles = StyleSheet.create({
   },
   downloadBtnTxt: { color: theme.background, fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
   gemmaReady: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
-  gemmaReadyTxt: { color: theme.brightGold, fontWeight: '600', fontSize: 14 },
+  gemmaReadyTxt: { color: "#7C3AED", fontWeight: '600', fontSize: 14 },
   gemmaAlert: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
   gemmaAlertTxt: { color: theme.secondaryText, fontSize: 13 },
   gemmaProgress: { padding: 4, marginBottom: 8 },
   gemmaProgressTxt: { color: theme.secondaryText, fontSize: 12, marginBottom: 8, lineHeight: 18 },
-  gemmaProgressPct: { color: theme.brightGold, fontWeight: 'bold', fontSize: 14, textAlign: 'center', marginTop: 4 },
+  gemmaProgressPct: { color: "#7C3AED", fontWeight: 'bold', fontSize: 14, textAlign: 'center', marginTop: 4 },
   progressBarBg: { height: 10, backgroundColor: theme.surfaceSoft, borderRadius: 5, overflow: 'hidden' },
   progressBarFill: { height: 10, backgroundColor: theme.gold, borderRadius: 5 },
   gemmaErrorBox: { backgroundColor: theme.dangerWash, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.danger },
@@ -3237,7 +3281,7 @@ const styles = StyleSheet.create({
   },
   mobileWarnBox: { backgroundColor: theme.surface, borderRadius: 18, padding: 24, width: '100%', borderWidth: 1, borderColor: theme.goldLine },
   mobileWarnIcon: { fontSize: 36, textAlign: 'center', marginBottom: 10 },
-  mobileWarnTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold, textAlign: 'center', marginBottom: 10 },
+  mobileWarnTitle: { fontSize: 17, fontWeight: 'bold', color: "#7C3AED", textAlign: 'center', marginBottom: 10 },
   mobileWarnDesc: { fontSize: 14, color: theme.secondaryText, lineHeight: 22, marginBottom: 20, textAlign: 'center' },
   mobileWarnBtns: { flexDirection: 'row', gap: 12 },
   mobileWarnCancel: { flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
@@ -3251,7 +3295,7 @@ const styles = StyleSheet.create({
     marginTop: 10, backgroundColor: theme.surfaceRaised, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: theme.goldLine,
   },
-  addUrlBtnTxt: { color: theme.brightGold, fontSize: 11, fontWeight: '700' },
+  addUrlBtnTxt: { color: "#7C3AED", fontSize: 11, fontWeight: '700' },
   addUrlBox: { width: '100%', paddingHorizontal: 4, marginTop: 8 },
   addUrlInput: {
     backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine,
@@ -3281,7 +3325,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface, borderRadius: 18, width: '100%', maxHeight: '75%',
     overflow: 'hidden', paddingBottom: 8, borderWidth: 1, borderColor: theme.goldLine,
   },
-  selectTextTitle: { fontSize: 16, fontWeight: '800', color: theme.brightGold, padding: 16, paddingBottom: 4 },
+  selectTextTitle: { fontSize: 16, fontWeight: '800', color: "#7C3AED", padding: 16, paddingBottom: 4 },
   selectTextHint: { fontSize: 11, color: theme.muted, paddingHorizontal: 16, paddingBottom: 8 },
   selectTextScroll: { maxHeight: 280, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.line, backgroundColor: theme.surfaceRaised },
   selectTextContent: {
@@ -3312,12 +3356,12 @@ const styles = StyleSheet.create({
   styleSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   styleSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine },
   styleSheetHandle: { width: 40, height: 4, backgroundColor: theme.goldSoft, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 6 },
-  styleSheetTitle: { fontSize: 20, fontWeight: 'bold', color: theme.brightGold, marginBottom: 16, marginTop: 4 },
+  styleSheetTitle: { fontSize: 20, fontWeight: 'bold', color: "#7C3AED", marginBottom: 16, marginTop: 4 },
   styleSheetSection: { fontSize: 14, fontWeight: '700', color: theme.text, marginBottom: 10, marginTop: 4 },
   styleSheetSub: { fontSize: 12, color: theme.muted, marginBottom: 8, marginTop: -6 },
   avatarThemeBtn: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: theme.goldLine, alignItems: 'center' },
   avatarThemeBtnActive: { backgroundColor: theme.gold, borderColor: theme.brightGold },
-  avatarThemeTxt: { fontSize: 14, color: theme.brightGold, fontWeight: '600' },
+  avatarThemeTxt: { fontSize: 14, color: "#7C3AED", fontWeight: '600' },
   styleSheetClose: { backgroundColor: theme.gold, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   styleSheetCloseTxt: { color: theme.background, fontSize: 16, fontWeight: 'bold' },
 
@@ -3326,21 +3370,21 @@ const styles = StyleSheet.create({
   wallpaperChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4 },
   wallpaperChipActive: { borderColor: theme.gold },
   wallpaperChipTxt: { fontSize: 13, fontWeight: '600', color: theme.background },
-  wallpaperCheck: { fontSize: 12, color: theme.brightGold, fontWeight: '900' },
+  wallpaperCheck: { fontSize: 12, color: "#7C3AED", fontWeight: '900' },
 
   // ── Bubble style chips ──
   bubbleStyleRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   bubbleStyleChip: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: theme.goldLine, alignItems: 'center', backgroundColor: theme.surfaceRaised },
   bubbleStyleChipActive: { borderColor: theme.brightGold, backgroundColor: theme.goldWash },
   bubbleStyleTxt: { fontSize: 13, fontWeight: '600', color: theme.secondaryText },
-  bubbleStyleTxtActive: { color: theme.brightGold },
+  bubbleStyleTxtActive: { color: "#7C3AED" },
 
   // ── Birthday ──
   bdayRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
   bdayInput: { flex: 1, borderWidth: 1.5, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, color: theme.text, letterSpacing: 2 },
   bdaySaveBtn: { backgroundColor: theme.gold, borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
   bdaySaveTxt: { color: theme.background, fontWeight: 'bold', fontSize: 14 },
-  bdaySet: { fontSize: 12, color: theme.brightGold, marginBottom: 12 },
+  bdaySet: { fontSize: 12, color: "#7C3AED", marginBottom: 12 },
 
   // ── Full-screen viewer prompt button ──
   viewerPromptBtn: {
@@ -3360,7 +3404,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     padding: 18, borderBottomWidth: 1, borderBottomColor: theme.line,
   },
-  promptTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold },
+  promptTitle: { fontSize: 17, fontWeight: 'bold', color: "#7C3AED" },
   promptClose: { fontSize: 22, color: theme.secondaryText },
   promptLoading: { padding: 40, alignItems: 'center', gap: 14 },
   promptLoadingTxt: { fontSize: 14, color: theme.secondaryText, textAlign: 'center' },

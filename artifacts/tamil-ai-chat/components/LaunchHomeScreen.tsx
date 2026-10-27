@@ -76,15 +76,14 @@ export default function LaunchHomeScreen() {
   const headerHeight = Math.max(50, Math.min(64, Math.round(pageHeight * 0.075)));
   const gridRowGap = compact ? 8 : 10;
   const availableCardsAndHero = Math.max(
-    0,
+    380,
     pageHeight - topInset - bottomInset - headerHeight - verticalGap * 2 - gridRowGap,
   );
   const tileWidth = Math.max(0, Math.floor((pageWidth - 32 - 16) / 3));
-  // Exact card aspect ratio matching image (height = width * 0.92)
-  const cardHeight = Math.round(tileWidth * 0.92);
-  // Hero banner takes 47% of page height, ensuring both cards and hero fit snugly without giant gaps
-  const maxHeroByCards = availableCardsAndHero - (cardHeight * 2 + gridRowGap);
-  const heroHeight = Math.max(180, Math.min(Math.round(pageHeight * 0.47), maxHeroByCards));
+  // Responsive card height: expands to fill screen space evenly without empty bottom gap
+  const heroHeight = Math.max(180, Math.min(Math.round(availableCardsAndHero * 0.44), 320));
+  const remainingForCards = Math.max(180, availableCardsAndHero - heroHeight - gridRowGap);
+  const cardHeight = Math.max(Math.round(tileWidth * 0.92), Math.floor((remainingForCards - gridRowGap) / 2));
   const iconRingSize = Math.max(36, Math.min(72, Math.round(cardHeight * 0.4)));
   const smallText = cardHeight < 126;
   const headerIconSize = Math.max(42, Math.min(62, headerHeight - 4));
@@ -363,7 +362,7 @@ export default function LaunchHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4 },
+  page: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, justifyContent: 'space-between' },
   webPage: { paddingTop: 67, paddingBottom: 34 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logo: { width: 62, height: 62, borderRadius: 18, borderWidth: 1.5, borderColor: '#D64DFF' },
