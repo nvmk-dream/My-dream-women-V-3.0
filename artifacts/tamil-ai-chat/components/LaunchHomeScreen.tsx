@@ -27,22 +27,32 @@ const COVER_FOLDER = 'my-girls/home-cover';
 
 type ServerStatus = 'unknown' | 'ok' | 'sleeping';
 
+const CARD_IMAGES = {
+  textToImage: require('../assets/images/home_card_text_to_image.png'),
+  aiCharacters: require('../assets/images/home_card_ai_characters.png'),
+  groupChat: require('../assets/images/home_card_group_chat.png'),
+  imageToScript: require('../assets/images/home_card_image_to_script.png'),
+  faceSwap: require('../assets/images/home_card_face_swap.png'),
+  cloud: require('../assets/images/home_card_cloud.png'),
+};
+
 type Feature = {
   title: string;
   subtitle: string;
   icon: string;
   color: string;
+  bgImage: any;
   route?: string;
   launchIntent?: 'group-chat' | 'image-to-script';
 };
 
 const FEATURES: Feature[] = [
-  { title: 'Text to Image', subtitle: 'Create Images', icon: 'image-outline', color: '#E64BFF', route: '/prompt-image' },
-  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF' },
-  { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', route: '/ai-girls', launchIntent: 'group-chat' },
-  { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', route: '/ai-girls', launchIntent: 'image-to-script' },
-  { title: 'Face Swap', subtitle: 'Cloud', icon: 'swap-horizontal-outline', color: '#E64BFF', route: '/face-swap' },
-  { title: 'Cloud', subtitle: 'Your Gallery', icon: 'cloud-outline', color: '#42CFFF', route: '/home' },
+  { title: 'Text to Image', subtitle: 'Create Images', icon: 'image-outline', color: '#E64BFF', bgImage: CARD_IMAGES.textToImage, route: '/prompt-image' },
+  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF', bgImage: CARD_IMAGES.aiCharacters },
+  { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', bgImage: CARD_IMAGES.groupChat, route: '/ai-girls', launchIntent: 'group-chat' },
+  { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', bgImage: CARD_IMAGES.imageToScript, route: '/ai-girls', launchIntent: 'image-to-script' },
+  { title: 'Face Swap', subtitle: 'Swap Faces', icon: 'swap-horizontal-outline', color: '#E64BFF', bgImage: CARD_IMAGES.faceSwap, route: '/face-swap' },
+  { title: 'Cloud', subtitle: 'Your Gallery', icon: 'cloud-outline', color: '#42CFFF', bgImage: CARD_IMAGES.cloud, route: '/home' },
 ];
 
 export default function LaunchHomeScreen() {
@@ -194,9 +204,15 @@ export default function LaunchHomeScreen() {
   const versionLabel = 'V' + version + (versionCode ? ' (' + versionCode + ')' : '');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
-      <StatusBar backgroundColor="#070A1B" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/home_floral_bg.png')}
+      style={styles.safe}
+      resizeMode="cover"
+    >
+      <View style={styles.ambientOverlay}>
+        <SafeAreaView style={styles.safeInner} edges={['top', 'left', 'right', 'bottom']}>
+          <StatusBar backgroundColor="#070A1B" barStyle="light-content" />
+          <Stack.Screen options={{ headerShown: false }} />
       <View
         style={[styles.page, Platform.OS === 'web' && styles.webPage]}
         onLayout={({ nativeEvent }) => {
@@ -326,7 +342,15 @@ export default function LaunchHomeScreen() {
               accessibilityState={{ disabled: !feature.route }}
               activeOpacity={0.82}
               disabled={!feature.route}
-              style={[styles.featureCard, { width: tileWidth, height: cardHeight, borderColor: feature.color, shadowColor: feature.color }]}
+              style={[
+                styles.featureCard,
+                {
+                  width: tileWidth,
+                  height: cardHeight,
+                  borderColor: feature.color,
+                  shadowColor: feature.color,
+                },
+              ]}
               onPress={feature.route ? () => {
                 if (feature.launchIntent) {
                   router.push({ pathname: '/ai-girls', params: { launch: feature.launchIntent } });
@@ -335,16 +359,53 @@ export default function LaunchHomeScreen() {
                 router.push(feature.route as any);
               } : undefined}
             >
-              <View style={[styles.featureIconRing, { width: iconRingSize, height: iconRingSize, borderRadius: iconRingSize / 2, marginBottom: smallText ? 5 : 10, borderColor: feature.color, shadowColor: feature.color }]}>
-                <Ionicons name={feature.icon as any} size={iconRingSize * 0.44} color={feature.color} />
-              </View>
-              <Text style={[styles.featureTitle, { fontSize: smallText ? 11 : 14, lineHeight: smallText ? 14 : 18 }]}>{feature.title}</Text>
-              <Text style={[styles.featureSubtitle, { fontSize: smallText ? 9 : 11, lineHeight: smallText ? 12 : 15, marginTop: smallText ? 1 : 3 }]}>{feature.subtitle}</Text>
+              <ImageBackground
+                source={feature.bgImage}
+                style={styles.cardBgImage}
+                imageStyle={styles.cardImageStyle}
+                resizeMode="cover"
+              >
+                <View style={[styles.cardIconBadge, { borderColor: feature.color, shadowColor: feature.color }]}>
+                  <Ionicons name={feature.icon as any} size={Math.round(iconRingSize * 0.45)} color={feature.color} />
+                </View>
+                <LinearGradient
+                  colors={['transparent', 'rgba(4, 9, 26, 0.72)', 'rgba(4, 9, 26, 0.96)']}
+                  style={styles.cardTextGradient}
+                >
+                  <Text
+                    numberOfLines={smallText ? 1 : 2}
+                    style={[
+                      styles.featureTitle,
+                      {
+                        fontSize: smallText ? 11 : 13,
+                        lineHeight: smallText ? 14 : 17,
+                      },
+                    ]}
+                  >
+                    {feature.title}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.featureSubtitle,
+                      {
+                        fontSize: smallText ? 9 : 11,
+                        lineHeight: smallText ? 12 : 14,
+                        marginTop: smallText ? 1 : 2,
+                      },
+                    ]}
+                  >
+                    {feature.subtitle}
+                  </Text>
+                </LinearGradient>
+              </ImageBackground>
             </TouchableOpacity>
           ))}
         </View>
       </View>
-    </SafeAreaView>
+        </SafeAreaView>
+      </View>
+    </ImageBackground>
   );
 }
 
@@ -381,8 +442,68 @@ const styles = StyleSheet.create({
   changeBackgroundButton: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(2,8,24,0.72)' },
   changeBackgroundText: { color: '#FFFFFF', fontWeight: '700' },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  featureCard: { borderRadius: 22, borderWidth: 1.4, backgroundColor: 'rgba(9, 15, 36, 0.96)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, paddingVertical: 6, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 9, elevation: 3 },
-  featureIconRing: { borderWidth: 1.6, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.32, shadowRadius: 10 },
-  featureTitle: { color: '#F6F7FF', fontSize: 14, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
-  featureSubtitle: { color: '#B5BED5', fontSize: 11, lineHeight: 15, marginTop: 3, textAlign: 'center' },
+  safeInner: { flex: 1 },
+  ambientOverlay: { flex: 1, backgroundColor: 'rgba(5, 9, 26, 0.38)' },
+  featureCard: {
+    borderRadius: 22,
+    borderWidth: 1.8,
+    overflow: 'hidden',
+    backgroundColor: '#090F24',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.42,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  cardBgImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'space-between',
+  },
+  cardImageStyle: {
+    borderRadius: 20,
+  },
+  cardIconBadge: {
+    position: 'absolute',
+    top: 7,
+    left: 7,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(4, 9, 26, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 2,
+  },
+  cardTextGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 7,
+    paddingTop: 18,
+    paddingBottom: 6,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+  },
+  featureTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    textAlign: 'left',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  featureSubtitle: {
+    color: '#C8D3EC',
+    fontWeight: '600',
+    textAlign: 'left',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
 });
