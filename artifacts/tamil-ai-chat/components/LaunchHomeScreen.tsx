@@ -211,7 +211,7 @@ export default function LaunchHomeScreen() {
     >
       <View style={styles.ambientOverlay}>
         <SafeAreaView style={styles.safeInner} edges={['top', 'left', 'right', 'bottom']}>
-          <StatusBar backgroundColor="#070A1B" barStyle="light-content" />
+          <StatusBar backgroundColor="#E8EEFB" barStyle="dark-content" />
           <Stack.Screen options={{ headerShown: false }} />
       <View
         style={[styles.page, Platform.OS === 'web' && styles.webPage]}
@@ -238,7 +238,7 @@ export default function LaunchHomeScreen() {
             style={[styles.settingsButton, { width: headerIconSize, height: headerIconSize, borderRadius: headerIconSize / 2 }]}
             onPress={() => router.push('/settings')}
           >
-            <Ionicons name="settings-outline" size={Math.min(26, headerIconSize * 0.46)} color="#F4F7FF" />
+            <Ionicons name="settings-outline" size={Math.min(26, headerIconSize * 0.46)} color="#18204E" />
           </TouchableOpacity>
         </View>
 
@@ -416,11 +416,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logo: { width: 62, height: 62, borderRadius: 18, borderWidth: 1.5, borderColor: '#D64DFF' },
   headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { color: '#F7F8FF', fontSize: 22, fontWeight: '800' },
+  headerTitle: { color: '#18204E', fontSize: 22, fontWeight: '800' },
   headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, minWidth: 0 },
-  headerSubtitle: { color: '#ABB6D2', fontSize: 10, flexShrink: 1 },
-  headerVersion: { color: '#ABB6D2', fontSize: 10, flexShrink: 0 },
-  settingsButton: { width: 54, height: 54, borderRadius: 28, borderWidth: 1.5, borderColor: '#54617E', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(16, 23, 48, 0.78)' },
+  headerSubtitle: { color: '#4B5573', fontSize: 10, flexShrink: 1 },
+  headerVersion: { color: '#4B5573', fontSize: 10, flexShrink: 0 },
+  settingsButton: { width: 54, height: 54, borderRadius: 28, borderWidth: 1.5, borderColor: '#A5B4D6', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.88)' },
   hero: { width: '100%', borderRadius: 24, borderWidth: 1.5, borderColor: '#35DFFF', overflow: 'hidden', backgroundColor: '#10172F', shadowColor: '#16CFFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   heroImage: { width: '100%', height: '100%' },
   heroImageStyle: { borderRadius: 22 },
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   changeBackgroundText: { color: '#FFFFFF', fontWeight: '700' },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   safeInner: { flex: 1 },
-  ambientOverlay: { flex: 1, backgroundColor: 'rgba(5, 9, 26, 0.38)' },
+  ambientOverlay: { flex: 1 },
   featureCard: {
     borderRadius: 22,
     borderWidth: 1.8,
