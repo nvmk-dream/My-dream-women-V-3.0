@@ -79,14 +79,12 @@ export default function LaunchHomeScreen() {
     0,
     pageHeight - topInset - bottomInset - headerHeight - verticalGap * 2 - gridRowGap,
   );
-  const targetHeroHeight = Math.max(150, Math.min(430, Math.round(pageHeight * 0.44)));
-  const minCardHeight = Math.max(76, Math.min(112, Math.floor(availableCardsAndHero * 0.23)));
-  const cardHeight = Math.max(
-    minCardHeight,
-    Math.min(188, Math.floor((availableCardsAndHero - targetHeroHeight) / 2)),
-  );
-  const heroHeight = Math.max(110, availableCardsAndHero - cardHeight * 2);
-  const tileWidth = Math.max(0, (pageWidth - 32 - 24) / 3);
+  const tileWidth = Math.max(0, Math.floor((pageWidth - 32 - 16) / 3));
+  // Exact card aspect ratio matching image (height = width * 0.92)
+  const cardHeight = Math.round(tileWidth * 0.92);
+  // Hero banner takes 47% of page height, ensuring both cards and hero fit snugly without giant gaps
+  const maxHeroByCards = availableCardsAndHero - (cardHeight * 2 + gridRowGap);
+  const heroHeight = Math.max(180, Math.min(Math.round(pageHeight * 0.47), maxHeroByCards));
   const iconRingSize = Math.max(36, Math.min(72, Math.round(cardHeight * 0.4)));
   const smallText = cardHeight < 126;
   const headerIconSize = Math.max(42, Math.min(62, headerHeight - 4));
@@ -353,7 +351,7 @@ export default function LaunchHomeScreen() {
               <Image
                 source={feature.bgImage}
                 style={styles.cardImage}
-                resizeMode="contain"
+                resizeMode="cover"
               />
             </TouchableOpacity>
           ))}
