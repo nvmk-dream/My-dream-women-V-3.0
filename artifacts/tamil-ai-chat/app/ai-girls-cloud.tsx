@@ -25,7 +25,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import { Ionicons } from '@expo/vector-icons';
-import { cloudTheme as ct } from '../constants/cloud-theme';
+import { projectTwoTheme as ct } from '../constants/project-two-theme';
 
 const CUSTOM_CHARS_KEY = 'cloud_custom_chars';
 
@@ -396,6 +396,8 @@ export default function AIGirlsCloudScreen() {
   const personas = [...basePersonas, ...customChars];
   const personaIdsKey = JSON.stringify(personas.map(persona => persona.id));
   const [profilePhotoUris, setProfilePhotoUris] = useState<Record<string, string>>({});
+  const [stylePreviewUris, setStylePreviewUris] = useState<Record<string, string>>({});
+  const [refreshToken, setRefreshToken] = useState(0);
   useFocusEffect(useCallback(() => {
     let active = true;
     const ids: string[] = JSON.parse(personaIdsKey);
@@ -415,10 +417,49 @@ export default function AIGirlsCloudScreen() {
     };
     void refreshProfilePhotos();
     return () => { active = false; };
-  }, [personaIdsKey]));
+  }, [personaIdsKey, refreshToken]));
   const photoStyles = masterStyles
     .filter(s => !hiddenStyles.has(s.id))
     .map(s => ({ ...s, id: s.folderName, label: s.name }));
+  const photoStylesKey = photoStyles.map(style => style.id).join('|');
+
+  useEffect(() => {
+    if (depth !== 1 || !selectedChar) return;
+    let active = true;
+
+    const loadStylePreviews = async () => {
+      const entries = await Promise.all(photoStyles.map(async style => {
+        const cacheKey = `cloud_photos_${selectedChar.id}_${style.id}`;
+        try {
+          const cachedRaw = await AsyncStorage.getItem(cacheKey);
+          const cached = normalizeCloudPhotos(cachedRaw ? JSON.parse(cachedRaw) : []);
+          if (cached.length > 0) {
+            return [style.id, cached[0].thumbnailUrl || cached[0].url] as const;
+          }
+        } catch {}
+
+        try {
+          const remote = normalizeCloudPhotos(
+            await listCloudinaryImages(`my-girls/${selectedChar.id}/${style.id}`),
+          );
+          if (remote.length > 0) {
+            AsyncStorage.setItem(cacheKey, JSON.stringify(remote)).catch(() => {});
+            return [style.id, remote[0].thumbnailUrl || remote[0].url] as const;
+          }
+        } catch {}
+        return [style.id, null] as const;
+      }));
+
+      if (active) {
+        setStylePreviewUris(Object.fromEntries(
+          entries.filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+        ));
+      }
+    };
+
+    void loadStylePreviews();
+    return () => { active = false; };
+  }, [depth, selectedChar?.id, photoStylesKey, refreshToken]);
 
   const handleNewFolder = () => {
     setFolderName('');
@@ -814,8 +855,14 @@ export default function AIGirlsCloudScreen() {
   useEffect(() => { depthRef.current = depth; }, [depth]);
 
   const goBack = useCallback(() => {
-    if (depthRef.current === 2) { setDepth(1); setPhotos([]); return true; }
-    if (depthRef.current === 1) { setDepth(0); setSelectedChar(null); return true; }
+    if (depthRef.current === 2) { setDepth(1); setSelectedStyle(null); setPhotos([]); return true; }
+    if (depthRef.current === 1) {
+      setDepth(0);
+      setSelectedChar(null);
+      setSelectedStyle(null);
+      setStylePreviewUris({});
+      return true;
+    }
     router.back(); return false;
   }, [router]);
 
@@ -851,6 +898,8 @@ export default function AIGirlsCloudScreen() {
 
   const selectChar = (char: typeof personas[0]) => {
     setSelectedChar(char);
+    setSelectedStyle(null);
+    setStylePreviewUris({});
     setDepth(1);
     AsyncStorage.getItem(`hidden_styles_${char.id}`).then(raw => {
       setHiddenStyles(new Set(raw ? JSON.parse(raw) : []));
@@ -954,14 +1003,44 @@ export default function AIGirlsCloudScreen() {
   // Breadcrumb
   const renderBreadcrumb = () => (
     <View style={s.breadcrumb}>
-      <Text style={s.breadcrumbTxt}>
-        <Text style={s.breadcrumbHome}>Home</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.breadcrumbTrail}>
+        <TouchableOpacity
+          accessibilityRole="link"
+          accessibilityLabel="Home"
+          onPress={() => router.replace('/home' as any)}
+        >
+          <Text style={s.breadcrumbHome}>Home</Text>
+        </TouchableOpacity>
         <Text style={s.breadcrumbSep}> › </Text>
-        <Text style={s.breadcrumbCur}>My AI Girls</Text>
+        <TouchableOpacity
+          accessibilityRole={depth > 0 ? 'link' : undefined}
+          accessibilityLabel="My AI Girls"
+          disabled={depth === 0}
+          onPress={() => {
+            setDepth(0);
+            setSelectedChar(null);
+            setSelectedStyle(null);
+            setPhotos([]);
+            setStylePreviewUris({});
+          }}
+        >
+          <Text style={[s.breadcrumbCur, depth > 0 && s.breadcrumbLink]}>My AI Girls</Text>
+        </TouchableOpacity>
         {selectedChar && (
           <>
             <Text style={s.breadcrumbSep}> › </Text>
-            <Text style={s.breadcrumbCur}>{selectedChar.name}</Text>
+            <TouchableOpacity
+              accessibilityRole={depth === 2 ? 'link' : undefined}
+              accessibilityLabel={selectedChar.name}
+              disabled={depth !== 2}
+              onPress={() => {
+                setDepth(1);
+                setSelectedStyle(null);
+                setPhotos([]);
+              }}
+            >
+              <Text style={[s.breadcrumbCur, depth === 2 && s.breadcrumbLink]}>{selectedChar.name}</Text>
+            </TouchableOpacity>
           </>
         )}
         {selectedStyle && (
@@ -970,7 +1049,7 @@ export default function AIGirlsCloudScreen() {
             <Text style={s.breadcrumbCur}>{selectedStyle.label}</Text>
           </>
         )}
-      </Text>
+      </ScrollView>
     </View>
   );
 
@@ -1041,7 +1120,13 @@ export default function AIGirlsCloudScreen() {
         keyExtractor={p => p.id}
         renderItem={({ item }) => (
           <TouchableOpacity style={s.row} onPress={() => selectStyle(item)} activeOpacity={0.7}>
-            <Image source={require('../assets/images/cloud-photo-placeholder.png')} style={s.styleThumb} resizeMode="cover" />
+            <Image
+              source={stylePreviewUris[item.id]
+                ? { uri: stylePreviewUris[item.id] }
+                : require('../assets/images/cloud-photo-placeholder.png')}
+              style={s.styleThumb}
+              resizeMode="cover"
+            />
             <Text style={s.styleRowName}>{item.label}</Text>
             {selectedChar && (
               <TouchableOpacity
@@ -1174,6 +1259,7 @@ export default function AIGirlsCloudScreen() {
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
         <TouchableOpacity style={s.refreshBtn} onPress={() => {
+          setRefreshToken(value => value + 1);
           if (depth === 2 && selectedChar && selectedStyle) {
             loadPhotos(selectedChar.id, selectedStyle.id);
           }
@@ -1315,10 +1401,11 @@ const s = StyleSheet.create({
 
   // Breadcrumb
   breadcrumb: {
-    backgroundColor: ct.surfaceRaised, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: ct.line,
+    backgroundColor: ct.surfaceRaised, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: ct.goldLine,
   },
-  breadcrumbTxt: { fontSize: 13 },
+  breadcrumbTrail: { flexDirection: 'row', alignItems: 'center', minHeight: 20 },
   breadcrumbHome: { color: ct.cyan, fontWeight: '700' },
+  breadcrumbLink: { color: ct.brightGold },
   breadcrumbSep: { color: ct.muted },
   breadcrumbCur: { color: ct.gold, fontWeight: '700' },
 

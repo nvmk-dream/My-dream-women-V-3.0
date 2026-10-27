@@ -15,6 +15,7 @@ import { ALL_PERSONAS, BASE_PROMPT, Persona } from '../constants/personas';
 import { RichEditor } from 'react-native-pell-rich-editor';
 import { uploadToCloudinary, getCloudinaryMeta, setCloudinaryMeta, analyzeAvatarProfile } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { projectTwoTheme as theme } from '../constants/project-two-theme';
 
 const DEFAULT_IMAGE_VIDEO_PROMPT = `Chat txt இல் upload செய்யப்படும் photo/video-வில் இருக்கும்/நடப்பதை,உண்மையில் தெரியும் விஷயங்களை வெளிப்படையாக opena pesalam adult contact ellame, image மற்றும் video வில் நடப்பதை நீ/உனக்கு நடப்பதாக நினைத்து பேச வேண்டும்.
 படத்தை பார்த்து Character behaviour normal, prasana mode க்கு ஏற்ற மாதிரி casual Tamil-ல் comment பண்ணு
@@ -36,7 +37,7 @@ const stripHtml = (html: string): string =>
   html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
 
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
-function SectionCard({ sectionKey, icon, title, subtitle, color = '#075E54', children, openSections, onToggle, headerExtra }: {
+function SectionCard({ sectionKey, icon, title, subtitle, color = theme.gold, children, openSections, onToggle, headerExtra }: {
   sectionKey: string; icon: string; title: string; subtitle?: string; color?: string;
   children: React.ReactNode; openSections: Record<string, boolean>; onToggle: (key: string) => void;
   headerExtra?: React.ReactNode;
@@ -109,7 +110,7 @@ function Field({ label, hint, value, onChange, minH = 60, wordInputs, onSetWordI
           returnKeyType="done"
         />
         <TouchableOpacity style={styles.wordAddBtn} onPress={addWord}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
+          <Text style={{ color: theme.background, fontWeight: '700' }}>+</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -555,7 +556,7 @@ export default function EditCharacterScreen() {
   if (!persona) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color="#075E54" />
+        <ActivityIndicator color={theme.brightGold} />
       </View>
     );
   }
@@ -564,14 +565,14 @@ export default function EditCharacterScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{
         title: name ? `${name} - Edit` : 'Edit Character',
-        headerStyle: { backgroundColor: '#075E54' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: theme.gold },
+        headerTintColor: theme.background,
         headerTitleStyle: { fontWeight: 'bold' },
         headerRight: () => (
           <TouchableOpacity onPress={handleSave} disabled={saving} style={{ marginRight: 16 }}>
             {saving
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Save</Text>
+              ? <ActivityIndicator size="small" color={theme.background} />
+              : <Text style={{ color: theme.background, fontSize: 16, fontWeight: 'bold' }}>Save</Text>
             }
           </TouchableOpacity>
         ),
@@ -594,15 +595,15 @@ export default function EditCharacterScreen() {
           <View style={styles.avatarBtns}>
             <TouchableOpacity style={[styles.uploadBtn, uploadingAvatar && { opacity: 0.6 }]} onPress={pickAvatar} disabled={uploadingAvatar}>
               {uploadingAvatar
-                ? <><ActivityIndicator color="#fff" size="small" /><Text style={[styles.uploadBtnText, { marginLeft: 6 }]}>Uploading...</Text></>
+                ? <><ActivityIndicator color={theme.background} size="small" /><Text style={[styles.uploadBtnText, { marginLeft: 6 }]}>Uploading...</Text></>
                 : <Text style={styles.uploadBtnText}>📱 Phone</Text>
               }
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: '#1565C0' }]} onPress={() => { setCloudUrlInput(avatarPhotoUri ?? ''); setShowCloudUrl(true); }}>
-              <Text style={styles.uploadBtnText}>☁️ Cloud URL</Text>
+            <TouchableOpacity style={[styles.uploadBtn, styles.cloudUrlBtn]} onPress={() => { setCloudUrlInput(avatarPhotoUri ?? ''); setShowCloudUrl(true); }}>
+              <Text style={[styles.uploadBtnText, styles.cloudUrlBtnText]}>☁️ Cloud URL</Text>
             </TouchableOpacity>
             {avatarPhotoUri && (
-              <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: '#B71C1C' }]} onPress={() => setAvatarPhotoUri(undefined)}>
+              <TouchableOpacity style={[styles.uploadBtn, styles.removeBtn]} onPress={() => setAvatarPhotoUri(undefined)}>
                 <Text style={styles.uploadBtnText}>🗑️ Remove</Text>
               </TouchableOpacity>
             )}
@@ -626,10 +627,10 @@ export default function EditCharacterScreen() {
               />
               <View style={styles.cloudBtns}>
                 <TouchableOpacity style={styles.cloudCancel} onPress={() => setShowCloudUrl(false)}>
-                  <Text style={{ color: '#555', fontWeight: '600' }}>Cancel</Text>
+                  <Text style={{ color: theme.secondaryText, fontWeight: '600' }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cloudApply} onPress={applyCloudUrl}>
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>Apply</Text>
+                  <Text style={{ color: theme.background, fontWeight: '700' }}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -654,10 +655,10 @@ export default function EditCharacterScreen() {
               />
               <View style={styles.cloudBtns}>
                 <TouchableOpacity style={styles.cloudCancel} onPress={() => setShowModeCloud(null)}>
-                  <Text style={{ color: '#555', fontWeight: '600' }}>Cancel</Text>
+                  <Text style={{ color: theme.secondaryText, fontWeight: '600' }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cloudApply} onPress={applyModeCloudUrl}>
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>Apply</Text>
+                  <Text style={{ color: theme.background, fontWeight: '700' }}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -697,18 +698,18 @@ export default function EditCharacterScreen() {
           icon="📖"
           title="இன்றைய கதை"
           subtitle="Today's Story"
-          color="#8D6E63"
+          color={theme.gold}
           openSections={openSections}
           onToggle={toggleSection}
           headerExtra={persona?.id === 'kallaatam' ? (
             <TouchableOpacity
               onPress={handleStorySave}
               disabled={storySaving}
-              style={{ backgroundColor: '#2E7D32', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
+            style={{ backgroundColor: theme.gold, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6, flexDirection: 'row', alignItems: 'center', opacity: storySaving ? 0.6 : 1 }}
             >
               {storySaving
-                ? <ActivityIndicator size="small" color="#fff" style={{ marginRight: 4 }} />
-                : <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>💾 Save</Text>}
+                ? <ActivityIndicator size="small" color={theme.background} style={{ marginRight: 4 }} />
+                : <Text style={{ color: theme.background, fontSize: 11, fontWeight: '700' }}>💾 Save</Text>}
             </TouchableOpacity>
           ) : undefined}
         >
@@ -725,38 +726,38 @@ export default function EditCharacterScreen() {
           {!!todayStory.trim() && (
             <TouchableOpacity
               onPress={() => setTodayStory('')}
-              style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#efebe9', borderRadius: 12, alignSelf: 'flex-start' }}
+              style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 12, alignSelf: 'flex-start' }}
             >
-              <Text style={{ color: '#5d4037', fontSize: 11, fontWeight: '600' }}>🗑️ Story Clear பண்ணு</Text>
+              <Text style={{ color: theme.secondaryText, fontSize: 11, fontWeight: '600' }}>🗑️ Story Clear பண்ணு</Text>
             </TouchableOpacity>
           )}
         </SectionCard>
 
         {/* ── கல்லாட்டம் Story Engine — only shown for this persona ── */}
         {persona?.id === 'kallaatam' && (
-          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color="#2E7D32" openSections={openSections} onToggle={toggleSection}
+          <SectionCard sectionKey="kallaatamEngine" icon="🎭" title="CHARACTER DETAILS (All characters)" subtitle="அனைத்து கதாபாத்திர விவரங்கள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}
 >
 
             {/* Tasks */}
-            <View style={{ backgroundColor: '#f1f8e9', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#c8e6c9' }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: theme.goldLine }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={{ fontSize: 15, marginRight: 6 }}>✅</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1b5e20' }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brightGold }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Switch value={kTaskContinue} onValueChange={setKTaskContinue} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
-                <Text style={{ marginLeft: 10, fontSize: 13, color: '#2e7d32', flex: 1 }}>கொடுக்கப்பட்ட கதையை தொடரவும்.</Text>
+                <Switch value={kTaskContinue} onValueChange={setKTaskContinue} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+                <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, flex: 1 }}>கொடுக்கப்பட்ட கதையை தொடரவும்.</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Switch value={kTaskOutline} onValueChange={setKTaskOutline} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
-                <Text style={{ marginLeft: 10, fontSize: 13, color: '#2e7d32', flex: 1 }}>Out Line வைத்து கொண்டு புது Screen play செய்யவும்.</Text>
+                <Switch value={kTaskOutline} onValueChange={setKTaskOutline} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+                <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, flex: 1 }}>Out Line வைத்து கொண்டு புது Screen play செய்யவும்.</Text>
               </View>
             </View>
 
             {/* Outline Box */}
             <View style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#4a148c' }}>📋 Story Outline</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brightGold }}>📋 Story Outline</Text>
 
               </View>
               <TextInput
@@ -774,30 +775,30 @@ export default function EditCharacterScreen() {
             <View style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ fontSize: 16, marginRight: 6 }}>🎭</Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1565C0' }}>Character Details:</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.brightGold }}>Character Details:</Text>
               </View>
               {/* Table header */}
-              <View style={{ flexDirection: 'row', backgroundColor: '#e3f2fd', paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6, marginBottom: 4 }}>
-                <Text style={{ width: 28, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>#</Text>
-                <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: '#555' }}>👤 பெயர்</Text>
-                <Text style={{ flex: 1.4, fontSize: 10, fontWeight: '700', color: '#555' }}>📋 கதாபாத்திரம்</Text>
-                <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>🎭 by</Text>
-                <Text style={{ width: 36, fontSize: 10, fontWeight: '700', color: '#555', textAlign: 'center' }}>Avtar</Text>
+              <View style={{ flexDirection: 'row', backgroundColor: theme.surfaceSoft, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6, marginBottom: 4, borderWidth: 1, borderColor: theme.line }}>
+                <Text style={{ width: 28, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>#</Text>
+                <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: theme.brightGold }}>👤 பெயர்</Text>
+                <Text style={{ flex: 1.4, fontSize: 10, fontWeight: '700', color: theme.brightGold }}>📋 கதாபாத்திரம்</Text>
+                <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>🎭 by</Text>
+                <Text style={{ width: 36, fontSize: 10, fontWeight: '700', color: theme.brightGold, textAlign: 'center' }}>Avtar</Text>
               </View>
               {kChars.map((ch, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, backgroundColor: '#fafafa', borderRadius: 8, padding: 4 }}>
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 4, borderWidth: 1, borderColor: theme.line }}>
                   <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: ['#E53935','#455A64','#37474F','#7B1FA2','#E91E63','#1E88E5'][i], alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
                     <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{i+1}</Text>
                   </View>
                   <TextInput
-                    style={{ flex: 1, backgroundColor: '#f0f0f0', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: '#222', marginRight: 4 }}
+                    style={{ flex: 1, backgroundColor: theme.surface, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: theme.text, marginRight: 4, borderWidth: 1, borderColor: theme.line }}
                     value={ch.name}
                     onChangeText={v => { const arr = [...kChars]; arr[i] = {...arr[i], name: v}; setKChars(arr); }}
                     placeholder="பேரு..."
                     placeholderTextColor="#bbb"
                   />
                   <TextInput
-                    style={{ flex: 1.4, backgroundColor: '#f0f0f0', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: '#222', marginRight: 4 }}
+                    style={{ flex: 1.4, backgroundColor: theme.surface, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 4, fontSize: 12, color: theme.text, marginRight: 4, borderWidth: 1, borderColor: theme.line }}
                     value={ch.role}
                     onChangeText={v => { const arr = [...kChars]; arr[i] = {...arr[i], role: v}; setKChars(arr); }}
                     placeholder="கதாபாத்திரம்..."
@@ -806,7 +807,7 @@ export default function EditCharacterScreen() {
                   <Switch
                     value={ch.aiPlay}
                     onValueChange={v => { const arr = [...kChars]; arr[i] = {...arr[i], aiPlay: v}; setKChars(arr); }}
-                    trackColor={{ true: '#43a047', false: '#ccc' }}
+                    trackColor={{ true: theme.gold, false: '#555' }}
                     thumbColor="#fff"
                     style={{ width: 44 }}
                   />
@@ -816,19 +817,19 @@ export default function EditCharacterScreen() {
             </View>
 
             {/* Master toggle */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#e8f5e9', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#a5d6a7' }}>
-              <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: '#43a047' }} thumbColor="#fff" />
-              <Text style={{ marginLeft: 10, fontSize: 13, color: '#1b5e20', fontWeight: '600', flex: 1 }}>அனைத்து character உம் AI roleplay செய்ய வேண்டும்.</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: theme.goldLine }}>
+              <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: theme.gold }} thumbColor="#fff" />
+              <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, fontWeight: '600', flex: 1 }}>அனைத்து character உம் AI roleplay செய்ய வேண்டும்.</Text>
             </View>
 
           </SectionCard>
         )}
 
-        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color="#1565C0" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="userStyle" icon="👤" title="User Style" subtitle="உங்கள் ஸ்டைல்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
           <Text style={styles.fieldHint}>ஒவ்வொரு mode-லயும் user எப்படி பேசுவாரு, எப்படி feel ஆவாரு என்று சொல்லுங்க — AI அதுக்கு ஏத்த மாதிரி character react பண்ணும்.</Text>
 
           {/* WhatsApp mode */}
-          <Text style={[styles.sectionLabel, { color: '#25D366', marginTop: 12, marginBottom: 4 }]}>💬 WhatsApp Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 12, marginBottom: 4 }]}>💬 WhatsApp Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userWhatsappBeh}
@@ -840,7 +841,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* Normal mode */}
-          <Text style={[styles.sectionLabel, { color: '#075E54', marginTop: 10, marginBottom: 4 }]}>😇 Normal Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>😇 Normal Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userNormalBeh}
@@ -852,7 +853,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* Presana mode */}
-          <Text style={[styles.sectionLabel, { color: '#E91E63', marginTop: 10, marginBottom: 4 }]}>😈 Presana Mode — User Style</Text>
+          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>😈 Presana Mode — User Style</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 56 }]}
             value={userPresanaBeh}
@@ -864,7 +865,7 @@ export default function EditCharacterScreen() {
           />
 
           {/* User body description */}
-          <Text style={[styles.sectionLabel, { color: '#6D4C41', marginTop: 10, marginBottom: 4 }]}>🧍 User உருவம் / Body Description</Text>
+          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 10, marginBottom: 4 }]}>🧍 User உருவம் / Body Description</Text>
           <TextInput
             style={[styles.fieldInput, { minHeight: 72 }]}
             value={userBodyDesc}
@@ -877,8 +878,8 @@ export default function EditCharacterScreen() {
 
           {/* ── Character Message Font Style ── */}
           <View style={styles.divider} />
-          <Text style={[styles.sectionLabel, { color: '#1565C0', marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
-          <Text style={{ color: '#888', fontSize: 11, marginBottom: 10 }}>Character reply messages-ல் font color & size set பண்ணுங்க.</Text>
+          <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 4, marginBottom: 4 }]}>🎨 Character Message Font Style</Text>
+          <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 10 }}>Character reply messages-ல் font color & size set பண்ணுங்க.</Text>
 
           <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>🖌️ Font Color</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
@@ -904,7 +905,7 @@ export default function EditCharacterScreen() {
                   backgroundColor: color,
                   alignItems: 'center', justifyContent: 'center',
                   borderWidth: charFontColor === color ? 3 : 1.5,
-                  borderColor: charFontColor === color ? '#075E54' : '#ddd',
+                  borderColor: charFontColor === color ? theme.gold : theme.line,
                 }}
               >
                 {charFontColor === color && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✓</Text>}
@@ -912,8 +913,8 @@ export default function EditCharacterScreen() {
             ))}
           </View>
           {!!charFontColor && (
-            <TouchableOpacity onPress={() => setCharFontColor('')} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, backgroundColor: '#f0f0f0', borderRadius: 10, marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: '#555' }}>↺ Default Color Reset</Text>
+            <TouchableOpacity onPress={() => setCharFontColor('')} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 10, marginBottom: 8 }}>
+              <Text style={{ fontSize: 11, color: theme.secondaryText }}>↺ Default Color Reset</Text>
             </TouchableOpacity>
           )}
 
@@ -927,68 +928,68 @@ export default function EditCharacterScreen() {
                   flex: 1, paddingVertical: 10, borderRadius: 10,
                   alignItems: 'center',
                   borderWidth: 1.5,
-                  borderColor: charFontSize === size ? '#1565C0' : '#ddd',
-                  backgroundColor: charFontSize === size ? '#e3f2fd' : '#fafafa',
+                  borderColor: charFontSize === size ? theme.gold : theme.line,
+                  backgroundColor: charFontSize === size ? theme.goldWash : theme.surfaceRaised,
                 }}
               >
-                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? '#1565C0' : '#555' }}>{label}</Text>
-                <Text style={{ fontSize: 9, color: '#999', marginTop: 2 }}>{size}px</Text>
+                <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? theme.brightGold : theme.secondaryText }}>{label}</Text>
+                <Text style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>{size}px</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {(!!charFontColor || charFontSize > 0) && (
-            <View style={{ backgroundColor: '#f8f9fa', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#e0e0e0' }}>
-              <Text style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>👀 Preview:</Text>
-              <Text style={{ fontSize: charFontSize || 15, color: charFontColor || '#111', fontWeight: '500' }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.goldLine }}>
+              <Text style={{ fontSize: 10, color: theme.muted, marginBottom: 4 }}>👀 Preview:</Text>
+              <Text style={{ fontSize: charFontSize || 15, color: charFontColor || theme.text, fontWeight: '500' }}>
                 நான் உன்னை ரொம்ப miss பண்றேன்! 💕
               </Text>
             </View>
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color="#6C63FF" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="avatarReflection" icon="🖼️" title="User Avatar Reflection" subtitle="உங்கள் அவதார் பிரதிபலிப்பு" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ color: '#888', fontSize: 11, lineHeight: 17 }}>
+              <Text style={{ color: theme.secondaryText, fontSize: 11, lineHeight: 17 }}>
                 {'Avatar photos-ல் பார்க்குற தோற்றம் (முடி நீளம்/நிறம், முகம், உடல்வாகு) chat conversation-ல் naturally reflect ஆகும். AI photo-ஐ Gemini-ல் analyze பண்ணி character conversation-ல் mention பண்ணும்.'}
               </Text>
             </View>
             <Switch
               value={avatarReflectionEnabled}
               onValueChange={setAvatarReflectionEnabled}
-              trackColor={{ false: '#ddd', true: '#6C63FF' }}
+              trackColor={{ false: '#555', true: theme.gold }}
               thumbColor="#fff"
             />
           </View>
           {avatarReflectionEnabled && (
             <View>
           {/* User Prasana Photo inside Avatar Reflection */}
-          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#ede9ff' }}>
-            <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 4 }]}>📸 உன் Photo (Prasana Mode)</Text>
-            <Text style={{ color: '#888', fontSize: 11, marginBottom: 10 }}>இந்த character-கிட்ட Prasana mode-ல் chat பண்ணும்போது AI உன் தோற்றம் mention பண்ண இந்த photo use ஆகும்.</Text>
+          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.line }}>
+            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>📸 உன் Photo (Prasana Mode)</Text>
+            <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 10 }}>இந்த character-கிட்ட Prasana mode-ல் chat பண்ணும்போது AI உன் தோற்றம் mention பண்ண இந்த photo use ஆகும்.</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {uploadingUserPrasanaPhoto
-                ? <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: '#FCE4EC', justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color="#E91E63" /></View>
+                ? <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.gold, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator color={theme.brightGold} /></View>
                 : userPrasanaPhotoUri
                   ? <TouchableOpacity onPress={pickUserPrasanaPhoto}>
                       <Image source={{ uri: userPrasanaPhotoUri }} style={{ width: 70, height: 70, borderRadius: 35 }} />
                     </TouchableOpacity>
                   : <TouchableOpacity onPress={pickUserPrasanaPhoto}
-                      style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: '#FCE4EC', justifyContent: 'center', alignItems: 'center' }}>
+                      style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.gold, justifyContent: 'center', alignItems: 'center' }}>
                       <Text style={{ fontSize: 28 }}>😈</Text>
                     </TouchableOpacity>
               }
               <View style={{ flex: 1, gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.uploadBtn, { backgroundColor: '#E91E63' }]}
+                  style={styles.uploadBtn}
                   onPress={pickUserPrasanaPhoto}
                 >
                   <Text style={styles.uploadBtnText}>📱 Gallery</Text>
                 </TouchableOpacity>
                 {userPrasanaPhotoUri && (
                   <TouchableOpacity
-                    style={[styles.uploadBtn, { backgroundColor: '#B71C1C' }]}
+                    style={[styles.uploadBtn, styles.removeBtn]}
                     onPress={() => setUserPrasanaPhotoUri(undefined)}
                   >
                     <Text style={styles.uploadBtnText}>🗑️ Remove</Text>
@@ -998,8 +999,8 @@ export default function EditCharacterScreen() {
             </View>
           </View>
 
-              <Text style={[styles.sectionLabel, { color: '#6C63FF', marginTop: 8, marginBottom: 4 }]}>✏️ Reflection Instruction (திருத்தலாம்)</Text>
-              <Text style={{ color: '#aaa', fontSize: 10, marginBottom: 6 }}>
+              <Text style={[styles.sectionLabel, { color: theme.brightGold, marginTop: 8, marginBottom: 4 }]}>✏️ Reflection Instruction (திருத்தலாம்)</Text>
+              <Text style={{ color: theme.muted, fontSize: 10, marginBottom: 6 }}>
                 {'Empty-ஆ விட்டால் default instruction use ஆகும். Custom instruction போட்டால் அது use ஆகும்.'}
               </Text>
               <TextInput
@@ -1013,15 +1014,15 @@ export default function EditCharacterScreen() {
               />
               <TouchableOpacity
                 onPress={() => setAvatarReflectionPrompt('')}
-                style={{ marginTop: 8, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: '#ede9ff', borderRadius: 10, alignSelf: 'flex-start' }}
+                style={{ marginTop: 8, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 10, alignSelf: 'flex-start' }}
               >
-                <Text style={{ color: '#6C63FF', fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
+                <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
               </TouchableOpacity>
             </View>
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்" color="#E91E63" openSections={openSections} onToggle={toggleSection}>
+        <SectionCard sectionKey="mood" icon="🌶️" title="Mood / Behaviour" subtitle="மூடு / நடத்தைகள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
           <View style={styles.moodRow}>
             <View style={styles.moodInfo}>
               <Text style={styles.moodTitle}>
@@ -1036,7 +1037,7 @@ export default function EditCharacterScreen() {
             <Switch
               value={normalMode}
               onValueChange={toggleNormalMode}
-              trackColor={{ false: '#E91E63', true: '#075E54' }}
+              trackColor={{ false: theme.danger, true: theme.gold }}
               thumbColor="#fff"
             />
           </View>
@@ -1045,20 +1046,20 @@ export default function EditCharacterScreen() {
               style={[styles.moodBadge, !normalMode && styles.moodBadgeActive]}
               onPress={() => toggleNormalMode(false)}
             >
-              <Text style={[styles.moodBadgeTxt, !normalMode && { color: '#fff' }]}>😈 Presana</Text>
+              <Text style={[styles.moodBadgeTxt, !normalMode && { color: theme.background }]}>😈 Presana</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.moodBadge, normalMode && { backgroundColor: '#075E54', borderColor: '#075E54' }]}
+              style={[styles.moodBadge, normalMode && styles.moodBadgeActive]}
               onPress={() => toggleNormalMode(true)}
             >
-              <Text style={[styles.moodBadgeTxt, normalMode && { color: '#fff' }]}>😇 Normal</Text>
+              <Text style={[styles.moodBadgeTxt, normalMode && { color: theme.background }]}>😇 Normal</Text>
             </TouchableOpacity>
           </View>
 
           {/* Presana behaviour — visible */}
           <View style={{ marginTop: 14 }}>
-            <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 4 }]}>😈 PRESANA MODE — BEHAVIOUR TEXT</Text>
-            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>இந்த character presana mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
+            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>😈 PRESANA MODE — BEHAVIOUR TEXT</Text>
+            <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 6 }}>இந்த character presana mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
               value={presanaBehaviour}
@@ -1073,8 +1074,8 @@ export default function EditCharacterScreen() {
 
           {/* Normal behaviour — visible */}
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.sectionLabel, { color: '#075E54', marginBottom: 4 }]}>😇 NORMAL MODE — BEHAVIOUR TEXT</Text>
-            <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>Normal mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
+            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 4 }]}>😇 NORMAL MODE — BEHAVIOUR TEXT</Text>
+            <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 6 }}>Normal mode-ல எப்படி பேசணும்னு customize பண்ணுங்க.</Text>
             <TextInput
               style={[styles.fieldInput, { minHeight: 80 }]}
               value={normalBehaviour}
@@ -1087,7 +1088,7 @@ export default function EditCharacterScreen() {
             />
           </View>
 
-          <Text style={{ color: '#888', fontSize: 11, marginTop: 8 }}>💡 Save பண்ணா chat-ல உடனே apply ஆகும்.</Text>
+          <Text style={{ color: theme.muted, fontSize: 11, marginTop: 8 }}>💡 Save பண்ணா chat-ல உடனே apply ஆகும்.</Text>
         </SectionCard>
 
         <SectionCard sectionKey="greeting" icon="😊" title="Greeting (First Message)" subtitle="முதல் வாழ்த்து" openSections={openSections} onToggle={toggleSection}>
@@ -1102,105 +1103,105 @@ export default function EditCharacterScreen() {
           />
         </SectionCard>
 
-        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color="#c62828" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
+        <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+          <Text style={{ color: theme.secondaryText, fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: theme.goldLine }}>
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.gold }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: theme.brightGold }}>B</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.goldLine }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brightGold }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => baseRulesEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: theme.goldLine }} />
             ))}
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setForeColor('#111111')}
-              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
-              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
+              <Text style={{ fontSize: 10, color: theme.brightGold }}>↺</Text>
             </TouchableOpacity>
           </View>
           <RichEditor
             ref={baseRulesEditorRef}
             initialContentHTML={basePromptEdit}
             onChange={(html) => setBasePromptEdit(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#ffcdd2', backgroundColor: '#fff5f5' }}
-            editorStyle={{ backgroundColor: '#fff5f5', color: '#555', fontSize: 13 }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised }}
+            editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 13 }}
             useContainer={false}
             autoCorrect={false}
           />
           <TouchableOpacity
             onPress={() => setBasePromptEdit(BASE_PROMPT)}
-            style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#ffcdd2', borderRadius: 12, alignSelf: 'flex-start' }}
+            style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 12, alignSelf: 'flex-start' }}
           >
-            <Text style={{ color: '#c62828', fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
+            <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Default-க்கு Reset</Text>
           </TouchableOpacity>
         </SectionCard>
 
-        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt" color="#1b5e20" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#388e3c', fontSize: 10, marginBottom: 8 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
+        <SectionCard sectionKey="characterPrompt" icon="🟢" title="Character Prompt" subtitle="கேரக்டர் Prompt" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+          <Text style={{ color: theme.secondaryText, fontSize: 10, marginBottom: 8 }}>✏️ Long-press → Cut / Copy / Paste / Select All</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
             <TouchableOpacity
               onPress={saveDefaultPrompt}
-              style={{ backgroundColor: '#2e7d32', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
+              style={{ backgroundColor: theme.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
             >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>⭐ Default Save</Text>
+              <Text style={{ color: theme.background, fontSize: 10, fontWeight: '700' }}>⭐ Default Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={loadDefaultPrompt}
-              style={{ backgroundColor: defaultPromptExists ? '#1565C0' : '#aaa', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
+              style={{ backgroundColor: defaultPromptExists ? theme.surfaceRaised : '#555', borderWidth: 1, borderColor: theme.goldLine, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
             >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
+              <Text style={{ color: theme.brightGold, fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: '#f0f4ff', borderRadius: 10, padding: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: theme.goldLine }}>
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e8eaf6', borderWidth: 1.5, borderColor: '#3949ab' }}>
-              <Text style={{ fontSize: 13, fontWeight: '900', color: '#3949ab' }}>B</Text>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.gold }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: theme.brightGold }}>B</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#e3f2fd', borderWidth: 1.5, borderColor: '#1565C0' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1565C0' }}>{l}</Text>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.goldLine }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brightGold }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => charPromptEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#ddd' }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: theme.goldLine }} />
             ))}
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.setForeColor('#111111')}
-              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#ffe0e0', borderRadius: 8 }}>
-              <Text style={{ fontSize: 10, color: '#c62828' }}>↺</Text>
+              style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
+              <Text style={{ fontSize: 10, color: theme.brightGold }}>↺</Text>
             </TouchableOpacity>
           </View>
           <RichEditor
             ref={charPromptEditorRef}
             initialContentHTML={charOnly}
             onChange={(html) => setCharOnly(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#c8e6c9', backgroundColor: '#f9fff9' }}
-            editorStyle={{ backgroundColor: '#f9fff9', color: '#333', fontSize: 14 }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised }}
+            editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
             useContainer={false}
             autoCorrect={false}
           />
         </SectionCard>
 
-        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt" color="#4527A0" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#6C63FF', fontSize: 10, marginBottom: 8 }}>
+        <SectionCard sectionKey="imageVideoPrompt" icon="📸" title="Image / Video Analysis Prompt" subtitle="படம் / வீடியோ பகுப்பாய்வு Prompt" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+          <Text style={{ color: theme.brightGold, fontSize: 10, marginBottom: 8 }}>
             {'Photo/Video அனுப்பும்போது இந்த prompt மட்டும் use ஆகும். Empty விட்டால் character-ஓட default prompt use ஆகும்.'}
           </Text>
           <TextInput
-            style={[styles.fieldInput, { minHeight: 160, fontSize: 12, lineHeight: 18, backgroundColor: '#f5f3ff' }]}
+            style={[styles.fieldInput, { minHeight: 160, fontSize: 12, lineHeight: 18, backgroundColor: theme.surfaceRaised }]}
             value={imageVideoPrompt}
             onChangeText={setImageVideoPrompt}
             multiline
@@ -1215,43 +1216,43 @@ export default function EditCharacterScreen() {
           {imageVideoPrompt.trim().length > 0 && (
             <TouchableOpacity
               onPress={() => setImageVideoPrompt('')}
-              style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#ede9ff', borderRadius: 10, alignSelf: 'flex-start' }}
+              style={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 14, backgroundColor: theme.surfaceSoft, borderWidth: 1, borderColor: theme.line, borderRadius: 10, alignSelf: 'flex-start' }}
             >
-              <Text style={{ color: '#6C63FF', fontSize: 11, fontWeight: '600' }}>↺ Clear (Default-க்கு)</Text>
+              <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>↺ Clear (Default-க்கு)</Text>
             </TouchableOpacity>
           )}
         </SectionCard>
 
-        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு" color="#C2185B" openSections={openSections} onToggle={toggleSection}>
-          <Text style={{ color: '#888', fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
+        <SectionCard sectionKey="modeAvatarsImageGen" icon="🏔️" title="Character avatar reflection" subtitle="கேரக்டர் அவதார் பிரதிபலிப்பு" color={theme.gold} openSections={openSections} onToggle={toggleSection}>
+          <Text style={{ color: theme.muted, fontSize: 11, marginBottom: 14 }}>Presana mode-ல் வேற photo set பண்ணலாம். Empty விட்டா main avatar use ஆகும்.</Text>
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.sectionLabel, { color: '#E91E63', marginBottom: 8 }]}>😈 PRESANA</Text>
+            <Text style={[styles.sectionLabel, { color: theme.brightGold, marginBottom: 8 }]}>😈 PRESANA</Text>
             <TouchableOpacity onPress={() => pickModeAvatar('presana')}>
               {presanaAvatarUri
                 ? <Image source={{ uri: presanaAvatarUri }} style={styles.modeAvatarImg} />
                 : <View style={[styles.modeAvatarPlaceholder, { borderColor: '#E91E63' }]}>
                     <Text style={{ fontSize: 28 }}>😈</Text>
-                    <Text style={{ fontSize: 10, color: '#E91E63', marginTop: 4 }}>Tap to set</Text>
+                    <Text style={{ fontSize: 10, color: theme.brightGold, marginTop: 4 }}>Tap to set</Text>
                   </View>
               }
             </TouchableOpacity>
             {presanaAvatarUri && (
               <TouchableOpacity style={[styles.modeRemoveBtn, { borderColor: '#E91E63' }]} onPress={() => setPresanaAvatarUri(undefined)}>
-                <Text style={{ color: '#E91E63', fontSize: 12 }}>🗑️ Remove</Text>
+                <Text style={{ color: theme.brightGold, fontSize: 12 }}>🗑️ Remove</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#FCE4EC', borderRadius: 12 }}
+              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, borderRadius: 12 }}
               onPress={() => { setModeCloudInput(''); setShowModeCloud('presana'); }}
             >
-              <Text style={{ color: '#C62828', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
+              <Text style={{ color: theme.brightGold, fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           {analyzingFields && (
-            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:'#E3F2FD', borderRadius:8 }}>
-              <ActivityIndicator size="small" color="#1565C0" style={{ marginRight:8 }} />
-              <Text style={{ color:'#1565C0', fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
+            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:theme.surfaceRaised, borderWidth:1, borderColor:theme.goldLine, borderRadius:8 }}>
+              <ActivityIndicator size="small" color={theme.brightGold} style={{ marginRight:8 }} />
+              <Text style={{ color:theme.secondaryText, fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
             </View>
           )}
           <Field label="A. முக அமைப்பு (FACE)" value={faceDesc} onChange={setFaceDesc} hint="e.g. beautiful Tamil woman, 24 years old, long wavy black hair..." minH={80} wordInputs={wordInputs} onSetWordInputs={setWordInputs} />
@@ -1267,7 +1268,7 @@ export default function EditCharacterScreen() {
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
           {saving
-            ? <ActivityIndicator color="#fff" />
+            ? <ActivityIndicator color={theme.background} />
             : <Text style={styles.saveBtnText}>Save Character</Text>
           }
         </TouchableOpacity>
@@ -1277,56 +1278,67 @@ export default function EditCharacterScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f0f2f5' },
+  safe: { flex: 1, backgroundColor: theme.background },
   scroll: { flex: 1 },
   content: { padding: 12, paddingBottom: 50 },
   avatarSection: { alignItems: 'center', paddingVertical: 20 },
-  avatarWrap: { position: 'relative', marginBottom: 12 },
+  avatarWrap: {
+    position: 'relative', marginBottom: 12, padding: 4, borderRadius: 58,
+    borderWidth: 2, borderColor: theme.gold, backgroundColor: theme.surface,
+    shadowColor: theme.gold, shadowOpacity: 0.24, shadowRadius: 12, elevation: 6,
+  },
   avatarCircle: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
-  avatarImg: { width: 100, height: 100, borderRadius: 50 },
-  avatarEmoji: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
+  avatarImg: { width: 100, height: 100, borderRadius: 50, borderWidth: 1, borderColor: theme.brightGold },
+  avatarEmoji: { color: theme.text, fontSize: 36, fontWeight: 'bold' },
   cameraOverlay: { position: 'absolute', bottom: 2, right: 2, backgroundColor: '#333', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
   cameraIcon: { fontSize: 14 },
   avatarBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
-  uploadBtn: { backgroundColor: '#075E54', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  uploadBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  cloudOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  cloudModal: { backgroundColor: '#fff', borderRadius: 16, padding: 20, width: '100%' },
-  cloudTitle: { fontSize: 17, fontWeight: 'bold', color: '#1565C0', marginBottom: 6 },
-  cloudSub: { fontSize: 12, color: '#888', marginBottom: 14 },
-  cloudInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, fontSize: 13, color: '#222', backgroundColor: '#f8f9fa', marginBottom: 16 },
+  uploadBtn: { backgroundColor: theme.gold, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.brightGold },
+  uploadBtnText: { color: theme.background, fontSize: 13, fontWeight: '700' },
+  cloudUrlBtn: { backgroundColor: theme.surfaceRaised, borderColor: theme.goldLine },
+  cloudUrlBtnText: { color: theme.brightGold },
+  removeBtn: { backgroundColor: theme.danger, borderColor: theme.danger },
+  cloudOverlay: { flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  cloudModal: { backgroundColor: theme.surface, borderRadius: 16, padding: 20, width: '100%', borderWidth: 1, borderColor: theme.goldLine },
+  cloudTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold, marginBottom: 6 },
+  cloudSub: { fontSize: 12, color: theme.secondaryText, marginBottom: 14 },
+  cloudInput: { borderWidth: 1, borderColor: theme.goldLine, borderRadius: 10, padding: 10, fontSize: 13, color: theme.text, backgroundColor: theme.surfaceRaised, marginBottom: 16 },
   cloudBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
-  cloudCancel: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f0f0f0' },
-  cloudApply: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: '#1565C0' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, elevation: 2 },
+  cloudCancel: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line },
+  cloudApply: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.gold },
+  card: {
+    backgroundColor: theme.surface, borderRadius: 14, padding: 16, marginBottom: 14,
+    borderWidth: 1, borderColor: theme.goldLine, elevation: 3,
+    shadowColor: theme.gold, shadowOpacity: 0.08, shadowRadius: 8,
+  },
   sectionCardHeader: { flexDirection: 'row', alignItems: 'center' },
   sectionCardIcon: { fontSize: 20, marginRight: 10 },
   sectionCardTitle: { fontSize: 15, fontWeight: '700' },
-  sectionCardSubtitle: { fontSize: 11, color: '#888', marginTop: 2 },
-  sectionCardChevron: { fontSize: 13, color: '#888', fontWeight: '700', marginLeft: 8 },
-  sectionCardBody: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#888', letterSpacing: 0.8, marginBottom: 8 },
-  nameInput: { backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', padding: 10, fontSize: 15, color: '#111' },
+  sectionCardSubtitle: { fontSize: 11, color: theme.muted, marginTop: 2 },
+  sectionCardChevron: { fontSize: 13, color: theme.brightGold, fontWeight: '700', marginLeft: 8 },
+  sectionCardBody: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.line },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: theme.brightGold, letterSpacing: 0.8, marginBottom: 8 },
+  nameInput: { backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, padding: 10, fontSize: 15, color: theme.text },
   fieldWrap: { marginBottom: 4 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#555', marginBottom: 6, marginTop: 4 },
-  fieldInput: { backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', padding: 10, fontSize: 14, color: '#222', lineHeight: 20 },
-  fieldHint: { fontSize: 11, color: '#aaa', marginTop: 4, marginBottom: 4, lineHeight: 16 },
-  wordAddInput: { flex: 1, backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: '#222' },
-  wordAddBtn: { marginLeft: 6, backgroundColor: '#075E54', width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 14 },
-  footerNote: { fontSize: 12, color: '#888', textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
-  saveBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: theme.secondaryText, marginBottom: 6, marginTop: 4 },
+  fieldInput: { backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, padding: 10, fontSize: 14, color: theme.text, lineHeight: 20 },
+  fieldHint: { fontSize: 11, color: theme.muted, marginTop: 4, marginBottom: 4, lineHeight: 16 },
+  wordAddInput: { flex: 1, backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: theme.text },
+  wordAddBtn: { marginLeft: 6, backgroundColor: theme.gold, width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  divider: { height: 1, backgroundColor: theme.line, marginVertical: 14 },
+  footerNote: { fontSize: 12, color: theme.muted, textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
+  saveBtn: { backgroundColor: theme.gold, borderRadius: 12, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: theme.brightGold },
+  saveBtnText: { color: theme.background, fontSize: 16, fontWeight: 'bold' },
   moodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   moodInfo: { flex: 1, marginRight: 12 },
-  moodTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 3 },
-  moodSub: { fontSize: 12, color: '#888', lineHeight: 17 },
+  moodTitle: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 3 },
+  moodSub: { fontSize: 12, color: theme.muted, lineHeight: 17 },
   moodBadgeRow: { flexDirection: 'row', gap: 10 },
-  moodBadge: { flex: 1, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', alignItems: 'center' },
-  moodBadgeActive: { backgroundColor: '#E91E63', borderColor: '#E91E63' },
-  moodBadgeTxt: { fontSize: 14, fontWeight: '700', color: '#555' },
+  moodBadge: { flex: 1, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: theme.goldLine, alignItems: 'center' },
+  moodBadgeActive: { backgroundColor: theme.gold, borderColor: theme.brightGold },
+  moodBadgeTxt: { fontSize: 14, fontWeight: '700', color: theme.secondaryText },
   modeAvatarRow: { flexDirection: 'row', gap: 12 },
-  modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#ddd' },
-  modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' },
+  modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: theme.gold },
+  modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surfaceRaised },
   modeRemoveBtn: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
 });

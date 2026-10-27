@@ -12,6 +12,8 @@ import { sendMessage, pingServer, sendToLocalGemma, Message, generateImage, gene
 import MediaImageViewer from '../components/MediaImageViewer';
 import MediaVideoPlayer from '../components/MediaVideoPlayer';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { LinearGradient } from 'expo-linear-gradient';
+import { projectTwoTheme as theme } from '../constants/project-two-theme';
 
 function cloudVideoThumbnail(videoUrl: string): string {
   try {
@@ -131,7 +133,7 @@ const { width, height } = Dimensions.get('window');
 
 // ── Chat Wallpapers ──────────────────────────────────────────────
 const WALLPAPERS = [
-  { id: 'default', label: '🟢 WhatsApp', bg: '#ECE5DD', dark: false },
+  { id: 'default', label: '✦ Black + Gold', bg: theme.background, dark: true },
   { id: 'dark',    label: '🌙 Dark',     bg: '#1C1C1E', dark: true  },
   { id: 'pink',    label: '🌸 Pink',     bg: '#F48FB1', dark: false },
   { id: 'blue',    label: '💙 Blue',     bg: '#90CAF9', dark: false },
@@ -1843,14 +1845,13 @@ export default function ChatScreen() {
 
   // ── Wallpaper + Bubble style helpers ──────────────────────────
   const wallpaperBg = (WALLPAPERS.find(w => w.id === chatWallpaper) ?? WALLPAPERS[0]).bg;
-  const isDark      = (WALLPAPERS.find(w => w.id === chatWallpaper) ?? WALLPAPERS[0]).dark;
   const bubbleRadius = bubbleStyle === 'round' ? 22 : 10;
-  const aiBubbleBg   = bubbleStyle === 'modern' ? (isDark ? '#2c2c2e' : '#fff') : (isDark ? '#2c2c2e' : '#fff');
-  const userBubbleBg = bubbleStyle === 'modern' ? (isDark ? '#1a3d2b' : '#d4f5d4') : '#DCF8C6';
-  const msgTextColor = isDark ? '#f0f0f0' : '#111';
+  const aiBubbleBg   = theme.surfaceRaised;
+  const userBubbleBg = theme.background;
+  const msgTextColor = theme.text;
   const aiMsgTextColor = charFontColor || msgTextColor;
   const aiMsgFontSize = charFontSize > 0 ? charFontSize : 15;
-  const timeTextColor = isDark ? '#888' : '#888';
+  const timeTextColor = theme.muted;
 
   // ── Copy helper ────────────────────────────────────────────────
   const copyText = (text: string) => {
@@ -2000,9 +2001,18 @@ export default function ChatScreen() {
               : [styles.aiBubble,  { backgroundColor: aiBubbleBg }],
           ]}
         >
+          {isUser && (
+            <LinearGradient
+              pointerEvents="none"
+              colors={[theme.surface, theme.background, 'rgba(212, 175, 55, 0.16)']}
+              start={{ x: 0.05, y: 0 }}
+              end={{ x: 0.95, y: 1 }}
+              style={[StyleSheet.absoluteFillObject, { borderRadius: bubbleRadius }]}
+            />
+          )}
           {item.imageLoading ? (
             <View style={styles.imgLoadingWrap}>
-              <ActivityIndicator color="#075E54" size="small" />
+              <ActivityIndicator color={theme.brightGold} size="small" />
               {renderTextWithOperaLinks(item.content, [styles.msgText, aiTextStyle], styles.messageLink, openChatUrl)}
             </View>
           ) : item.imageUrl ? (
@@ -2148,7 +2158,7 @@ export default function ChatScreen() {
               onPress={() => { setKiruthikaDetailsDraft(kiruthikaUserDetails); setShowKiruthikaDetails(true); }}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Text style={{ fontSize: 10, color: '#FF6B9D', fontWeight: '700', backgroundColor: '#FF6B9D22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>📝 Details</Text>
+              <Text style={{ fontSize: 10, color: theme.brightGold, fontWeight: '700', backgroundColor: theme.goldWash, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>📝 Details</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -2178,15 +2188,15 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: wallpaperBg }]}>
-      <StatusBar backgroundColor="#075E54" barStyle="light-content" />
+      <StatusBar backgroundColor={theme.gold} barStyle="dark-content" />
       {avatarAsBg && activeAvatarUri ? (
         <Image source={{ uri: activeAvatarUri }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.12 }} blurRadius={6} resizeMode="cover" />
       ) : null}
       <Stack.Screen options={{
         headerTitle,
         headerRight,
-        headerStyle: { backgroundColor: '#128C7E' },
-        headerTintColor: '#fff',
+        headerStyle: { backgroundColor: theme.gold },
+        headerTintColor: theme.background,
       }} />
 
       {/* Offline status banner — status only, settings via ⚙️ gear icon */}
@@ -2227,7 +2237,7 @@ export default function ChatScreen() {
         {loading && (
           <View style={styles.loadingRow}>
             <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color="#075E54" />
+              <ActivityIndicator size="small" color={theme.brightGold} />
               <Text style={styles.loadingText}>
                 {persona ? `${persona.name} பதில் அளிக்கிறார்...` : 'பதில் தயாராகிறது...'}
               </Text>
@@ -2237,10 +2247,10 @@ export default function ChatScreen() {
 
         {showScrollBtn && (
           <TouchableOpacity
-            style={{ position: 'absolute', right: 12, bottom: 90, zIndex: 99, backgroundColor: '#075E54', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 4, elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4 }}
+            style={{ position: 'absolute', right: 12, bottom: 90, zIndex: 99, backgroundColor: theme.gold, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 4, elevation: 8, shadowColor: theme.gold, shadowOpacity: 0.22, shadowRadius: 4 }}
             onPress={() => flatListRef.current?.scrollToEnd({ animated: true })}
           >
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>⬇ Latest</Text>
+            <Text style={{ color: theme.background, fontSize: 14, fontWeight: '700' }}>⬇ Latest</Text>
           </TouchableOpacity>
         )}
         <View style={{ position: 'relative' }}>
@@ -2248,28 +2258,28 @@ export default function ChatScreen() {
           <View style={styles.chatFabs}>
 
             <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#E53935' }]}
+              style={[styles.chatFabItem, { backgroundColor: theme.gold }]}
               onPress={() => setShowGenModal(true)}
               disabled={generatingPhoto}
             >
               {generatingPhoto
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color={theme.brightGold} size="small" />
                 : <Text style={styles.cameraIcon}>📷</Text>
               }
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#00897B' }]}
+              style={[styles.chatFabItem, { backgroundColor: theme.surfaceRaised }]}
               onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
             >
               <Text style={styles.cameraIcon}>☁️</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.chatFabItem, { backgroundColor: '#1565C0' }]}
+              style={[styles.chatFabItem, { backgroundColor: theme.surfaceRaised }]}
               onPress={() => handleTranslate(input)}
               disabled={translateLoading}
             >
               {translateLoading
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color={theme.brightGold} size="small" />
                 : <Text style={styles.cameraIcon}>🔤</Text>
               }
             </TouchableOpacity>
@@ -2284,7 +2294,7 @@ export default function ChatScreen() {
                 value={input}
                 onChangeText={setInput}
                 placeholder="தமிழில் தட்டச்சு பண்ணுங்க..."
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.muted}
                 multiline
                 maxLength={1000}
               />
@@ -2295,8 +2305,8 @@ export default function ChatScreen() {
                 disabled={fileLoading || loading}
               >
                 {fileLoading
-                  ? <ActivityIndicator color="#999" size="small" />
-                  : <Text style={{ fontSize: 20, color: '#aaa' }}>📎</Text>
+                  ? <ActivityIndicator color={theme.brightGold} size="small" />
+                  : <Text style={{ fontSize: 20, color: theme.brightGold }}>📎</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -2481,7 +2491,7 @@ export default function ChatScreen() {
             </View>
             {promptLoading ? (
               <View style={styles.promptLoading}>
-                <ActivityIndicator size="large" color="#6a1b9a" />
+                <ActivityIndicator size="large" color={theme.brightGold} />
                 <Text style={styles.promptLoadingTxt}>AI image-ஐ analyze பண்றது... ⏳</Text>
               </View>
             ) : (
@@ -2510,7 +2520,7 @@ export default function ChatScreen() {
             </View>
             {translateLoading ? (
               <View style={styles.promptLoading}>
-                <ActivityIndicator size="large" color="#1565C0" />
+                <ActivityIndicator size="large" color={theme.brightGold} />
                 <Text style={styles.promptLoadingTxt}>Translate பண்றேன்... ⏳</Text>
               </View>
             ) : (
@@ -2519,7 +2529,7 @@ export default function ChatScreen() {
               </ScrollView>
             )}
             {!translateLoading && !!translateResult && !translateResult.startsWith('❌') && (
-              <TouchableOpacity style={[styles.promptCopyBtn, { backgroundColor: '#1565C0' }]} onPress={() => copyText(translateResult)}>
+              <TouchableOpacity style={styles.promptCopyBtn} onPress={() => copyText(translateResult)}>
                 <Text style={styles.promptCopyTxt}>📋 Copy Translation</Text>
               </TouchableOpacity>
             )}
@@ -2627,7 +2637,7 @@ export default function ChatScreen() {
                 {WALLPAPERS.map(w => (
                   <TouchableOpacity key={w.id} style={[styles.wallpaperChip, { backgroundColor: w.bg }, chatWallpaper === w.id && styles.wallpaperChipActive]}
                     onPress={() => saveWallpaper(w.id)}>
-                    <Text style={styles.wallpaperChipTxt}>{w.label}</Text>
+                    <Text style={[styles.wallpaperChipTxt, { color: w.dark ? theme.text : theme.background }]}>{w.label}</Text>
                     {chatWallpaper === w.id && <Text style={styles.wallpaperCheck}>✓</Text>}
                   </TouchableOpacity>
                 ))}
@@ -2775,8 +2785,8 @@ export default function ChatScreen() {
                 maxLength={5}
               />
               <View style={styles.gemmaBtnRow}>
-                <TouchableOpacity style={[styles.gemmaBtn, { backgroundColor: '#ccc' }]} onPress={() => setShowGemmaSettings(false)} disabled={webllmDownloading}>
-                  <Text style={[styles.gemmaBtnTxt, { color: '#333' }]}>Cancel</Text>
+                <TouchableOpacity style={[styles.gemmaBtn, { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line }]} onPress={() => setShowGemmaSettings(false)} disabled={webllmDownloading}>
+                  <Text style={[styles.gemmaBtnTxt, { color: theme.secondaryText }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.gemmaBtn} onPress={saveGemmaPort} disabled={webllmDownloading}>
                   <Text style={styles.gemmaBtnTxt}>Save Port</Text>
@@ -2791,33 +2801,33 @@ export default function ChatScreen() {
       {personaId === 'kiruthika' && (
         <Modal visible={showKiruthikaDetails} transparent animationType="slide" onRequestClose={() => setShowKiruthikaDetails(false)}>
           <TouchableOpacity style={{ flex: 1, backgroundColor: '#00000066' }} activeOpacity={1} onPress={() => setShowKiruthikaDetails(false)}>
-            <TouchableOpacity activeOpacity={1} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }}>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#FF6B9D', marginBottom: 6 }}>📝 என்னோட Details — கிருத்திகா-க்கு</Text>
-              <Text style={{ fontSize: 12, color: '#888', marginBottom: 12, lineHeight: 18 }}>{"உன்னோட உண்மையான details இங்க type பண்ணு. கிருத்திகா நினைவில் வச்சு பேசுவா. (பெயர், ஊர், job, family, health — எல்லாம் சொல்லலாம்)"}</Text>
+            <TouchableOpacity activeOpacity={1} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, borderWidth: 1, borderColor: theme.goldLine }}>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.brightGold, marginBottom: 6 }}>📝 என்னோட Details — கிருத்திகா-க்கு</Text>
+              <Text style={{ fontSize: 12, color: theme.secondaryText, marginBottom: 12, lineHeight: 18 }}>{"உன்னோட உண்மையான details இங்க type பண்ணு. கிருத்திகா நினைவில் வச்சு பேசுவா. (பெயர், ஊர், job, family, health — எல்லாம் சொல்லலாம்)"}</Text>
               <TextInput
-                style={{ borderWidth: 1.5, borderColor: '#FF6B9D55', borderRadius: 12, padding: 14, fontSize: 14, minHeight: 130, textAlignVertical: 'top', color: '#222', backgroundColor: '#FFF5F9', lineHeight: 20 }}
+                style={{ borderWidth: 1.5, borderColor: theme.goldLine, borderRadius: 12, padding: 14, fontSize: 14, minHeight: 130, textAlignVertical: 'top', color: theme.text, backgroundColor: theme.surfaceRaised, lineHeight: 20 }}
                 value={kiruthikaDetailsDraft}
                 onChangeText={setKiruthikaDetailsDraft}
                 multiline
                 placeholder={"உன்னோட பெயர், ஊர், job, family, health, daily routine — எவ்வளவு சொன்னாலும் OK..."}
-                placeholderTextColor="#ccc"
+                placeholderTextColor={theme.muted}
               />
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                 <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#eee', borderRadius: 12, padding: 13, alignItems: 'center' }}
+                  style={{ flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line, borderRadius: 12, padding: 13, alignItems: 'center' }}
                   onPress={() => setShowKiruthikaDetails(false)}
                 >
-                  <Text style={{ color: '#666', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+                  <Text style={{ color: theme.secondaryText, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{ flex: 2, backgroundColor: '#FF6B9D', borderRadius: 12, padding: 13, alignItems: 'center' }}
+                  style={{ flex: 2, backgroundColor: theme.gold, borderRadius: 12, padding: 13, alignItems: 'center' }}
                   onPress={async () => {
                     setKiruthikaUserDetails(kiruthikaDetailsDraft);
                     await AsyncStorage.setItem('kiruthika_user_details', kiruthikaDetailsDraft).catch(() => {});
                     setShowKiruthikaDetails(false);
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>💾 Save — கிருத்திகா-க்கு சொல்லு</Text>
+                  <Text style={{ color: theme.background, fontWeight: '700', fontSize: 14 }}>💾 Save — கிருத்திகா-க்கு சொல்லு</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -2859,58 +2869,58 @@ export default function ChatScreen() {
               />
             )}
             <View style={{ alignItems: 'center', paddingVertical: 10 }}>
-              <Text style={{ color: '#aaa', fontSize: 12 }}>
+              <Text style={{ color: theme.secondaryText, fontSize: 12 }}>
                 தற்போதைய நேரம்:{' '}
-                <Text style={{ color: '#25D366', fontWeight: '700' }}>{fmtSec(trimCurrentSec)}</Text>
+                <Text style={{ color: theme.brightGold, fontWeight: '700' }}>{fmtSec(trimCurrentSec)}</Text>
                 {' '}/ {trimPending ? fmtSec(trimPending.durationSec) : '00:00'}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 }}>
               <TouchableOpacity
                 onPress={() => setTrimStartSec(Math.min(trimCurrentSec, trimEndSec - 1))}
-                style={{ flex: 1, backgroundColor: '#1b5e20', paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
+                style={{ flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: '#69f0ae', fontWeight: '700', fontSize: 13 }}>▶ Start இங்கே வை</Text>
-                <Text style={{ color: '#69f0ae', fontSize: 11, marginTop: 2 }}>{fmtSec(trimStartSec)}</Text>
+                <Text style={{ color: theme.brightGold, fontWeight: '700', fontSize: 13 }}>▶ Start இங்கே வை</Text>
+                <Text style={{ color: theme.secondaryText, fontSize: 11, marginTop: 2 }}>{fmtSec(trimStartSec)}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setTrimEndSec(Math.max(trimCurrentSec, trimStartSec + 1))}
-                style={{ flex: 1, backgroundColor: '#7b1fa2', paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
+                style={{ flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, paddingVertical: 12, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: '#ea80fc', fontWeight: '700', fontSize: 13 }}>⏹ End இங்கே வை</Text>
-                <Text style={{ color: '#ea80fc', fontSize: 11, marginTop: 2 }}>{fmtSec(trimEndSec)}</Text>
+                <Text style={{ color: theme.brightGold, fontWeight: '700', fontSize: 13 }}>⏹ End இங்கே வை</Text>
+                <Text style={{ color: theme.secondaryText, fontSize: 11, marginTop: 2 }}>{fmtSec(trimEndSec)}</Text>
               </TouchableOpacity>
             </View>
             <View style={{
-              marginHorizontal: 16, backgroundColor: '#0d1b2a', borderRadius: 12,
-              padding: 12, marginBottom: 14, alignItems: 'center',
+              marginHorizontal: 16, backgroundColor: theme.surfaceRaised, borderRadius: 12,
+              padding: 12, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.goldLine,
             }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
                 {fmtSec(trimStartSec)} → {fmtSec(trimEndSec)}
-                {'  '}<Text style={{ color: '#25D366' }}>({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)</Text>
+                {'  '}<Text style={{ color: theme.brightGold }}>({Math.max(0, Math.round(trimEndSec - trimStartSec))} sec)</Text>
               </Text>
-              <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+              <Text style={{ color: theme.muted, fontSize: 11, marginTop: 4 }}>
                 Video play பண்ணி சரியான நேரத்தில் ▶ Start / ⏹ End press பண்ணுங்க
               </Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16 }}>
               <TouchableOpacity
                 onPress={() => setTrimPending(null)}
-                style={{ flex: 1, backgroundColor: '#2a2a3e', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
+                style={{ flex: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line, paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: '#aaa', fontWeight: '600' }}>ரத்து</Text>
+                <Text style={{ color: theme.secondaryText, fontWeight: '600' }}>ரத்து</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleTrimAndSend}
                 disabled={isTrimming}
                 style={{
-                  flex: 2, backgroundColor: isTrimming ? '#555' : '#00897b',
+                  flex: 2, backgroundColor: isTrimming ? '#756334' : theme.gold,
                   paddingVertical: 14, borderRadius: 14, alignItems: 'center',
                   flexDirection: 'row', justifyContent: 'center', gap: 8,
                 }}
               >
-                {isTrimming ? <ActivityIndicator color="#fff" size="small" /> : null}
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
+                {isTrimming ? <ActivityIndicator color={theme.background} size="small" /> : null}
+                <Text style={{ color: theme.background, fontWeight: '800', fontSize: 15 }}>
                   {isTrimming ? 'Trimming...' : '✂️ Trim & Send'}
                 </Text>
               </TouchableOpacity>
@@ -2931,14 +2941,14 @@ export default function ChatScreen() {
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' }}
           keyboardVerticalOffset={0}
         >
-          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 }}>
+          <View style={{ backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, borderWidth: 1, borderColor: theme.goldLine }}>
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: '#111' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.line }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.brightGold }}>
                 {stagingMedia?.isVideo ? '🎬 Video Preview' : '📷 Photo Preview'}
               </Text>
               <TouchableOpacity onPress={() => { setStagingMedia(null); setStagingCaption(''); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={{ fontSize: 24, color: '#888' }}>✕</Text>
+                <Text style={{ fontSize: 24, color: theme.secondaryText }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -2947,7 +2957,7 @@ export default function ChatScreen() {
               {stagingMedia?.isVideo ? (
                 <View style={{ width: '100%', height: 180, backgroundColor: '#0d0d0d', borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}>
                   <Text style={{ fontSize: 56 }}>🎬</Text>
-                  <Text style={{ color: '#bbb', fontSize: 13, marginTop: 8 }}>{stagingMedia.fileName}</Text>
+                  <Text style={{ color: theme.secondaryText, fontSize: 13, marginTop: 8 }}>{stagingMedia.fileName}</Text>
                 </View>
               ) : stagingMedia?.uri ? (
                 <Image
@@ -2964,11 +2974,11 @@ export default function ChatScreen() {
                 value={stagingCaption}
                 onChangeText={setStagingCaption}
                 placeholder="Caption தமிழ்ல type பண்ணுங்க (optional)…"
-                placeholderTextColor="#aaa"
+                placeholderTextColor={theme.muted}
                 style={{
-                  flex: 1, borderWidth: 1.5, borderColor: '#ddd', borderRadius: 22,
-                  paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#111',
-                  backgroundColor: '#f8f8f8',
+                  flex: 1, borderWidth: 1.5, borderColor: theme.goldLine, borderRadius: 22,
+                  paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: theme.text,
+                  backgroundColor: theme.surfaceRaised,
                 }}
                 multiline={false}
                 maxLength={200}
@@ -2978,19 +2988,19 @@ export default function ChatScreen() {
                 onPress={sendStagedMedia}
                 disabled={stagingUploading}
                 style={{
-                  backgroundColor: stagingUploading ? '#aaa' : '#25D366',
+                  backgroundColor: stagingUploading ? '#756334' : theme.gold,
                   borderRadius: 22, paddingVertical: 12, paddingHorizontal: 20,
                   flexDirection: 'row', alignItems: 'center', gap: 6,
                 }}
               >
                 {stagingUploading
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Send ➤</Text>
+                  : <Text style={{ color: theme.background, fontWeight: '800', fontSize: 15 }}>Send ➤</Text>
                 }
               </TouchableOpacity>
             </View>
             {stagingUploading && (
-              <Text style={{ textAlign: 'center', color: '#075E54', fontSize: 12, marginTop: 8, fontWeight: '600' }}>
+              <Text style={{ textAlign: 'center', color: theme.brightGold, fontSize: 12, marginTop: 8, fontWeight: '600' }}>
                 ☁️ Cloudinary upload → AI analyze பண்றோம்…
               </Text>
             )}
@@ -3010,17 +3020,17 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ECE5DD' },
+  container: { flex: 1, backgroundColor: theme.background },
   flex: { flex: 1 },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerAvatarImg: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: '#fff' },
-  headerAvatar: { width: 58, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
-  headerAvatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  headerName: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.3 },
-  headerOnline: { color: '#b2dfdb', fontSize: 11 },
-  headerDialectBadge: { color: '#FFD54F', fontSize: 13, fontWeight: '600', marginTop: 2 },
-  headerMoodBadge: { color: '#F48FB1', fontSize: 13, fontWeight: '700', marginTop: 2 },
-  headerMoodNormal: { color: '#A5D6A7' },
+  headerAvatarImg: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: theme.background },
+  headerAvatar: { width: 58, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.background },
+  headerAvatarText: { color: theme.background, fontSize: 20, fontWeight: 'bold' },
+  headerName: { color: theme.background, fontSize: 18, fontWeight: 'bold', letterSpacing: 0.3 },
+  headerOnline: { color: '#39300F', fontSize: 11 },
+  headerDialectBadge: { color: theme.background, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  headerMoodBadge: { color: theme.background, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  headerMoodNormal: { color: '#39300F' },
   headerBtns: { flexDirection: 'row', alignItems: 'center', marginRight: 8, gap: 10 },
   headerBtn: { padding: 6 },
   headerBtnIcon: { fontSize: 22 },
@@ -3034,20 +3044,20 @@ const styles = StyleSheet.create({
   avatarEmoji: { fontSize: 16, color: '#fff' },
   userAvatarWrap: { width: 34, height: 34, borderRadius: 17, overflow: 'hidden', marginBottom: 2 },
   userAvatarImg: { width: 34, height: 34, borderRadius: 17 },
-  userAvatarDefault: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#DCF8C6', justifyContent: 'center', alignItems: 'center' },
+  userAvatarDefault: { width: 34, height: 34, borderRadius: 17, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, justifyContent: 'center', alignItems: 'center' },
   userAvatarTxt: { fontSize: 16 },
   imgLoadingWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   generatedImg: { width: 220, height: 280, borderRadius: 8, marginBottom: 4 },
-  bubble: { maxWidth: '75%', borderRadius: 10, padding: 10, paddingBottom: 6, elevation: 1 },
-  userBubble: { backgroundColor: '#DCF8C6', borderTopRightRadius: 2 },
-  aiBubble: { backgroundColor: '#fff', borderTopLeftRadius: 2 },
+  bubble: { maxWidth: '75%', borderRadius: 10, padding: 10, paddingBottom: 6, elevation: 1, overflow: 'hidden' },
+  userBubble: { backgroundColor: theme.background, borderTopRightRadius: 2, borderWidth: 1, borderColor: theme.goldLine },
+  aiBubble: { backgroundColor: theme.surfaceRaised, borderTopLeftRadius: 2, borderWidth: 1, borderColor: theme.line },
   galleryBubble: { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0 },
-  msgText: { fontSize: 15, lineHeight: 22, color: '#111' },
-  messageLink: { color: '#1565C0', textDecorationLine: 'underline' },
-  timeText: { fontSize: 10, color: '#888', alignSelf: 'flex-end', marginTop: 3 },
+  msgText: { fontSize: 15, lineHeight: 22, color: theme.text },
+  messageLink: { color: theme.brightGold, textDecorationLine: 'underline' },
+  timeText: { fontSize: 10, color: theme.muted, alignSelf: 'flex-end', marginTop: 3 },
   loadingRow: { flexDirection: 'row', padding: 8, paddingLeft: 14 },
-  loadingBubble: { backgroundColor: '#fff', borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  loadingText: { color: '#075E54', fontSize: 13 },
+  loadingBubble: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.goldLine },
+  loadingText: { color: theme.brightGold, fontSize: 13 },
   chatFabs: {
     position: 'absolute', right: 10, bottom: 74,
     alignItems: 'center', gap: 10, zIndex: 100,
@@ -3056,65 +3066,66 @@ const styles = StyleSheet.create({
     width: 52, height: 52, borderRadius: 26,
     justifyContent: 'center', alignItems: 'center',
     elevation: 5,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine,
+    shadowColor: theme.gold, shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
   },
   inputBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: '#F0F0F0', borderTopWidth: 1, borderTopColor: '#ddd', gap: 12,
+    backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: theme.goldLine, gap: 12,
   },
   inputWrapper: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 24,
+    backgroundColor: theme.surface, borderRadius: 24, borderWidth: 1, borderColor: theme.goldLine,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  input: { flex: 1, paddingLeft: 16, paddingRight: 4, paddingVertical: 12, fontSize: 15, maxHeight: 120, color: '#111', minHeight: 48 },
+  input: { flex: 1, paddingLeft: 16, paddingRight: 4, paddingVertical: 12, fontSize: 15, maxHeight: 120, color: theme.text, minHeight: 48 },
   btnStack: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  promptImageBtn: { backgroundColor: '#E91E8C', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  promptPickBtn: { backgroundColor: '#7B1FA2', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  cameraBtn: { backgroundColor: '#E53935', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
-  translateBtn: { backgroundColor: '#1565C0', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
+  promptImageBtn: { backgroundColor: theme.gold, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  promptPickBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  cameraBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
+  translateBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
   cameraIcon: { fontSize: 18 },
-  sendBtn: { backgroundColor: '#25D366', width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#25D366', shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
-  sendBtnDisabled: { backgroundColor: '#a8dfc4' },
+  sendBtn: { backgroundColor: theme.gold, width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: theme.gold, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  sendBtnDisabled: { backgroundColor: '#756334' },
   attachBtn: { width: 42, height: 42, justifyContent: 'center', alignItems: 'center', paddingRight: 12 },
-  sendIcon: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  sendIcon: { color: theme.background, fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  pickerSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%' },
-  pickerHandle: { width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
-  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  pickerTitle: { fontSize: 17, fontWeight: 'bold', color: '#111' },
-  pickerClose: { fontSize: 20, color: '#888', padding: 4 },
-  pickerCharInfo: { backgroundColor: '#e8f5e9', borderRadius: 8, padding: 10, marginTop: 10 },
-  pickerCharText: { color: '#2e7d32', fontSize: 13 },
-  styleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  styleRowSelected: { backgroundColor: '#f0f4ff' },
-  styleRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#bbb', marginRight: 8, justifyContent: 'center', alignItems: 'center' },
-  styleRadioSelected: { borderColor: '#6C63FF' },
-  styleRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6C63FF' },
-  styleLabel: { fontSize: 14.5, color: '#333', flex: 1 },
-  styleLabelSelected: { color: '#6C63FF', fontWeight: '600' },
+  pickerSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine },
+  pickerHandle: { width: 40, height: 4, backgroundColor: theme.goldSoft, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
+  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.line },
+  pickerTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold },
+  pickerClose: { fontSize: 20, color: theme.secondaryText, padding: 4 },
+  pickerCharInfo: { backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: theme.goldLine },
+  pickerCharText: { color: theme.secondaryText, fontSize: 13 },
+  styleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.line },
+  styleRowSelected: { backgroundColor: theme.goldWash },
+  styleRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: theme.muted, marginRight: 8, justifyContent: 'center', alignItems: 'center' },
+  styleRadioSelected: { borderColor: theme.gold },
+  styleRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.brightGold },
+  styleLabel: { fontSize: 14.5, color: theme.secondaryText, flex: 1 },
+  styleLabelSelected: { color: theme.brightGold, fontWeight: '600' },
 
   // New split layout
   styleListFull: { maxHeight: 340 },
-  styleRowFull: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  styleRowFullLabel: { fontSize: 15, color: '#333', flex: 1 },
-  styleRowArrow: { color: '#aaa', fontSize: 18, marginLeft: 6 },
+  styleRowFull: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: theme.line },
+  styleRowFullLabel: { fontSize: 15, color: theme.secondaryText, flex: 1 },
+  styleRowArrow: { color: theme.gold, fontSize: 18, marginLeft: 6 },
 
   // Generate collapsible
-  generateSection: { borderTopWidth: 1, borderTopColor: '#eee', marginTop: 4 },
-  generateToggle: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#f5f5f5' },
-  generateToggleTxt: { color: '#075E54', fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  generateSection: { borderTopWidth: 1, borderTopColor: theme.line, marginTop: 4 },
+  generateToggle: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.surfaceRaised },
+  generateToggleTxt: { color: theme.brightGold, fontWeight: '700', fontSize: 14, textAlign: 'center' },
   generateInner: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  hfBadge: { backgroundColor: '#fff3e0', borderRadius: 8, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#ff6b35' },
-  hfBadgeTxt: { color: '#bf360c', fontSize: 12, textAlign: 'center' },
+  hfBadge: { backgroundColor: theme.surfaceRaised, borderRadius: 8, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
+  hfBadgeTxt: { color: theme.secondaryText, fontSize: 12, textAlign: 'center' },
 
-  genLabel: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 8 },
-  genInput: { backgroundColor: '#f8f8f8', borderRadius: 10, borderWidth: 1, borderColor: '#ddd', padding: 12, fontSize: 14, color: '#222', minHeight: 60, textAlignVertical: 'top', marginBottom: 8 },
-  genBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
-  genBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  genNote: { fontSize: 12, color: '#888', textAlign: 'center' },
+  genLabel: { fontSize: 13, fontWeight: '600', color: theme.secondaryText, marginBottom: 8 },
+  genInput: { backgroundColor: theme.surfaceRaised, borderRadius: 10, borderWidth: 1, borderColor: theme.goldLine, padding: 12, fontSize: 14, color: theme.text, minHeight: 60, textAlignVertical: 'top', marginBottom: 8 },
+  genBtn: { backgroundColor: theme.gold, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  genBtnText: { color: theme.background, fontSize: 16, fontWeight: 'bold' },
+  genNote: { fontSize: 12, color: theme.muted, textAlign: 'center' },
   viewerBg: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   viewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
   viewerCloseText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
@@ -3125,46 +3136,46 @@ const styles = StyleSheet.create({
   browseBtn: { backgroundColor: '#1565C0' },
 
   // Cloud browser
-  browserBg: { flex: 1, backgroundColor: '#111' },
+  browserBg: { flex: 1, backgroundColor: theme.background },
   browserHeader: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#075E54', paddingHorizontal: 12,
+    backgroundColor: theme.gold, paddingHorizontal: 12,
     paddingVertical: 14, paddingTop: 44, gap: 8,
   },
   browserCloseBtn: { padding: 6 },
-  browserCloseTxt: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  browserTitle: { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  browserCount: { color: '#b2dfdb', fontSize: 13, marginTop: 2 },
-  browserSendBtn: { backgroundColor: '#25D366', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  browserSendTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  browserPhotoWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
+  browserCloseTxt: { color: theme.background, fontSize: 22, fontWeight: 'bold' },
+  browserTitle: { color: theme.background, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  browserCount: { color: '#39300F', fontSize: 13, marginTop: 2 },
+  browserSendBtn: { backgroundColor: theme.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  browserSendTxt: { color: theme.brightGold, fontSize: 12, fontWeight: '700' },
+  browserPhotoWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   browserCenter: { alignItems: 'center', gap: 16 },
-  browserLoadingTxt: { color: '#aaa', fontSize: 14, textAlign: 'center', marginTop: 12 },
+  browserLoadingTxt: { color: theme.secondaryText, fontSize: 14, textAlign: 'center', marginTop: 12 },
   browserEmptyIcon: { fontSize: 64 },
-  browserEmptyTxt: { color: '#aaa', fontSize: 16, textAlign: 'center', lineHeight: 26 },
+  browserEmptyTxt: { color: theme.secondaryText, fontSize: 16, textAlign: 'center', lineHeight: 26 },
   browserPhoto: { width, height: height * 0.62 },
   browserNav: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1a1a1a', paddingVertical: 14, paddingHorizontal: 12,
+    backgroundColor: theme.surface, paddingVertical: 14, paddingHorizontal: 12,
   },
   navBtn: {
-    backgroundColor: '#333', borderRadius: 10,
+    backgroundColor: theme.surfaceRaised, borderRadius: 10, borderWidth: 1, borderColor: theme.goldLine,
     paddingHorizontal: 16, paddingVertical: 10,
   },
   navBtnDisabled: { opacity: 0.3 },
-  navBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  navBtnTxt: { color: theme.brightGold, fontWeight: '700', fontSize: 14 },
   dotsWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, flex: 1, justifyContent: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#555' },
-  dotActive: { backgroundColor: '#25D366', width: 12, height: 12, borderRadius: 6 },
+  dotActive: { backgroundColor: theme.brightGold, width: 12, height: 12, borderRadius: 6 },
   browserActions: {
     flexDirection: 'row', gap: 12, padding: 14,
-    backgroundColor: '#1a1a1a', borderTopWidth: 1, borderTopColor: '#333',
+    backgroundColor: theme.surface, borderTopWidth: 1, borderTopColor: theme.goldLine,
   },
   browserActionBtn: {
-    flex: 1, backgroundColor: '#075E54', borderRadius: 12,
+    flex: 1, backgroundColor: theme.gold, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
   },
-  browserActionTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  browserActionTxt: { color: theme.background, fontWeight: '700', fontSize: 14 },
 
   // Offline banner
   offlineBanner: { backgroundColor: '#FF6F00', paddingVertical: 4, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
@@ -3173,186 +3184,186 @@ const styles = StyleSheet.create({
 
   // Gemma / Offline settings modal
   gemmaSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, maxHeight: '85%',
+    backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine,
   },
-  gemmaDivider: { height: 1, backgroundColor: '#eee', marginVertical: 20 },
-  gemmaTitle: { fontSize: 16, fontWeight: 'bold', color: '#111', marginBottom: 10 },
-  gemmaDesc: { fontSize: 13, color: '#444', lineHeight: 20, marginBottom: 14 },
-  gemmaPortHint: { fontWeight: 'bold', color: '#075E54' },
-  gemmaPortLabel: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6 },
+  gemmaDivider: { height: 1, backgroundColor: theme.line, marginVertical: 20 },
+  gemmaTitle: { fontSize: 16, fontWeight: 'bold', color: theme.brightGold, marginBottom: 10 },
+  gemmaDesc: { fontSize: 13, color: theme.secondaryText, lineHeight: 20, marginBottom: 14 },
+  gemmaPortHint: { fontWeight: 'bold', color: theme.brightGold },
+  gemmaPortLabel: { fontSize: 13, fontWeight: '600', color: theme.secondaryText, marginBottom: 6 },
   gemmaPortInput: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 10,
+    borderWidth: 1, borderColor: theme.goldLine, borderRadius: 10, backgroundColor: theme.surfaceRaised,
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 18, color: '#111', marginBottom: 16,
+    fontSize: 18, color: theme.text, marginBottom: 16,
     textAlign: 'center', letterSpacing: 2,
   },
   gemmaBtnRow: { flexDirection: 'row', gap: 10 },
   gemmaBtn: {
-    flex: 1, backgroundColor: '#075E54', borderRadius: 12,
+    flex: 1, backgroundColor: theme.gold, borderRadius: 12,
     paddingVertical: 12, alignItems: 'center',
   },
-  gemmaBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  gemmaBtnTxt: { color: theme.background, fontWeight: 'bold', fontSize: 15 },
 
   // WebLLM download UI
   downloadBtn: {
-    backgroundColor: '#1565C0', borderRadius: 12,
+    backgroundColor: theme.gold, borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', marginBottom: 8,
   },
-  downloadBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
-  gemmaReady: { backgroundColor: '#e8f5e9', borderRadius: 10, padding: 14, marginBottom: 8 },
-  gemmaReadyTxt: { color: '#2e7d32', fontWeight: '600', fontSize: 14 },
-  gemmaAlert: { backgroundColor: '#fff3e0', borderRadius: 10, padding: 14, marginBottom: 8 },
-  gemmaAlertTxt: { color: '#e65100', fontSize: 13 },
+  downloadBtnTxt: { color: theme.background, fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
+  gemmaReady: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
+  gemmaReadyTxt: { color: theme.brightGold, fontWeight: '600', fontSize: 14 },
+  gemmaAlert: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: theme.goldLine },
+  gemmaAlertTxt: { color: theme.secondaryText, fontSize: 13 },
   gemmaProgress: { padding: 4, marginBottom: 8 },
-  gemmaProgressTxt: { color: '#444', fontSize: 12, marginBottom: 8, lineHeight: 18 },
-  gemmaProgressPct: { color: '#075E54', fontWeight: 'bold', fontSize: 14, textAlign: 'center', marginTop: 4 },
-  progressBarBg: { height: 10, backgroundColor: '#e0e0e0', borderRadius: 5, overflow: 'hidden' },
-  progressBarFill: { height: 10, backgroundColor: '#1565C0', borderRadius: 5 },
-  gemmaErrorBox: { backgroundColor: '#fdecea', borderRadius: 10, padding: 12, marginBottom: 12 },
-  gemmaErrorTxt: { color: '#c62828', fontSize: 13, lineHeight: 20 },
+  gemmaProgressTxt: { color: theme.secondaryText, fontSize: 12, marginBottom: 8, lineHeight: 18 },
+  gemmaProgressPct: { color: theme.brightGold, fontWeight: 'bold', fontSize: 14, textAlign: 'center', marginTop: 4 },
+  progressBarBg: { height: 10, backgroundColor: theme.surfaceSoft, borderRadius: 5, overflow: 'hidden' },
+  progressBarFill: { height: 10, backgroundColor: theme.gold, borderRadius: 5 },
+  gemmaErrorBox: { backgroundColor: theme.dangerWash, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: theme.danger },
+  gemmaErrorTxt: { color: '#EF9A9A', fontSize: 13, lineHeight: 20 },
   mobileWarnOverlay: {
     ...StyleSheet.absoluteFillObject, zIndex: 300,
     backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24,
   },
-  mobileWarnBox: { backgroundColor: '#fff', borderRadius: 18, padding: 24, width: '100%' },
+  mobileWarnBox: { backgroundColor: theme.surface, borderRadius: 18, padding: 24, width: '100%', borderWidth: 1, borderColor: theme.goldLine },
   mobileWarnIcon: { fontSize: 36, textAlign: 'center', marginBottom: 10 },
-  mobileWarnTitle: { fontSize: 17, fontWeight: 'bold', color: '#111', textAlign: 'center', marginBottom: 10 },
-  mobileWarnDesc: { fontSize: 14, color: '#444', lineHeight: 22, marginBottom: 20, textAlign: 'center' },
+  mobileWarnTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold, textAlign: 'center', marginBottom: 10 },
+  mobileWarnDesc: { fontSize: 14, color: theme.secondaryText, lineHeight: 22, marginBottom: 20, textAlign: 'center' },
   mobileWarnBtns: { flexDirection: 'row', gap: 12 },
-  mobileWarnCancel: { flex: 1, backgroundColor: '#e0e0e0', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  mobileWarnCancelTxt: { color: '#555', fontWeight: '700', fontSize: 14 },
-  mobileWarnOk: { flex: 2, backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  mobileWarnOkTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  mobileWarnCancel: { flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  mobileWarnCancelTxt: { color: theme.secondaryText, fontWeight: '700', fontSize: 14 },
+  mobileWarnOk: { flex: 2, backgroundColor: theme.gold, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  mobileWarnOkTxt: { color: theme.background, fontWeight: '800', fontSize: 14 },
 
 
   // Add-from-URL
   addUrlBtn: {
-    marginTop: 10, backgroundColor: '#e8f5e9', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#a5d6a7',
+    marginTop: 10, backgroundColor: theme.surfaceRaised, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: theme.goldLine,
   },
-  addUrlBtnTxt: { color: '#2e7d32', fontSize: 11, fontWeight: '700' },
+  addUrlBtnTxt: { color: theme.brightGold, fontSize: 11, fontWeight: '700' },
   addUrlBox: { width: '100%', paddingHorizontal: 4, marginTop: 8 },
   addUrlInput: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#aaa',
+    backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine,
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6,
-    fontSize: 11, color: '#111',
+    fontSize: 11, color: theme.text,
   },
   addUrlSave: {
-    flex: 1, backgroundColor: '#075E54', borderRadius: 8,
+    flex: 1, backgroundColor: theme.gold, borderRadius: 8,
     paddingVertical: 7, alignItems: 'center',
   },
-  addUrlSaveTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  addUrlSaveTxt: { color: theme.background, fontWeight: 'bold', fontSize: 14 },
   addUrlCancel: {
-    flex: 1, backgroundColor: '#e53935', borderRadius: 8,
+    flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line, borderRadius: 8,
     paddingVertical: 7, alignItems: 'center',
   },
-  addUrlCancelTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  addUrlCancelTxt: { color: theme.secondaryText, fontWeight: 'bold', fontSize: 14 },
   addUrlSmallBtn: {
-    marginTop: 4, marginHorizontal: 4, backgroundColor: '#f0f0f0', borderRadius: 6,
-    paddingVertical: 5, alignItems: 'center', borderWidth: 1, borderColor: '#ddd',
+    marginTop: 4, marginHorizontal: 4, backgroundColor: theme.surfaceRaised, borderRadius: 6,
+    paddingVertical: 5, alignItems: 'center', borderWidth: 1, borderColor: theme.line,
   },
-  addUrlSmallBtnTxt: { color: '#555', fontSize: 10, fontWeight: '600' },
+  addUrlSmallBtnTxt: { color: theme.secondaryText, fontSize: 10, fontWeight: '600' },
 
   // ── Message action (long-press) ──
   msgActionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 28 },
   selectTextOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   selectTextBox: {
-    backgroundColor: '#fff', borderRadius: 18, width: '100%', maxHeight: '75%',
-    overflow: 'hidden', paddingBottom: 8,
+    backgroundColor: theme.surface, borderRadius: 18, width: '100%', maxHeight: '75%',
+    overflow: 'hidden', paddingBottom: 8, borderWidth: 1, borderColor: theme.goldLine,
   },
-  selectTextTitle: { fontSize: 16, fontWeight: '800', color: '#111', padding: 16, paddingBottom: 4 },
-  selectTextHint: { fontSize: 11, color: '#888', paddingHorizontal: 16, paddingBottom: 8 },
-  selectTextScroll: { maxHeight: 280, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#fafafa' },
+  selectTextTitle: { fontSize: 16, fontWeight: '800', color: theme.brightGold, padding: 16, paddingBottom: 4 },
+  selectTextHint: { fontSize: 11, color: theme.muted, paddingHorizontal: 16, paddingBottom: 8 },
+  selectTextScroll: { maxHeight: 280, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.line, backgroundColor: theme.surfaceRaised },
   selectTextContent: {
-    fontSize: 17, lineHeight: 26, color: '#111', padding: 16,
+    fontSize: 17, lineHeight: 26, color: theme.text, padding: 16,
     letterSpacing: 0.2,
   },
   selectTextActions: { flexDirection: 'row', gap: 10, padding: 12, paddingTop: 10 },
   selectTextCopyAll: {
-    flex: 1, backgroundColor: '#E91E8C', borderRadius: 10,
+    flex: 1, backgroundColor: theme.gold, borderRadius: 10,
     paddingVertical: 10, alignItems: 'center',
   },
-  selectTextCopyAllTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  selectTextCopyAllTxt: { color: theme.background, fontWeight: '700', fontSize: 14 },
   selectTextClose: {
-    flex: 1, backgroundColor: '#f0f0f0', borderRadius: 10,
+    flex: 1, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line, borderRadius: 10,
     paddingVertical: 10, alignItems: 'center',
   },
-  selectTextCloseTxt: { color: '#333', fontWeight: '700', fontSize: 14 },
-  msgActionBox: { backgroundColor: '#fff', borderRadius: 18, width: '100%', overflow: 'hidden' },
-  msgActionPreview: { fontSize: 13, color: '#555', padding: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  msgActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
+  selectTextCloseTxt: { color: theme.secondaryText, fontWeight: '700', fontSize: 14 },
+  msgActionBox: { backgroundColor: theme.surface, borderRadius: 18, width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: theme.goldLine },
+  msgActionPreview: { fontSize: 13, color: theme.secondaryText, padding: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.line },
+  msgActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: theme.line },
   msgActionDelete: { },
   msgActionIcon: { fontSize: 20 },
-  msgActionTxt: { fontSize: 16, fontWeight: '600', color: '#111' },
+  msgActionTxt: { fontSize: 16, fontWeight: '600', color: theme.text },
   msgActionCancel: { paddingVertical: 16, alignItems: 'center' },
-  msgActionCancelTxt: { fontSize: 15, color: '#888', fontWeight: '600' },
+  msgActionCancelTxt: { fontSize: 15, color: theme.muted, fontWeight: '600' },
 
   // ── Chat Style Sheet ──
   styleSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  styleSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, maxHeight: '85%' },
-  styleSheetHandle: { width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 6 },
-  styleSheetTitle: { fontSize: 20, fontWeight: 'bold', color: '#111', marginBottom: 16, marginTop: 4 },
-  styleSheetSection: { fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 10, marginTop: 4 },
-  styleSheetSub: { fontSize: 12, color: '#888', marginBottom: 8, marginTop: -6 },
-  avatarThemeBtn: { backgroundColor: '#e3f2fd', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: '#90CAF9', alignItems: 'center' },
-  avatarThemeBtnActive: { backgroundColor: '#1565C0', borderColor: '#1565C0' },
-  avatarThemeTxt: { fontSize: 14, color: '#1565C0', fontWeight: '600' },
-  styleSheetClose: { backgroundColor: '#075E54', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
-  styleSheetCloseTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  styleSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine },
+  styleSheetHandle: { width: 40, height: 4, backgroundColor: theme.goldSoft, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 6 },
+  styleSheetTitle: { fontSize: 20, fontWeight: 'bold', color: theme.brightGold, marginBottom: 16, marginTop: 4 },
+  styleSheetSection: { fontSize: 14, fontWeight: '700', color: theme.text, marginBottom: 10, marginTop: 4 },
+  styleSheetSub: { fontSize: 12, color: theme.muted, marginBottom: 8, marginTop: -6 },
+  avatarThemeBtn: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: theme.goldLine, alignItems: 'center' },
+  avatarThemeBtnActive: { backgroundColor: theme.gold, borderColor: theme.brightGold },
+  avatarThemeTxt: { fontSize: 14, color: theme.brightGold, fontWeight: '600' },
+  styleSheetClose: { backgroundColor: theme.gold, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  styleSheetCloseTxt: { color: theme.background, fontSize: 16, fontWeight: 'bold' },
 
   // ── Wallpaper grid ──
   wallpaperGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   wallpaperChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4 },
-  wallpaperChipActive: { borderColor: '#075E54' },
-  wallpaperChipTxt: { fontSize: 13, fontWeight: '600', color: '#333' },
-  wallpaperCheck: { fontSize: 12, color: '#075E54', fontWeight: '900' },
+  wallpaperChipActive: { borderColor: theme.gold },
+  wallpaperChipTxt: { fontSize: 13, fontWeight: '600', color: theme.background },
+  wallpaperCheck: { fontSize: 12, color: theme.brightGold, fontWeight: '900' },
 
   // ── Bubble style chips ──
   bubbleStyleRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
-  bubbleStyleChip: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#ddd', alignItems: 'center', backgroundColor: '#fafafa' },
-  bubbleStyleChipActive: { borderColor: '#075E54', backgroundColor: '#e8f5e9' },
-  bubbleStyleTxt: { fontSize: 13, fontWeight: '600', color: '#555' },
-  bubbleStyleTxtActive: { color: '#075E54' },
+  bubbleStyleChip: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: theme.goldLine, alignItems: 'center', backgroundColor: theme.surfaceRaised },
+  bubbleStyleChipActive: { borderColor: theme.brightGold, backgroundColor: theme.goldWash },
+  bubbleStyleTxt: { fontSize: 13, fontWeight: '600', color: theme.secondaryText },
+  bubbleStyleTxtActive: { color: theme.brightGold },
 
   // ── Birthday ──
   bdayRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
-  bdayInput: { flex: 1, borderWidth: 1.5, borderColor: '#ddd', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, color: '#111', letterSpacing: 2 },
-  bdaySaveBtn: { backgroundColor: '#075E54', borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
-  bdaySaveTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  bdaySet: { fontSize: 12, color: '#2e7d32', marginBottom: 12 },
+  bdayInput: { flex: 1, borderWidth: 1.5, borderColor: theme.goldLine, backgroundColor: theme.surfaceRaised, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, color: theme.text, letterSpacing: 2 },
+  bdaySaveBtn: { backgroundColor: theme.gold, borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
+  bdaySaveTxt: { color: theme.background, fontWeight: 'bold', fontSize: 14 },
+  bdaySet: { fontSize: 12, color: theme.brightGold, marginBottom: 12 },
 
   // ── Full-screen viewer prompt button ──
   viewerPromptBtn: {
     position: 'absolute', bottom: 36, alignSelf: 'center',
-    backgroundColor: '#6a1b9a', borderRadius: 24,
+    backgroundColor: theme.gold, borderRadius: 24,
     paddingHorizontal: 22, paddingVertical: 12,
   },
-  viewerPromptTxt: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  viewerPromptTxt: { color: theme.background, fontWeight: 'bold', fontSize: 15 },
 
   // ── Prompt result modal ──
   promptOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   promptSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '70%', paddingBottom: 20,
+    backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '70%', paddingBottom: 20, borderWidth: 1, borderColor: theme.goldLine,
   },
   promptHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 18, borderBottomWidth: 1, borderBottomColor: '#eee',
+    padding: 18, borderBottomWidth: 1, borderBottomColor: theme.line,
   },
-  promptTitle: { fontSize: 17, fontWeight: 'bold', color: '#6a1b9a' },
-  promptClose: { fontSize: 22, color: '#888' },
+  promptTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold },
+  promptClose: { fontSize: 22, color: theme.secondaryText },
   promptLoading: { padding: 40, alignItems: 'center', gap: 14 },
-  promptLoadingTxt: { fontSize: 14, color: '#555', textAlign: 'center' },
+  promptLoadingTxt: { fontSize: 14, color: theme.secondaryText, textAlign: 'center' },
   promptScroll: { padding: 16, maxHeight: 340 },
   promptText: {
-    fontSize: 14, color: '#111', lineHeight: 22,
+    fontSize: 14, color: theme.text, lineHeight: 22,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   promptCopyBtn: {
     marginHorizontal: 16, marginTop: 10,
-    backgroundColor: '#6a1b9a', borderRadius: 14,
+    backgroundColor: theme.gold, borderRadius: 14,
     paddingVertical: 14, alignItems: 'center',
   },
-  promptCopyTxt: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  promptCopyTxt: { color: theme.background, fontWeight: 'bold', fontSize: 15 },
 });
