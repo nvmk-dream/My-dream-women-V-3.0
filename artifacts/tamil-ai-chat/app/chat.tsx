@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TextInput, TouchableOpacity, ImageBackground,
   FlatList, StyleSheet, KeyboardAvoidingView,
   Platform, ActivityIndicator, Alert, Modal,
   Image, ScrollView, Dimensions, StatusBar,
@@ -1976,7 +1976,10 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
-    const aiTextStyle = isUser ? { color: msgTextColor } : { color: aiMsgTextColor, fontSize: aiMsgFontSize };
+    const aiTextStyle = isUser
+      ? { color: '#FFFFFF', fontWeight: '500' as const }
+      : { color: charFontColor || '#1E1B4B', fontSize: aiMsgFontSize };
+    const bubbleTimeColor = isUser ? 'rgba(255, 255, 255, 0.85)' : '#64748B';
     return (
       <View style={[styles.msgRow, isUser ? styles.userRow : styles.aiRow]}>
         {!isUser && persona && (
@@ -1997,16 +2000,16 @@ export default function ChatScreen() {
             styles.bubble,
             { borderRadius: bubbleRadius },
             isUser
-              ? [styles.userBubble, { backgroundColor: userBubbleBg, marginRight: 6 }]
-              : [styles.aiBubble,  { backgroundColor: aiBubbleBg }],
+              ? [styles.userBubble, { marginRight: 6 }]
+              : [styles.aiBubble,  { backgroundColor: 'rgba(255, 255, 255, 0.94)' }],
           ]}
         >
           {isUser && (
             <LinearGradient
               pointerEvents="none"
-              colors={[theme.surface, theme.background, 'rgba(212, 175, 55, 0.16)']}
-              start={{ x: 0.05, y: 0 }}
-              end={{ x: 0.95, y: 1 }}
+              colors={['#8B5CF6', '#6366F1', '#3B82F6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={[StyleSheet.absoluteFillObject, { borderRadius: bubbleRadius }]}
             />
           )}
@@ -2099,7 +2102,7 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           )}
-          <Text style={[styles.timeText, { color: timeTextColor }]}>
+          <Text style={[styles.timeText, { color: bubbleTimeColor }]}>
             {item.timestamp.toLocaleTimeString('ta-IN', { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </TouchableOpacity>
@@ -2219,18 +2222,23 @@ export default function ChatScreen() {
         </View>
       )}
 
-      <KeyboardAvoidingView
-        style={[styles.flex, { backgroundColor: wallpaperBg }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+      <ImageBackground
+        source={require('../assets/images/chat_rose_bg.png')}
+        style={styles.flex}
+        resizeMode="cover"
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.msgList}
-          style={{ backgroundColor: wallpaperBg }}
+        <KeyboardAvoidingView
+          style={[styles.flex, { backgroundColor: 'transparent' }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.msgList}
+            style={{ backgroundColor: 'transparent' }}
           onScroll={(e) => { const y = e.nativeEvent.contentOffset.y; const h = e.nativeEvent.contentSize.height; const vh = e.nativeEvent.layoutMeasurement.height; setShowScrollBtn(h - y - vh > 120); }}
           scrollEventThrottle={200}
         />
@@ -2320,6 +2328,7 @@ export default function ChatScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      </ImageBackground>
 
       <Modal visible={showGenModal} transparent animationType="slide" onRequestClose={() => setShowGenModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGenModal(false)}>
@@ -3023,8 +3032,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
   flex: { flex: 1 },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerAvatarImg: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: theme.background },
-  headerAvatar: { width: 58, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.background },
+  headerAvatarImg: { width: 52, height: 52, borderRadius: 26, borderWidth: 2.5, borderColor: '#D946EF' },
+  headerAvatar: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#D946EF' },
   headerAvatarText: { color: theme.background, fontSize: 20, fontWeight: 'bold' },
   headerName: { color: theme.background, fontSize: 18, fontWeight: 'bold', letterSpacing: 0.3 },
   headerOnline: { color: '#39300F', fontSize: 11 },
@@ -3048,13 +3057,13 @@ const styles = StyleSheet.create({
   userAvatarTxt: { fontSize: 16 },
   imgLoadingWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   generatedImg: { width: 220, height: 280, borderRadius: 8, marginBottom: 4 },
-  bubble: { maxWidth: '75%', borderRadius: 10, padding: 10, paddingBottom: 6, elevation: 1, overflow: 'hidden' },
-  userBubble: { backgroundColor: theme.background, borderTopRightRadius: 2, borderWidth: 1, borderColor: theme.goldLine },
-  aiBubble: { backgroundColor: theme.surfaceRaised, borderTopLeftRadius: 2, borderWidth: 1, borderColor: theme.line },
+  bubble: { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, elevation: 2, overflow: 'hidden' },
+  userBubble: { backgroundColor: '#6366F1', borderTopRightRadius: 4, borderWidth: 1, borderColor: 'rgba(199, 210, 254, 0.4)' },
+  aiBubble: { backgroundColor: 'rgba(255, 255, 255, 0.94)', borderTopLeftRadius: 4, borderWidth: 1.2, borderColor: 'rgba(216, 180, 254, 0.7)', elevation: 2, shadowColor: '#C084FC', shadowOpacity: 0.1, shadowRadius: 5 },
   galleryBubble: { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0 },
-  msgText: { fontSize: 15, lineHeight: 22, color: theme.text },
-  messageLink: { color: theme.brightGold, textDecorationLine: 'underline' },
-  timeText: { fontSize: 10, color: theme.muted, alignSelf: 'flex-end', marginTop: 3 },
+  msgText: { fontSize: 15, lineHeight: 22, color: '#1E1B4B' },
+  messageLink: { color: '#6366F1', textDecorationLine: 'underline' },
+  timeText: { fontSize: 10, color: '#64748B', alignSelf: 'flex-end', marginTop: 3 },
   loadingRow: { flexDirection: 'row', padding: 8, paddingLeft: 14 },
   loadingBubble: { backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.goldLine },
   loadingText: { color: theme.brightGold, fontSize: 13 },
@@ -3072,25 +3081,25 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: theme.goldLine, gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)', borderTopWidth: 1.2, borderTopColor: 'rgba(216, 180, 254, 0.6)', gap: 10,
   },
   inputWrapper: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: theme.surface, borderRadius: 24, borderWidth: 1, borderColor: theme.goldLine,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#F8FAFC', borderRadius: 24, borderWidth: 1.2, borderColor: 'rgba(199, 210, 254, 0.8)',
+    shadowColor: '#C084FC', shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  input: { flex: 1, paddingLeft: 16, paddingRight: 4, paddingVertical: 12, fontSize: 15, maxHeight: 120, color: theme.text, minHeight: 48 },
+  input: { flex: 1, paddingLeft: 16, paddingRight: 4, paddingVertical: 12, fontSize: 15, maxHeight: 120, color: '#1E1B4B', minHeight: 48 },
   btnStack: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  promptImageBtn: { backgroundColor: theme.gold, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  promptPickBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  cameraBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
-  translateBtn: { backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.goldLine, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
+  promptImageBtn: { backgroundColor: '#7C3AED', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  promptPickBtn: { backgroundColor: '#F5EEFD', borderWidth: 1, borderColor: '#D8B4FE', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+  cameraBtn: { backgroundColor: '#F5EEFD', borderWidth: 1, borderColor: '#D8B4FE', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
+  translateBtn: { backgroundColor: '#F5EEFD', borderWidth: 1, borderColor: '#D8B4FE', width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', elevation: 3 },
   cameraIcon: { fontSize: 18 },
-  sendBtn: { backgroundColor: theme.gold, width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: theme.gold, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
-  sendBtnDisabled: { backgroundColor: '#756334' },
+  sendBtn: { backgroundColor: '#7C3AED', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#7C3AED', shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  sendBtnDisabled: { backgroundColor: '#DDD6FE' },
   attachBtn: { width: 42, height: 42, justifyContent: 'center', alignItems: 'center', paddingRight: 12 },
-  sendIcon: { color: theme.background, fontSize: 18, fontWeight: 'bold' },
+  sendIcon: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   pickerSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 10, maxHeight: '85%', borderWidth: 1, borderColor: theme.goldLine },
   pickerHandle: { width: 40, height: 4, backgroundColor: theme.goldSoft, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView, ImageBackground,
   StyleSheet, Alert, ActivityIndicator, Image, Modal, Switch,
   Animated, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { ParamsStore } from '../context/params-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,13 +38,28 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const stripHtml = (html: string): string =>
   html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
 
+const SECTION_BADGES: Record<string, { gradient: [string, string]; iconName: keyof typeof Ionicons.glyphMap; defaultEmoji: string }> = {
+  basicDetails: { gradient: ['#C084FC', '#7E22CE'], iconName: 'person', defaultEmoji: '👤' },
+  todayStory: { gradient: ['#A78BFA', '#6D28D9'], iconName: 'book', defaultEmoji: '📖' },
+  userStyle: { gradient: ['#60A5FA', '#1D4ED8'], iconName: 'person-circle', defaultEmoji: '👤' },
+  avatarReflection: { gradient: ['#818CF8', '#4338CA'], iconName: 'image', defaultEmoji: '🖼️' },
+  mood: { gradient: ['#F87171', '#DC2626'], iconName: 'flame', defaultEmoji: '🌶️' },
+  greeting: { gradient: ['#34D399', '#059669'], iconName: 'happy', defaultEmoji: '😊' },
+  baseRules: { gradient: ['#F472B6', '#DB2777'], iconName: 'refresh-circle', defaultEmoji: '⭕' },
+  characterPrompt: { gradient: ['#38BDF8', '#0284C7'], iconName: 'chatbubbles', defaultEmoji: '💬' },
+  imageVideoPrompt: { gradient: ['#E879F9', '#C026D3'], iconName: 'camera', defaultEmoji: '📷' },
+  kallaatamEngine: { gradient: ['#FBBF24', '#D97706'], iconName: 'game-controller', defaultEmoji: '🎲' },
+  modeAvatarsImageGen: { gradient: ['#FB7185', '#E11D48'], iconName: 'sparkles', defaultEmoji: '✨' },
+};
+
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
-function SectionCard({ sectionKey, icon, title, subtitle, color = theme.gold, children, openSections, onToggle, headerExtra }: {
+function SectionCard({ sectionKey, icon, title, subtitle, color, children, openSections, onToggle, headerExtra }: {
   sectionKey: string; icon: string; title: string; subtitle?: string; color?: string;
   children: React.ReactNode; openSections: Record<string, boolean>; onToggle: (key: string) => void;
   headerExtra?: React.ReactNode;
 }) {
   const isOpen = !!openSections[sectionKey];
+  const badge = SECTION_BADGES[sectionKey] || { gradient: ['#C084FC', '#7E22CE'], iconName: 'star', defaultEmoji: icon };
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -50,13 +67,20 @@ function SectionCard({ sectionKey, icon, title, subtitle, color = theme.gold, ch
         style={styles.sectionCardHeader}
         activeOpacity={0.75}
       >
-        <Text style={styles.sectionCardIcon}>{icon}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.sectionCardTitle, { color }]}>{title}</Text>
+        <LinearGradient
+          colors={badge.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.sectionBadge}
+        >
+          <Ionicons name={badge.iconName} size={22} color="#FFFFFF" />
+        </LinearGradient>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={[styles.sectionCardTitle, color ? { color } : null]}>{title}</Text>
           {subtitle ? <Text style={styles.sectionCardSubtitle}>{subtitle}</Text> : null}
         </View>
         {headerExtra ? <View onStartShouldSetResponder={() => true}>{headerExtra}</View> : null}
-        <Text style={styles.sectionCardChevron}>{isOpen ? '▲' : '▼'}</Text>
+        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#4338CA" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
       {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
     </View>
@@ -565,46 +589,76 @@ export default function EditCharacterScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{
         title: name ? `${name} - Edit` : 'Edit Character',
-        headerStyle: { backgroundColor: theme.gold },
-        headerTintColor: theme.background,
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerStyle: { backgroundColor: '#FDF2F4' },
+        headerTintColor: '#1E1B4B',
+        headerTitleStyle: { fontWeight: 'bold', color: '#1E1B4B' },
+        headerLeft: () => (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.headerBackBtn}
+          >
+            <Ionicons name="arrow-back" size={20} color="#4338CA" />
+          </TouchableOpacity>
+        ),
         headerRight: () => (
-          <TouchableOpacity onPress={handleSave} disabled={saving} style={{ marginRight: 16 }}>
+          <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerSavePill}>
             {saving
-              ? <ActivityIndicator size="small" color={theme.background} />
-              : <Text style={{ color: theme.background, fontSize: 16, fontWeight: 'bold' }}>Save</Text>
+              ? <ActivityIndicator size="small" color="#7C3AED" />
+              : <Text style={styles.headerSavePillTxt}>Save</Text>
             }
           </TouchableOpacity>
         ),
       }} />
+      <ImageBackground source={require('../assets/images/chat_rose_bg.png')} style={styles.bgImage} resizeMode="cover">
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         {/* ── AVATAR ── */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={pickAvatar} style={styles.avatarWrap}>
-            {avatarPhotoUri
-              ? <Image source={{ uri: avatarPhotoUri }} style={styles.avatarImg} />
-              : <View style={[styles.avatarCircle, { backgroundColor: persona.avatarColor }]}>
-                  <Text style={styles.avatarEmoji}>{avatarLetter || persona.emoji}</Text>
-                </View>
-            }
+          <TouchableOpacity onPress={pickAvatar} style={styles.avatarGlowContainer}>
+            <LinearGradient
+              colors={['#06B6D4', '#D946EF', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarNeonRing}
+            >
+              <View style={styles.avatarInnerWrap}>
+                {avatarPhotoUri
+                  ? <Image source={{ uri: avatarPhotoUri }} style={styles.avatarImg} />
+                  : <View style={[styles.avatarCircle, { backgroundColor: persona.avatarColor }]}>
+                      <Text style={styles.avatarEmoji}>{avatarLetter || persona.emoji}</Text>
+                    </View>
+                }
+              </View>
+            </LinearGradient>
             <View style={styles.cameraOverlay}>
-              <Text style={styles.cameraIcon}>📷</Text>
+              <Ionicons name="camera" size={16} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
           <View style={styles.avatarBtns}>
-            <TouchableOpacity style={[styles.uploadBtn, uploadingAvatar && { opacity: 0.6 }]} onPress={pickAvatar} disabled={uploadingAvatar}>
+            <TouchableOpacity
+              style={[styles.actionPillBtn, styles.phonePillBtn, uploadingAvatar && { opacity: 0.6 }]}
+              onPress={pickAvatar}
+              disabled={uploadingAvatar}
+            >
               {uploadingAvatar
-                ? <><ActivityIndicator color={theme.background} size="small" /><Text style={[styles.uploadBtnText, { marginLeft: 6 }]}>Uploading...</Text></>
-                : <Text style={styles.uploadBtnText}>📱 Phone</Text>
+                ? <><ActivityIndicator color="#7E22CE" size="small" /><Text style={[styles.phonePillTxt, { marginLeft: 4 }]}>Uploading...</Text></>
+                : <><Ionicons name="call" size={15} color="#7E22CE" /><Text style={styles.phonePillTxt}>Phone</Text></>
               }
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.uploadBtn, styles.cloudUrlBtn]} onPress={() => { setCloudUrlInput(avatarPhotoUri ?? ''); setShowCloudUrl(true); }}>
-              <Text style={[styles.uploadBtnText, styles.cloudUrlBtnText]}>☁️ Cloud URL</Text>
+            <TouchableOpacity
+              style={[styles.actionPillBtn, styles.cloudPillBtn]}
+              onPress={() => { setCloudUrlInput(avatarPhotoUri ?? ''); setShowCloudUrl(true); }}
+            >
+              <Ionicons name="cloud" size={16} color="#0284C7" />
+              <Text style={styles.cloudPillTxt}>Cloud URL</Text>
             </TouchableOpacity>
             {avatarPhotoUri && (
-              <TouchableOpacity style={[styles.uploadBtn, styles.removeBtn]} onPress={() => setAvatarPhotoUri(undefined)}>
-                <Text style={styles.uploadBtnText}>🗑️ Remove</Text>
+              <TouchableOpacity
+                style={[styles.actionPillBtn, styles.removePillBtn]}
+                onPress={() => setAvatarPhotoUri(undefined)}
+              >
+                <Ionicons name="trash" size={15} color="#E11D48" />
+                <Text style={styles.removePillTxt}>Remove</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -666,31 +720,54 @@ export default function EditCharacterScreen() {
         </Modal>
 
         <SectionCard sectionKey="basicDetails" icon="👤" title="Character Basic Details" subtitle="அடிப்படை விவரங்கள்" openSections={openSections} onToggle={toggleSection}>
-          <Text style={styles.sectionLabel}>NAME</Text>
-          <TextInput
-            style={styles.nameInput}
-            value={name}
-            onChangeText={setName}
-            placeholder="Character பேரு..."
-            placeholderTextColor="#bbb"
-          />
-          <Text style={[styles.sectionLabel, { marginTop: 14 }]}>AVATAR LETTER</Text>
-          <TextInput
-            style={styles.nameInput}
-            value={avatarLetter}
-            onChangeText={setAvatarLetter}
-            placeholder="ஒரு எழுத்து (e.g. க, ப, த)"
-            placeholderTextColor="#bbb"
-            maxLength={2}
-          />
-          <Text style={[styles.sectionLabel, { marginTop: 14 }]}>RELATIONSHIP</Text>
-          <TextInput
-            style={styles.nameInput}
-            value={relationship}
-            onChangeText={setRelationship}
-            placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
-            placeholderTextColor="#bbb"
-          />
+          <View style={styles.inputFieldBox}>
+            <View style={styles.inputFieldHeader}>
+              <View style={styles.fieldIconCircle}>
+                <Ionicons name="person-outline" size={15} color="#7C3AED" />
+              </View>
+              <Text style={styles.fieldBoxLabel}>NAME</Text>
+            </View>
+            <TextInput
+              style={styles.fieldBoxInput}
+              value={name}
+              onChangeText={setName}
+              placeholder="Character பேரு..."
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.inputFieldBox}>
+            <View style={styles.inputFieldHeader}>
+              <View style={styles.fieldIconCircle}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#7C3AED' }}>A</Text>
+              </View>
+              <Text style={styles.fieldBoxLabel}>AVATAR LETTER</Text>
+            </View>
+            <TextInput
+              style={styles.fieldBoxInput}
+              value={avatarLetter}
+              onChangeText={setAvatarLetter}
+              placeholder="ஒரு எழுத்து (e.g. க, ப, த)"
+              placeholderTextColor="#94A3B8"
+              maxLength={2}
+            />
+          </View>
+
+          <View style={styles.inputFieldBox}>
+            <View style={styles.inputFieldHeader}>
+              <View style={styles.fieldIconCircle}>
+                <Ionicons name="heart-outline" size={15} color="#7C3AED" />
+              </View>
+              <Text style={styles.fieldBoxLabel}>RELATIONSHIP</Text>
+            </View>
+            <TextInput
+              style={styles.fieldBoxInput}
+              value={relationship}
+              onChangeText={setRelationship}
+              placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
         </SectionCard>
 
         <SectionCard
@@ -1273,72 +1350,186 @@ export default function EditCharacterScreen() {
           }
         </TouchableOpacity>
       </ScrollView>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.background },
+  safe: { flex: 1, backgroundColor: '#FFF0F5' },
+  bgImage: { flex: 1, width: '100%', height: '100%' },
   scroll: { flex: 1 },
-  content: { padding: 12, paddingBottom: 50 },
-  avatarSection: { alignItems: 'center', paddingVertical: 20 },
-  avatarWrap: {
-    position: 'relative', marginBottom: 12, padding: 4, borderRadius: 58,
-    borderWidth: 2, borderColor: theme.gold, backgroundColor: theme.surface,
-    shadowColor: theme.gold, shadowOpacity: 0.24, shadowRadius: 12, elevation: 6,
+  content: { padding: 14, paddingBottom: 60 },
+  headerBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
-  avatarCircle: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
-  avatarImg: { width: 100, height: 100, borderRadius: 50, borderWidth: 1, borderColor: theme.brightGold },
-  avatarEmoji: { color: theme.text, fontSize: 36, fontWeight: 'bold' },
-  cameraOverlay: { position: 'absolute', bottom: 2, right: 2, backgroundColor: '#333', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
-  cameraIcon: { fontSize: 14 },
-  avatarBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
-  uploadBtn: { backgroundColor: theme.gold, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.brightGold },
-  uploadBtnText: { color: theme.background, fontSize: 13, fontWeight: '700' },
-  cloudUrlBtn: { backgroundColor: theme.surfaceRaised, borderColor: theme.goldLine },
-  cloudUrlBtnText: { color: theme.brightGold },
-  removeBtn: { backgroundColor: theme.danger, borderColor: theme.danger },
-  cloudOverlay: { flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  cloudModal: { backgroundColor: theme.surface, borderRadius: 16, padding: 20, width: '100%', borderWidth: 1, borderColor: theme.goldLine },
-  cloudTitle: { fontSize: 17, fontWeight: 'bold', color: theme.brightGold, marginBottom: 6 },
-  cloudSub: { fontSize: 12, color: theme.secondaryText, marginBottom: 14 },
-  cloudInput: { borderWidth: 1, borderColor: theme.goldLine, borderRadius: 10, padding: 10, fontSize: 13, color: theme.text, backgroundColor: theme.surfaceRaised, marginBottom: 16 },
+  headerSavePill: {
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1.2,
+    borderColor: '#C084FC',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginRight: 10,
+    elevation: 2,
+  },
+  headerSavePillTxt: {
+    color: '#7C3AED',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  avatarSection: { alignItems: 'center', paddingVertical: 18 },
+  avatarGlowContainer: {
+    position: 'relative',
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarNeonRing: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#D946EF',
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  avatarInnerWrap: {
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarCircle: { width: 118, height: 118, borderRadius: 59, justifyContent: 'center', alignItems: 'center' },
+  avatarImg: { width: 118, height: 118, borderRadius: 59 },
+  avatarEmoji: { color: '#1E1B4B', fontSize: 38, fontWeight: 'bold' },
+  cameraOverlay: {
+    position: 'absolute',
+    bottom: 2,
+    right: 4,
+    backgroundColor: '#6366F1',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+  },
+  avatarBtns: { flexDirection: 'row', gap: 10, justifyContent: 'center', marginTop: 8 },
+  actionPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    gap: 6,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  phonePillBtn: { backgroundColor: '#F5EEFD', borderColor: '#D8B4FE' },
+  phonePillTxt: { color: '#7E22CE', fontSize: 13, fontWeight: '700' },
+  cloudPillBtn: { backgroundColor: '#E0F2FE', borderColor: '#7DD3FC' },
+  cloudPillTxt: { color: '#0284C7', fontSize: 13, fontWeight: '700' },
+  removePillBtn: { backgroundColor: '#FFF1F2', borderColor: '#FDA4AF' },
+  removePillTxt: { color: '#E11D48', fontSize: 13, fontWeight: '700' },
+  cloudOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  cloudModal: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: '#DDD6FE', elevation: 8 },
+  cloudTitle: { fontSize: 17, fontWeight: 'bold', color: '#1E1B4B', marginBottom: 6 },
+  cloudSub: { fontSize: 12, color: '#64748B', marginBottom: 14 },
+  cloudInput: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, fontSize: 14, color: '#0F172A', backgroundColor: '#F8FAFC', marginBottom: 16 },
   cloudBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
-  cloudCancel: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: theme.line },
-  cloudApply: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.gold },
+  cloudCancel: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: '#F1F5F9' },
+  cloudApply: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: '#7C3AED' },
   card: {
-    backgroundColor: theme.surface, borderRadius: 14, padding: 16, marginBottom: 14,
-    borderWidth: 1, borderColor: theme.goldLine, elevation: 3,
-    shadowColor: theme.gold, shadowOpacity: 0.08, shadowRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(216, 180, 254, 0.65)',
+    elevation: 3,
+    shadowColor: '#C084FC',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   sectionCardHeader: { flexDirection: 'row', alignItems: 'center' },
-  sectionCardIcon: { fontSize: 20, marginRight: 10 },
-  sectionCardTitle: { fontSize: 15, fontWeight: '700' },
-  sectionCardSubtitle: { fontSize: 11, color: theme.muted, marginTop: 2 },
-  sectionCardChevron: { fontSize: 13, color: theme.brightGold, fontWeight: '700', marginLeft: 8 },
-  sectionCardBody: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.line },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: theme.brightGold, letterSpacing: 0.8, marginBottom: 8 },
-  nameInput: { backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, padding: 10, fontSize: 15, color: theme.text },
-  fieldWrap: { marginBottom: 4 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: theme.secondaryText, marginBottom: 6, marginTop: 4 },
-  fieldInput: { backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, padding: 10, fontSize: 14, color: theme.text, lineHeight: 20 },
-  fieldHint: { fontSize: 11, color: theme.muted, marginTop: 4, marginBottom: 4, lineHeight: 16 },
-  wordAddInput: { flex: 1, backgroundColor: theme.surfaceRaised, borderRadius: 8, borderWidth: 1, borderColor: theme.goldLine, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: theme.text },
-  wordAddBtn: { marginLeft: 6, backgroundColor: theme.gold, width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  divider: { height: 1, backgroundColor: theme.line, marginVertical: 14 },
-  footerNote: { fontSize: 12, color: theme.muted, textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
-  saveBtn: { backgroundColor: theme.gold, borderRadius: 12, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: theme.brightGold },
-  saveBtnText: { color: theme.background, fontSize: 16, fontWeight: 'bold' },
+  sectionBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  sectionCardTitle: { fontSize: 15, fontWeight: '700', color: '#1E1B4B' },
+  sectionCardSubtitle: { fontSize: 12, color: '#6366F1', marginTop: 2, fontWeight: '500' },
+  sectionCardBody: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(224, 231, 255, 0.8)' },
+  inputFieldBox: {
+    backgroundColor: 'rgba(248, 250, 252, 0.95)',
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(199, 210, 254, 0.8)',
+    padding: 12,
+    marginBottom: 12,
+  },
+  inputFieldHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  fieldIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fieldBoxLabel: { fontSize: 11, fontWeight: '700', color: '#4338CA', letterSpacing: 0.6 },
+  fieldBoxInput: { fontSize: 15, color: '#0F172A', paddingVertical: 4, paddingHorizontal: 2, fontWeight: '500' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#4338CA', letterSpacing: 0.8, marginBottom: 8 },
+  nameInput: { backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE', padding: 12, fontSize: 15, color: '#0F172A' },
+  fieldWrap: { marginBottom: 12 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#4338CA', marginBottom: 6, marginTop: 4 },
+  fieldInput: { backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE', padding: 12, fontSize: 14, color: '#0F172A', lineHeight: 20 },
+  fieldHint: { fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 6, lineHeight: 18 },
+  wordAddInput: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#DDD6FE', paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: '#0F172A' },
+  wordAddBtn: { marginLeft: 6, backgroundColor: '#7C3AED', width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  divider: { height: 1, backgroundColor: 'rgba(216, 180, 254, 0.5)', marginVertical: 14 },
+  footerNote: { fontSize: 12, color: '#64748B', textAlign: 'center', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18 },
+  saveBtn: { backgroundColor: '#7C3AED', borderRadius: 16, paddingVertical: 16, alignItems: 'center', elevation: 4 },
+  saveBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   moodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   moodInfo: { flex: 1, marginRight: 12 },
-  moodTitle: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 3 },
-  moodSub: { fontSize: 12, color: theme.muted, lineHeight: 17 },
+  moodTitle: { fontSize: 15, fontWeight: '700', color: '#1E1B4B', marginBottom: 3 },
+  moodSub: { fontSize: 12, color: '#64748B', lineHeight: 17 },
   moodBadgeRow: { flexDirection: 'row', gap: 10 },
-  moodBadge: { flex: 1, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: theme.goldLine, alignItems: 'center' },
-  moodBadgeActive: { backgroundColor: theme.gold, borderColor: theme.brightGold },
-  moodBadgeTxt: { fontSize: 14, fontWeight: '700', color: theme.secondaryText },
+  moodBadge: { flex: 1, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: '#DDD6FE', alignItems: 'center', backgroundColor: '#FFFFFF' },
+  moodBadgeActive: { backgroundColor: '#F3E8FF', borderColor: '#7C3AED' },
+  moodBadgeTxt: { fontSize: 14, fontWeight: '700', color: '#4338CA' },
   modeAvatarRow: { flexDirection: 'row', gap: 12 },
-  modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: theme.gold },
-  modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surfaceRaised },
-  modeRemoveBtn: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1 },
+  modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#7C3AED' },
+  modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', borderColor: '#C084FC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  modeRemoveBtn: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#FDA4AF', backgroundColor: '#FFF1F2' },
 });
