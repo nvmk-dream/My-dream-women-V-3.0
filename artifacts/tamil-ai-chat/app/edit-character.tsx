@@ -816,7 +816,7 @@ export default function EditCharacterScreen() {
 >
 
             {/* Tasks */}
-            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={{ fontSize: 15, marginRight: 6 }}>✅</Text>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#C084FC' }}>செய்ய வேண்டிய பணிகள் (Tasks):</Text>
@@ -894,7 +894,7 @@ export default function EditCharacterScreen() {
             </View>
 
             {/* Master toggle */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
               <Switch value={kAllAI} onValueChange={(v) => { setKAllAI(v); if (v) { setKChars(prev => prev.map(ch => ({...ch, aiPlay: true}))); } }} trackColor={{ true: '#7C3AED' }} thumbColor="#fff" />
               <Text style={{ marginLeft: 10, fontSize: 13, color: theme.secondaryText, fontWeight: '600', flex: 1 }}>அனைத்து character உம் AI roleplay செய்ய வேண்டும்.</Text>
             </View>
@@ -1006,7 +1006,7 @@ export default function EditCharacterScreen() {
                   alignItems: 'center',
                   borderWidth: 1.5,
                   borderColor: charFontSize === size ? '#7C3AED' : theme.line,
-                  backgroundColor: charFontSize === size ? '#7C3AED'Wash : theme.surfaceRaised,
+                  backgroundColor: charFontSize === size ? 'rgba(216, 180, 254, 0.2)' : theme.surfaceRaised,
                 }}
               >
                 <Text style={{ fontSize: size > 14 ? 14 : size, fontWeight: '700', color: charFontSize === size ? '#C084FC' : theme.secondaryText }}>{label}</Text>
@@ -1016,7 +1016,7 @@ export default function EditCharacterScreen() {
           </View>
 
           {(!!charFontColor || charFontSize > 0) && (
-            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+            <View style={{ backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
               <Text style={{ fontSize: 10, color: theme.muted, marginBottom: 4 }}>👀 Preview:</Text>
               <Text style={{ fontSize: charFontSize || 15, color: charFontColor || theme.text, fontWeight: '500' }}>
                 நான் உன்னை ரொம்ப miss பண்றேன்! 💕
@@ -1183,7 +1183,7 @@ export default function EditCharacterScreen() {
         <SectionCard sectionKey="baseRules" icon="🔴" title="Base Rules (All characters)" subtitle="அடிப்படை விதிகள்"  openSections={openSections} onToggle={toggleSection}>
           <Text style={{ color: theme.secondaryText, fontSize: 10, marginBottom: 6 }}>✏️ Text select பண்ணி → S/M/L/XL or color tap பண்ணுங்க</Text>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
               style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED' }}>
               <Text style={{ fontSize: 13, fontWeight: '900', color: '#C084FC' }}>B</Text>
@@ -1191,14 +1191,14 @@ export default function EditCharacterScreen() {
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => baseRulesEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED'Line }}>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#C084FC' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => baseRulesEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#7C3AED'Line }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: 'rgba(216, 180, 254, 0.7)' }} />
             ))}
             <TouchableOpacity onPress={() => baseRulesEditorRef.current?.setForeColor('#111111')}
               style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
@@ -1209,7 +1209,7 @@ export default function EditCharacterScreen() {
             ref={baseRulesEditorRef}
             initialContentHTML={basePromptEdit}
             onChange={(html) => setBasePromptEdit(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#7C3AED'Line, backgroundColor: theme.surfaceRaised }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)', backgroundColor: theme.surfaceRaised }}
             editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 13 }}
             useContainer={false}
             autoCorrect={false}
@@ -1233,13 +1233,13 @@ export default function EditCharacterScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={loadDefaultPrompt}
-              style={{ backgroundColor: defaultPromptExists ? theme.surfaceRaised : '#555', borderWidth: 1, borderColor: '#7C3AED'Line, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
+              style={{ backgroundColor: defaultPromptExists ? theme.surfaceRaised : '#555', borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}
             >
               <Text style={{ color: '#C084FC', fontSize: 10, fontWeight: '700' }}>📋 Load Default</Text>
             </TouchableOpacity>
           </View>
           {/* ── Rich Format Toolbar ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#7C3AED'Line }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8, backgroundColor: theme.surfaceRaised, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.commandDOM("document.execCommand('bold', false, null)")} 
               style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED' }}>
               <Text style={{ fontSize: 13, fontWeight: '900', color: '#C084FC' }}>B</Text>
@@ -1247,14 +1247,14 @@ export default function EditCharacterScreen() {
             <Text style={{ fontSize: 10, color: '#888' }}>📏</Text>
             {([{l:'S',s:1},{l:'M',s:3},{l:'L',s:5},{l:'XL',s:7}] as const).map(({l,s}) => (
               <TouchableOpacity key={s} onPress={() => charPromptEditorRef.current?.setFontSize(s)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: '#7C3AED'Line }}>
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1.5, borderColor: 'rgba(216, 180, 254, 0.7)' }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#C084FC' }}>{l}</Text>
               </TouchableOpacity>
             ))}
             <Text style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>🎨</Text>
             {(['#111111','#1565C0','#1b5e20','#b71c1c','#7c3aed','#e65100'] as const).map(clr => (
               <TouchableOpacity key={clr} onPress={() => charPromptEditorRef.current?.setForeColor(clr)}
-                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: '#7C3AED'Line }} />
+                style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: clr, borderWidth: 1.5, borderColor: 'rgba(216, 180, 254, 0.7)' }} />
             ))}
             <TouchableOpacity onPress={() => charPromptEditorRef.current?.setForeColor('#111111')}
               style={{ marginLeft: 2, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.line }}>
@@ -1265,7 +1265,7 @@ export default function EditCharacterScreen() {
             ref={charPromptEditorRef}
             initialContentHTML={charOnly}
             onChange={(html) => setCharOnly(html ?? '')}
-            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: '#7C3AED'Line, backgroundColor: theme.surfaceRaised }}
+            style={{ minHeight: 220, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)', backgroundColor: theme.surfaceRaised }}
             editorStyle={{ backgroundColor: theme.surfaceRaised, color: theme.text, fontSize: 14 }}
             placeholder="இந்த character-ஓட தனித்துவமான behavior, story, personality..."
             useContainer={false}
@@ -1319,7 +1319,7 @@ export default function EditCharacterScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: '#7C3AED'Line, borderRadius: 12 }}
+              style={{ marginTop: 8, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: theme.surfaceRaised, borderWidth: 1, borderColor: 'rgba(216, 180, 254, 0.7)', borderRadius: 12 }}
               onPress={() => { setModeCloudInput(''); setShowModeCloud('presana'); }}
             >
               <Text style={{ color: '#C084FC', fontSize: 11, fontWeight: '600' }}>☁️ Cloud URL</Text>
@@ -1327,7 +1327,7 @@ export default function EditCharacterScreen() {
           </View>
           <View style={styles.divider} />
           {analyzingFields && (
-            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:theme.surfaceRaised, borderWidth:1, borderColor:'#7C3AED'Line, borderRadius:8 }}>
+            <View style={{ flexDirection:'row', alignItems:'center', marginBottom:8, padding:10, backgroundColor:theme.surfaceRaised, borderWidth:1, borderColor:'rgba(216, 180, 254, 0.7)', borderRadius:8 }}>
               <ActivityIndicator size="small"  style={{ marginRight:8 }} />
               <Text style={{ color:theme.secondaryText, fontSize:13, fontWeight:'600' }}>📸 Photo analyze ஆகுது... Face/Body/Attire auto-fill ஆகும்</Text>
             </View>
