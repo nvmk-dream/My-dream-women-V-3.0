@@ -47,3 +47,25 @@
    - போலி கார்டுகள் அச்சிடப்படாத தூய பேக்கிரவுண்ட் அமைத்து, 6 கார்டுகளையும் திரையின் அளவிற்கு சமச்சீராகப் பொருத்துதல்.
 5. **Rule 2-ன்படி GitHub புஷ் & பில்ட்:**
    - மாற்றங்களை commit செய்து GitHub-ல் push செய்து, GitHub Actions workflow மூலம் APK பில்ட் ட்ரிக்கர் செய்தல்.
+
+---
+
+## 🏷️ Feature 3: Home Screen (Spring Butterfly Pastel) & Feature 2 தீர்வுகள் (Completed Log)
+- **செயல்படுத்தப்பட்டவை:**
+  1. **Spring Butterfly Pastel பின்னணி:** தூய 1080x2400 HD மலர் மற்றும் வண்ணத்துப் பூச்சி பின்னணி அமைக்கப்பட்டது.
+  2. **Header பகுதி:** Settings Gear Icon ⚙️ நீக்கப்பட்டு, ஒளிரும் பட்டாம்பூச்சி (Butterfly Icon) அமைக்கப்பட்டது (Settings navigation பாதுகாக்கப்பட்டது). வெளிப்படையான Pastel Theme + `2px solid rgba(184,247,255,0.85)` பார்டர்.
+  3. **Hero Banner & Y-axis Gap:** Hero மற்றும் 6 Cards இடையே உள்ள இடைவெளி கணிசமாகக் குறைக்கப்பட்டது.
+  4. **ஆறு Feature Cards (3x2 Grid):**
+     - Card 1: Text to Image (மாயாஜால கதைப் புத்தகம்)
+     - Card 2: AI Characters (தங்க ஃபிரேமில் 4 பெண்கள்)
+     - Card 3: Group Chat (3 பெண்கள் போர்ட்ரெய்ட்)
+     - Card 4: Image to Script (கேமரா & போன் மர மேஜையில்)
+     - Card 5: Face Swap (ஸ்பிளிட்-ஃபேஸ் நியான்)
+     - Card 6: Cloud (புகைப்படங்கள் கொண்ட கண்ணாடி குமிழ்கள்)
+     - மேல் இடது நியான் பேட்ஜ்கள் நீக்கப்பட்டு, கீழ்ப்புறம் வெள்ளை Title + Subtitle + Arrow icon அமைக்கப்பட்டது.
+  5. **Feature 2 Fixes (Chat Screen):**
+     - `chat.tsx`-ல் `backgroundColor: 'transparent'` அமைக்கப்பட்டு கரும்பட்டை நீக்கப்பட்டது.
+     - 3 மிதக்கும் பட்டன்கள் (Camera, Cloud, Translate) நீக்கப்பட்டன.
+     - `chat_rose_bg.png` தூய பின்னணியாக மாற்றப்பட்டு Ghost layer நீக்கப்பட்டது.
+  6. **GitHub Actions Build (Rule 2):** Commit `f0ccd34` புஷ் செய்யப்பட்டு, workflow run `40667771253` வெற்றிகரமாக இயக்கப்பட்டது.
+
