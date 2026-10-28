@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, ScrollView, Alert, Dimensions,
-  KeyboardAvoidingView, Platform, StatusBar,
+  KeyboardAvoidingView, Platform, StatusBar, ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -15,6 +15,8 @@ import {
   HF_NSFW_MODELS,
 } from '../services/api';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+
+const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
 
 const { width } = Dimensions.get('window');
 
@@ -61,12 +63,12 @@ function ProgressBar({ progress, msg }: { progress: number; msg: string }) {
   );
 }
 const pb = StyleSheet.create({
-  wrap: { backgroundColor: '#12103a', borderRadius: 12, padding: 12, marginVertical: 8, borderWidth: 1, borderColor: '#E91E8C33' },
+  wrap: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24, padding: 12, marginVertical: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
-  msg: { color: '#c4b5fd', fontSize: 12, flex: 1, lineHeight: 18 },
-  pct: { color: '#fff', fontSize: 20, fontWeight: '900', minWidth: 46, textAlign: 'right' },
-  track: { height: 8, borderRadius: 4, backgroundColor: '#1e1b4b', overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 4, backgroundColor: '#E91E8C' },
+  msg: { color: '#1E1B4B', fontSize: 13, flex: 1, lineHeight: 18, fontWeight: '700' },
+  pct: { color: '#1E1B4B', fontSize: 20, fontWeight: '900', minWidth: 46, textAlign: 'right' },
+  track: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.4)', overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4, backgroundColor: '#9333EA' },
 });
 
 // ── Main screen ──────────────────────────────────────────────────────────────
@@ -221,14 +223,15 @@ export default function PromptImageScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {/* Header */}
-        <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Text style={s.backTxt}>← Back</Text>
-          </TouchableOpacity>
+    <ImageBackground source={BUTTERFLY_BG} style={{ flex: 1 }} resizeMode="cover">
+      <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {/* Header */}
+          <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+            <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+              <Text style={s.backTxt}>← Back</Text>
+            </TouchableOpacity>
           <Text style={s.headerTitle}>🎨 Image Studio</Text>
           <View style={{ width: 60 }} />
         </View>
@@ -442,111 +445,112 @@ export default function PromptImageScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0a0a0a' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#111', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#222',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
   },
   backBtn: { width: 60 },
-  backTxt: { color: '#E91E8C', fontSize: 14, fontWeight: '600' },
-  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  backTxt: { color: '#1E1B4B', fontSize: 15, fontWeight: '700' },
+  headerTitle: { color: '#1E1B4B', fontSize: 18, fontWeight: '800' },
   scroll: { padding: 16, paddingBottom: 40 },
   modeToggle: {
-    flexDirection: 'row', backgroundColor: '#1a1a1a', borderRadius: 12,
-    padding: 4, marginBottom: 14, borderWidth: 1, borderColor: '#333',
+    flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24,
+    padding: 4, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  modeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  modeBtnActive: { backgroundColor: '#E91E8C' },
-  modeTxt: { color: '#888', fontSize: 13, fontWeight: '700' },
+  modeBtn: { flex: 1, paddingVertical: 10, borderRadius: 20, alignItems: 'center' },
+  modeBtnActive: { backgroundColor: '#9333EA' },
+  modeTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '700' },
   modeTxtActive: { color: '#fff' },
   modelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#1a1a2e', borderRadius: 10, padding: 10, marginBottom: 16,
-    borderWidth: 1, borderColor: '#E91E8C33',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, padding: 10, marginBottom: 16,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  modelBadgeTxt: { color: '#ccc', fontSize: 12, flex: 1 },
+  modelBadgeTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '700', flex: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  tokenStatus: { fontSize: 12, fontWeight: '600' },
-  sectionLabel: { color: '#888', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 8, marginTop: 4 },
-  step2Label: { color: '#E91E8C', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 8, marginTop: 16 },
+  tokenStatus: { fontSize: 12, fontWeight: '700' },
+  sectionLabel: { color: '#1E1B4B', fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 },
+  step2Label: { color: '#9333EA', fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
   presetsRow: { marginBottom: 16 },
   presetChip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#1e1e1e', marginRight: 8, borderWidth: 1, borderColor: '#333',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', marginRight: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  presetChipActive: { backgroundColor: '#E91E8C', borderColor: '#E91E8C' },
-  presetChipTxt: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  presetChipActive: { backgroundColor: '#9333EA', borderColor: '#9333EA' },
+  presetChipTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '700' },
   presetChipTxtActive: { color: '#fff' },
   promptInput: {
-    backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#333',
-    color: '#fff', fontSize: 14, padding: 12, height: 100, marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    color: '#1E1B4B', fontSize: 14, padding: 14, height: 100, marginBottom: 16, fontWeight: '600',
   },
   uploadBox: {
-    height: 200, borderRadius: 14, overflow: 'hidden', marginBottom: 12,
-    backgroundColor: '#1a1a1a', borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#444',
+    height: 200, borderRadius: 24, overflow: 'hidden', marginBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255, 255, 255, 0.75)',
   },
   uploadedImg: { width: '100%', height: '100%' },
   changeOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 8, alignItems: 'center',
+    backgroundColor: 'rgba(30, 27, 75, 0.65)', paddingVertical: 8, alignItems: 'center',
   },
   changeTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
   uploadPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   uploadIcon: { fontSize: 48 },
-  uploadHint: { color: '#999', fontSize: 15, fontWeight: '700' },
-  uploadSub: { color: '#555', fontSize: 12 },
+  uploadHint: { color: '#1E1B4B', fontSize: 15, fontWeight: '800' },
+  uploadSub: { color: '#312E81', fontSize: 12, fontWeight: '600' },
   analyzeBtn: {
-    backgroundColor: '#7c3aed', borderRadius: 12, paddingVertical: 14,
+    backgroundColor: '#9333EA', borderRadius: 20, paddingVertical: 14,
     alignItems: 'center', marginBottom: 12,
   },
-  analyzeBtnOff: { backgroundColor: '#3a1f7a', opacity: 0.7 },
+  analyzeBtnOff: { backgroundColor: '#A855F7', opacity: 0.7 },
   analyzeBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
   promptResult: {
-    backgroundColor: '#12103a', borderRadius: 12, padding: 14,
-    marginBottom: 12, borderWidth: 1, borderColor: '#7c3aed55',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
   promptResultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  promptResultTitle: { color: '#a78bfa', fontSize: 13, fontWeight: '800' },
-  reAnalyzeTxt: { color: '#E91E8C', fontSize: 12, fontWeight: '600' },
-  promptResultText: { color: '#ddd', fontSize: 12, lineHeight: 20 },
+  promptResultTitle: { color: '#1E1B4B', fontSize: 14, fontWeight: '800' },
+  reAnalyzeTxt: { color: '#9333EA', fontSize: 13, fontWeight: '700' },
+  promptResultText: { color: '#1E1B4B', fontSize: 13, lineHeight: 20, fontWeight: '600' },
   editPromptBtn: {
-    marginTop: 10, backgroundColor: '#1e1e1e', borderRadius: 8,
-    paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: '#555',
+    marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 16,
+    paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  editPromptTxt: { color: '#aaa', fontSize: 12, fontWeight: '600' },
+  editPromptTxt: { color: '#1E1B4B', fontSize: 12, fontWeight: '700' },
   genBtn: {
-    backgroundColor: '#E91E8C', borderRadius: 14, paddingVertical: 16,
+    backgroundColor: '#9333EA', borderRadius: 24, paddingVertical: 16,
     alignItems: 'center', marginVertical: 8,
   },
-  genBtnDisabled: { backgroundColor: '#7a0f47', opacity: 0.7 },
-  genBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  genBtnDisabled: { backgroundColor: '#A855F7', opacity: 0.6 },
+  genBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
   tokenWarning: {
-    backgroundColor: '#2a1a00', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#f59e0b44', marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, padding: 12,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)', marginTop: 8,
   },
-  tokenWarningTxt: { color: '#f59e0b', fontSize: 13, textAlign: 'center' },
+  tokenWarningTxt: { color: '#D97706', fontSize: 13, textAlign: 'center', fontWeight: '700' },
   errorBox: {
-    backgroundColor: '#2a0a0a', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#ef444444', marginTop: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, padding: 12,
+    borderWidth: 1, borderColor: '#EF4444', marginTop: 12,
   },
-  errorTxt: { color: '#ef4444', fontSize: 13 },
+  errorTxt: { color: '#DC2626', fontSize: 13, fontWeight: '700' },
   resultBox: { marginTop: 20 },
-  resultLabel: { color: '#22c55e', fontSize: 14, fontWeight: '700', marginBottom: 10 },
-  resultImg: { width: width - 32, height: width - 32, borderRadius: 14, backgroundColor: '#111' },
+  resultLabel: { color: '#15803D', fontSize: 14, fontWeight: '800', marginBottom: 10 },
+  resultImg: { width: width - 32, height: width - 32, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.2)' },
   resultBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
   regenBtn: {
-    flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12,
-    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#333',
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20,
+    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  regenBtnTxt: { color: '#E91E8C', fontSize: 14, fontWeight: '600' },
+  regenBtnTxt: { color: '#1E1B4B', fontSize: 14, fontWeight: '700' },
   newPhotoBtn: {
-    flex: 1, backgroundColor: '#1a1232', borderRadius: 12,
-    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#7c3aed55',
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20,
+    paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  newPhotoBtnTxt: { color: '#a78bfa', fontSize: 14, fontWeight: '600' },
+  newPhotoBtnTxt: { color: '#9333EA', fontSize: 14, fontWeight: '700' },
 });

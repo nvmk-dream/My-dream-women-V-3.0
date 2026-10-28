@@ -4,8 +4,10 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Modal, Pressable, Image,
   TextInput, ScrollView, ActivityIndicator, Alert,
-  StatusBar, DeviceEventEmitter,
+  StatusBar, DeviceEventEmitter, ImageBackground,
 } from 'react-native';
+
+const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -981,39 +983,30 @@ Then write these prompts:
 
     return (
       <TouchableOpacity
-        style={[s.chatRow, { borderColor: rowPalette.edge, shadowColor: rowPalette.edge }]}
+        style={s.chatRow}
         onPress={() => goChat(p)}
         onLongPress={() => openActionSheet(p)} activeOpacity={0.7}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={rowPalette.fill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[StyleSheet.absoluteFillObject, s.chatSurface]}
-        />
-        <View style={[s.avatar, { backgroundColor: p.avatarColor }]}>
-          {p.avatarPhotoUri
-            ? <Image source={{ uri: p.avatarPhotoUri }} style={s.avatarImg} />
-            : <Text style={s.avatarTxt}>{p.emoji}</Text>
-          }
+        <View style={s.avatarGlowRing}>
+          <View style={[s.avatar, { backgroundColor: p.avatarColor }]}>
+            {p.avatarPhotoUri
+              ? <Image source={{ uri: p.avatarPhotoUri }} style={s.avatarImg} />
+              : <Text style={s.avatarTxt}>{p.emoji}</Text>
+            }
+          </View>
         </View>
         <View style={s.chatMid}>
           <View style={s.chatNameRow}>
             <Text style={s.chatName} numberOfLines={1}>{p.name}</Text>
-            <TouchableOpacity
-              style={s.urlSettingsBtn}
-              onPress={() => openUrlSettings(p)}
-              accessibilityLabel={`Manage URLs for ${p.name}`}
-            >
-              <Text style={s.urlSettingsTxt}>🔗</Text>
-            </TouchableOpacity>
           </View>
           <Text style={s.chatSub} numberOfLines={1}>
             {p.editedRelationship ?? p.relationship} · {p.profession}
           </Text>
         </View>
         <View style={s.chatRight}>
-          <Text style={s.chatTime}>{p.time}</Text>
+          <View style={s.activeBadge}>
+            <View style={s.activeDot} />
+            <Text style={s.activeTxt}>Active</Text>
+          </View>
           {autoMsgEnabled && iv && (
             <Text style={s.timerBadge}>⏱{iv}m</Text>
           )}
@@ -1027,11 +1020,11 @@ Then write these prompts:
     );
   };
 
-  // ── Render ────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground source={BUTTERFLY_BG} style={{ flex: 1 }} resizeMode="cover">
+      <SafeAreaView style={s.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
       {isHomeFeatureLaunch ? (
         launch === 'group-chat' ? (
@@ -1106,23 +1099,13 @@ Then write these prompts:
       ) : (
         <>
       {/* Character-list header */}
-      <LinearGradient
-        colors={['#12203D', '#11172F', '#261633']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.85 }}
+      <View
         style={[s.header, { paddingTop: insets.top + 14 }]}
       >
-        <TouchableOpacity onPress={openProfileModal} style={s.userAvatarBtn}>
-          {uploadingUserPhoto
-            ? <View style={s.userPhotoDefault}><ActivityIndicator color="#fff" size="small" /></View>
-            : userPhoto
-              ? <Image source={{ uri: userPhoto }} style={s.userPhotoImg} />
-              : <View style={s.userPhotoDefault}><Text style={{ fontSize: 18 }}>👤</Text></View>
-          }
-          {!!userName && (
-            <Text style={s.userNameBadge} numberOfLines={1}>{userName}</Text>
-          )}
+        <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 8 }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E1B4B' }}>←</Text>
         </TouchableOpacity>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E1B4B' }}>Meet AI Girls</Text>
         <View style={s.headerSpacer} />
         <View style={s.headerIcons}>
           <TouchableOpacity
@@ -1134,7 +1117,7 @@ Then write these prompts:
             <Text style={s.headerAddCharTxt}>+</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Chat list */}
       {loading ? (
@@ -1517,53 +1500,52 @@ Then write these prompts:
         </View>
       </Modal>
     </SafeAreaView>
+  </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#080B18' },
-  directLaunchRoot: { flex: 1, backgroundColor: '#080B18' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
+  directLaunchRoot: { flex: 1, backgroundColor: 'transparent' },
   directLaunchHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingBottom: 18,
-    borderBottomWidth: 1, borderBottomColor: '#263152',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
   },
   directLaunchBack: {
     width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  directLaunchBackText: { color: '#fff', fontSize: 32, lineHeight: 36, marginTop: -3 },
-  directLaunchTitle: { color: '#F3F4FF', fontSize: 19, fontWeight: '800' },
-  directLaunchSubtitle: { color: '#B8C0D8', fontSize: 13, marginTop: 3 },
+  directLaunchBackText: { color: '#1E1B4B', fontSize: 32, lineHeight: 36, marginTop: -3 },
+  directLaunchTitle: { color: '#1E1B4B', fontSize: 19, fontWeight: '800' },
+  directLaunchSubtitle: { color: '#312E81', fontSize: 13, marginTop: 3 },
   directLaunchLoading: {
-    flex: 1, backgroundColor: '#080B18', alignItems: 'center', justifyContent: 'center', gap: 12,
+    flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 12,
   },
-  directLaunchLoadingText: { color: '#C7D2FE', fontSize: 15 },
+  directLaunchLoadingText: { color: '#1E1B4B', fontSize: 15 },
   directGroupList: { flex: 1 },
   directGroupListContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
   directGroupRow: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 10,
-    borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: '#263152',
-    backgroundColor: '#11172B',
+    borderRadius: 24, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
   },
-  directGroupRowSelected: { borderColor: '#38E6A1', backgroundColor: '#132C31' },
-  directGroupName: { color: '#F3F4FF' },
-  directGroupRelationship: { color: '#AEB8D0' },
-  directGroupActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#263152' },
-  directGroupCancel: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#66708A', alignItems: 'center' },
-  directGroupCancelText: { color: '#E5E7EB', fontWeight: '700' },
-  directGroupStart: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: '#075E54', alignItems: 'center' },
+  directGroupRowSelected: { borderColor: '#9333EA', backgroundColor: 'rgba(147, 51, 234, 0.15)' },
+  directGroupName: { color: '#1E1B4B', fontWeight: '800' },
+  directGroupRelationship: { color: '#312E81' },
+  directGroupActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.75)' },
+  directGroupCancel: { flex: 1, padding: 14, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.00)' },
+  directGroupCancelText: { color: '#1E1B4B', fontWeight: '700' },
+  directGroupStart: { flex: 1, padding: 14, borderRadius: 20, backgroundColor: '#9333EA', alignItems: 'center' },
   directGroupStartDisabled: { opacity: 0.4 },
   directGroupStartText: { color: '#fff', fontWeight: '800' },
 
   header: {
-    backgroundColor: '#0B1023',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 10, paddingVertical: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
     gap: 6,
-    borderBottomWidth: 1, borderBottomColor: '#263152',
-    elevation: 8,
-    shadowColor: '#51D8F2', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
   },
   userAvatarBtn: { alignItems: 'center', gap: 2, minWidth: 42 },
   userPhotoImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#51D8F2' },
@@ -1661,8 +1643,8 @@ const s = StyleSheet.create({
   statusPillTxt: { color: '#E8FFF4', fontSize: 10, fontWeight: '700' },
   pushBadge: { color: '#fff', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
 
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080B18' },
-  list: { flex: 1, backgroundColor: '#080B18' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
+  list: { flex: 1, backgroundColor: 'transparent' },
   listContent: { paddingTop: 10, paddingBottom: 120 },
   gridListContent: { paddingTop: 10, paddingBottom: 120, paddingLeft: 12, paddingRight: 12 },
   gridColumn: { justifyContent: 'space-between' },
@@ -1701,26 +1683,38 @@ const s = StyleSheet.create({
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'transparent', marginLeft: 12, marginRight: 12,
-    paddingHorizontal: 11, paddingVertical: 11,
-    borderRadius: 15, borderWidth: 1,
-    shadowOpacity: 0.27, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    marginHorizontal: 16, marginVertical: 8,
+    paddingHorizontal: 14, paddingVertical: 14,
+    borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: 'transparent', shadowOpacity: 0, elevation: 0,
   },
-  chatSurface: { borderRadius: 14 },
-  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 11, borderWidth: 1.5, borderColor: '#7583A8', overflow: 'hidden' },
-  avatarImg: { width: 48, height: 48, borderRadius: 24 },
-  avatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  chatMid: { flex: 1 },
+  avatarGlowRing: {
+    width: 66, height: 66, borderRadius: 33,
+    padding: 2.5, borderWidth: 2.5, borderColor: '#A855F7',
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  avatar: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  avatarImg: { width: 56, height: 56, borderRadius: 28 },
+  avatarTxt: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  chatMid: { flex: 1, marginLeft: 14, marginRight: 8, justifyContent: 'center' },
   chatNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginBottom: 3 },
-  chatName: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: '#F3F4FF', letterSpacing: 0.15 },
-  chatSub: { fontSize: 12, color: '#A8B1CA' },
-  chatRight: { alignItems: 'flex-end', gap: 4, marginLeft: 5 },
+  chatName: { flexShrink: 1, fontSize: 18, fontWeight: '800', color: '#1E1B4B', letterSpacing: 0.15 },
+  chatSub: { fontSize: 13, color: '#1E1B4B', opacity: 0.9, lineHeight: 18, fontWeight: '600' },
+  chatRight: { alignItems: 'flex-end', justifyContent: 'space-between', height: 56 },
+  activeBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(220, 252, 231, 0.7)',
+    borderWidth: 1, borderColor: 'rgba(134, 239, 172, 0.8)',
+    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 3, gap: 5,
+  },
+  activeDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22C55E' },
+  activeTxt: { color: '#15803D', fontSize: 11, fontWeight: '700' },
   urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
-  urlSettingsTxt: { fontSize: 17 },
-  chatTime: { fontSize: 11, color: '#9CA8C4' },
-  timerBadge: { fontSize: 10, color: '#F2CF68', fontWeight: '700' },
-  badge: { backgroundColor: '#24C980', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#A1FFD0' },
+  urlSettingsTxt: { fontSize: 16 },
+  timerBadge: { fontSize: 10, color: '#1E1B4B', fontWeight: '700', backgroundColor: 'rgba(255, 255, 255, 0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
+  badge: { backgroundColor: '#24C980', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#A1FFD0', marginTop: 4 },
   badgeTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   sep: { height: 9 },
 

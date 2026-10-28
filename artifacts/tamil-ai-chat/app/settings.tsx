@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Linking, ActivityIndicator, Alert, Image, TextInput, Modal, StatusBar,
-  NativeModules, Platform,
+  NativeModules, Platform, ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -12,10 +12,12 @@ import { uploadUriToCloudinary, getPhotoStyles, createPhotoStyle, deletePhotoSty
 import { ALL_PERSONAS } from '../constants/personas';
 import CharacterSettingsSection from '../components/CharacterSettingsSection';
 
-const APP_VERSION = '1.2.0';
-const LATEST_APK_URL = 'https://github.com/nvmk1985-blip/My-Dream-Women/releases/latest';
+const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
+
+const APP_VERSION = '1.3.0';
+const LATEST_APK_URL = 'https://github.com/nvmk-dream/My-dream-women-V-3.0/releases/latest';
 const API_BASE = '';
-const GITHUB_REPO = 'nvmk1985-blip/My-Dream-Women';
+const GITHUB_REPO = 'nvmk-dream/My-dream-women-V-3.0';
 const WORKFLOW_FILE = 'build-apk.yml';
 const KEYS_STORAGE = 'api_keys_store';
 
@@ -499,9 +501,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground source={BUTTERFLY_BG} style={{ flex: 1 }} resizeMode="cover">
+      <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
       {/* HuggingFace Token Modal */}
       <Modal visible={showHfModal} transparent animationType="slide" onRequestClose={() => setShowHfModal(false)}>
@@ -942,113 +945,115 @@ export default function SettingsScreen() {
       </Modal>
 
     </SafeAreaView>
+  </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0d1117' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
-    backgroundColor: '#161b22', flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', flexDirection: 'row',
     alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#30363d',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
   },
-  headerBack: { color: '#fff', fontSize: 22, fontWeight: 'bold', width: 40 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
+  headerBack: { color: '#1E1B4B', fontSize: 24, fontWeight: 'bold', width: 40 },
+  headerTitle: { color: '#1E1B4B', fontSize: 20, fontWeight: '800', flex: 1, textAlign: 'center' },
   scroll: { padding: 16, paddingBottom: 90 },
-  version: { color: '#8b949e', fontSize: 13, marginBottom: 18, textAlign: 'center' },
+  version: { color: '#1E1B4B', fontSize: 13, marginBottom: 18, textAlign: 'center', fontWeight: '700' },
   card: {
-    backgroundColor: '#161b22', borderRadius: 14, padding: 16,
-    marginBottom: 16, borderWidth: 1, borderColor: '#30363d',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 28, padding: 18,
+    marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   cardIcon: { fontSize: 22 },
-  cardTitle: { color: '#e6edf3', fontSize: 16, fontWeight: '700' },
-  cardDesc: { color: '#8b949e', fontSize: 13, lineHeight: 20, marginBottom: 14 },
+  cardTitle: { color: '#1E1B4B', fontSize: 17, fontWeight: '800' },
+  cardDesc: { color: '#1E1B4B', fontSize: 13, lineHeight: 20, marginBottom: 14, fontWeight: '600', opacity: 0.9 },
   updateBtn: {
-    backgroundColor: '#238636', borderRadius: 10,
+    backgroundColor: '#9333EA', borderRadius: 20,
     paddingVertical: 12, alignItems: 'center', marginBottom: 10,
   },
-  updateBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  checkMsg: { color: '#8b949e', fontSize: 13, marginBottom: 8 },
+  updateBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  checkMsg: { color: '#1E1B4B', fontSize: 13, marginBottom: 8, fontWeight: '700' },
   downloadLink: {
-    backgroundColor: '#1f6feb', borderRadius: 10,
+    backgroundColor: '#7C3AED', borderRadius: 20,
     paddingVertical: 11, alignItems: 'center',
   },
-  downloadLinkTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  downloadLinkTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
   playProtectBtn: {
-    backgroundColor: '#2f81f7', borderRadius: 10,
+    backgroundColor: '#0284C7', borderRadius: 20,
     paddingVertical: 12, alignItems: 'center',
   },
-  playProtectBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  playProtectBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#21262d',
+    paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.5)',
   },
-  infoLabel: { color: '#8b949e', fontSize: 13 },
-  infoVal: { color: '#e6edf3', fontSize: 13, fontWeight: '600' },
+  infoLabel: { color: '#312E81', fontSize: 13, fontWeight: '700' },
+  infoVal: { color: '#1E1B4B', fontSize: 13, fontWeight: '800' },
   iconPreviewRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  iconPreview: { width: 60, height: 60, borderRadius: 14, borderWidth: 2, borderColor: '#388bfd' },
+  iconPreview: { width: 60, height: 60, borderRadius: 18, borderWidth: 2, borderColor: '#9333EA' },
   iconPreviewInfo: { flex: 1 },
-  iconPreviewTitle: { color: '#3fb950', fontSize: 14, fontWeight: '700' },
-  iconPreviewHint: { color: '#8b949e', fontSize: 12, marginTop: 2 },
+  iconPreviewTitle: { color: '#15803D', fontSize: 14, fontWeight: '800' },
+  iconPreviewHint: { color: '#1E1B4B', fontSize: 12, marginTop: 2, fontWeight: '600' },
   iconBtn: {
-    backgroundColor: '#6e40c9', borderRadius: 10,
+    backgroundColor: '#9333EA', borderRadius: 20,
     paddingVertical: 13, alignItems: 'center',
     flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 12,
   },
-  iconBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  iconBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
   buildStatusBox: {
-    borderRadius: 12, borderWidth: 1.5,
-    padding: 14, marginBottom: 12, backgroundColor: '#0d1117',
+    borderRadius: 20, borderWidth: 1.5,
+    padding: 14, marginBottom: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderColor: 'rgba(255, 255, 255, 0.75)',
   },
   buildStatusHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   buildStatusIcon: { fontSize: 18 },
-  buildStatusTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
-  buildStatusMsg: { color: '#c9d1d9', fontSize: 13, lineHeight: 20 },
+  buildStatusTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: '#1E1B4B' },
+  buildStatusMsg: { color: '#1E1B4B', fontSize: 13, lineHeight: 20, fontWeight: '600' },
   viewLogsBtn: {
-    backgroundColor: '#21262d', borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 16,
     paddingVertical: 9, alignItems: 'center', marginTop: 10,
-    borderWidth: 1, borderColor: '#30363d',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  viewLogsTxt: { color: '#8b949e', fontSize: 13, fontWeight: '600' },
+  viewLogsTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '700' },
   downloadApkBtn: {
-    backgroundColor: '#238636', borderRadius: 8,
+    backgroundColor: '#15803D', borderRadius: 20,
     paddingVertical: 12, alignItems: 'center', marginTop: 10,
   },
   downloadApkTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
   retryBtn: {
-    backgroundColor: '#21262d', borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 16,
     paddingVertical: 9, alignItems: 'center', marginTop: 10,
-    borderWidth: 1, borderColor: '#f85149',
+    borderWidth: 1, borderColor: '#EF4444',
   },
-  retryTxt: { color: '#f85149', fontSize: 13, fontWeight: '600' },
+  retryTxt: { color: '#DC2626', fontSize: 13, fontWeight: '700' },
   manualTriggerBtn: {
-    backgroundColor: '#161b22', borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20,
     paddingVertical: 11, alignItems: 'center', marginBottom: 12,
-    borderWidth: 1, borderColor: '#388bfd', borderStyle: 'dashed',
+    borderWidth: 1, borderColor: '#9333EA', borderStyle: 'dashed',
   },
-  manualTriggerTxt: { color: '#388bfd', fontWeight: '600', fontSize: 13 },
-  iconSteps: { backgroundColor: '#0d1117', borderRadius: 10, padding: 12, gap: 6 },
-  iconStep: { color: '#8b949e', fontSize: 12, lineHeight: 18 },
+  manualTriggerTxt: { color: '#9333EA', fontWeight: '800', fontSize: 13 },
+  iconSteps: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, padding: 12, gap: 6, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)' },
+  iconStep: { color: '#1E1B4B', fontSize: 12, lineHeight: 18, fontWeight: '600' },
   keysBtn: {
-    backgroundColor: '#b08800', borderRadius: 12,
+    backgroundColor: '#D97706', borderRadius: 20,
     paddingVertical: 14, alignItems: 'center', marginBottom: 16,
   },
-  keysBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  keysBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
   tipsCard: {
-    backgroundColor: '#161b22', borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: '#30363d',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24, padding: 16,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  tipsTitle: { color: '#e6edf3', fontSize: 14, fontWeight: '700', marginBottom: 10 },
-  tip: { color: '#8b949e', fontSize: 12, lineHeight: 20, marginBottom: 4 },
+  tipsTitle: { color: '#1E1B4B', fontSize: 15, fontWeight: '800', marginBottom: 10 },
+  tip: { color: '#1E1B4B', fontSize: 12, lineHeight: 20, marginBottom: 4, fontWeight: '600' },
   latestApkBanner: {
-    backgroundColor: '#0d2818', borderRadius: 12, borderWidth: 1.5, borderColor: '#238636',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24, borderWidth: 1.5, borderColor: '#15803D',
     padding: 14, marginBottom: 12, alignItems: 'center',
   },
-  latestApkBannerTitle: { color: '#3fb950', fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  latestApkBannerSub: { color: '#8b949e', fontSize: 11, marginBottom: 10 },
-  latestApkBannerBtn: { color: '#fff', fontWeight: '700', fontSize: 13, backgroundColor: '#238636', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
+  latestApkBannerTitle: { color: '#15803D', fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  latestApkBannerSub: { color: '#1E1B4B', fontSize: 11, marginBottom: 10, fontWeight: '600' },
+  latestApkBannerBtn: { color: '#fff', fontWeight: '800', fontSize: 13, backgroundColor: '#15803D', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
   keyModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   keyModalBox: {
     backgroundColor: '#161b22', borderTopLeftRadius: 22, borderTopRightRadius: 22,
@@ -1085,33 +1090,34 @@ const s = StyleSheet.create({
   serverOfflineTxt: { color: '#f85149', fontSize: 12, textAlign: 'center' },
   // ── Photo Styles ──────────────────────────────────────────────────────────
   stylesSectionLabel: {
-    color: '#8b949e', fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
+    color: '#1E1B4B', fontSize: 12, fontWeight: '800', letterSpacing: 0.8,
     textTransform: 'uppercase', marginBottom: 8, marginTop: 4,
   },
   styleRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#0d1117', borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 11, marginBottom: 6,
-    borderWidth: 1, borderColor: '#21262d',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
-  styleRowHidden: { borderColor: '#2a1f1f', backgroundColor: '#0d0d0d' },
-  styleRowLabel: { color: '#e6edf3', fontSize: 14, fontWeight: '600' },
-  styleHiddenBadge: { color: '#6e4040', fontSize: 10, marginTop: 2 },
-  stylePromptHint: { color: '#555', fontSize: 11, marginTop: 2 },
+  styleRowHidden: { borderColor: 'rgba(239, 68, 68, 0.6)', backgroundColor: 'rgba(255, 255, 255, 0.00)' },
+  styleRowLabel: { color: '#1E1B4B', fontSize: 14, fontWeight: '700' },
+  styleHiddenBadge: { color: '#DC2626', fontSize: 10, marginTop: 2, fontWeight: '700' },
+  stylePromptHint: { color: '#312E81', fontSize: 11, marginTop: 2, fontWeight: '600' },
   styleToggleBtn: {
-    width: 36, height: 36, borderRadius: 8,
-    backgroundColor: '#161b22', justifyContent: 'center', alignItems: 'center',
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
   },
   permanentDeleteBtn: {
-    backgroundColor: '#321719', borderRadius: 8, borderWidth: 1,
-    borderColor: '#f85149', paddingHorizontal: 9, paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, borderWidth: 1,
+    borderColor: '#EF4444', paddingHorizontal: 9, paddingVertical: 8,
     justifyContent: 'center', alignItems: 'center', marginLeft: 8,
   },
-  permanentDeleteTxt: { color: '#f85149', fontSize: 11, fontWeight: '800' },
+  permanentDeleteTxt: { color: '#DC2626', fontSize: 11, fontWeight: '800' },
   addStyleBtn: {
-    backgroundColor: '#1c2a1c', borderRadius: 10, borderWidth: 1,
-    borderColor: '#238636', borderStyle: 'dashed',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20, borderWidth: 1,
+    borderColor: '#15803D', borderStyle: 'dashed',
     paddingVertical: 12, alignItems: 'center', marginTop: 8,
   },
-  addStyleBtnTxt: { color: '#3fb950', fontWeight: '700', fontSize: 14 },
+  addStyleBtnTxt: { color: '#15803D', fontWeight: '800', fontSize: 14 },
 });

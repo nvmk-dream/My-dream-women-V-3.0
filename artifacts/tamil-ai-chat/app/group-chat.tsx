@@ -2,9 +2,11 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Modal, Image, ScrollView,
+  Modal, Image, ScrollView, ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
 import { Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -274,7 +276,8 @@ export default function GroupChatScreen() {
   const swapReady = !!selfieUrl && !!selectedTarget && !uploadingSelfie;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ImageBackground source={BUTTERFLY_BG} style={{ flex: 1 }} resizeMode="cover">
+      <SafeAreaView style={styles.container}>
       <Stack.Screen options={{
         title: `Group Chat (${personas.length})`,
         headerStyle: { backgroundColor: '#075E54' },
@@ -490,38 +493,57 @@ export default function GroupChatScreen() {
         </View>
       </Modal>
     </SafeAreaView>
+  </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ECE5DD' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
 
-  groupBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#128C7E', paddingHorizontal: 14, paddingVertical: 8, gap: 6, flexWrap: 'wrap' },
-  miniAvatar: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  miniAvatarTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  groupBarTxt: { color: '#dcf8c6', fontSize: 12, flex: 1 },
-  swapBarBtn: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
-  swapBarBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  groupBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    paddingHorizontal: 14, paddingVertical: 10, gap: 6, flexWrap: 'wrap',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
+  },
+  miniAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#A855F7' },
+  miniAvatarTxt: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  groupBarTxt: { color: '#1E1B4B', fontSize: 13, flex: 1, fontWeight: '800' },
+  swapBarBtn: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)' },
+  swapBarBtnTxt: { color: '#1E1B4B', fontSize: 12, fontWeight: '800' },
 
-  msgList: { padding: 10 },
-  row: { marginVertical: 3, flexDirection: 'row', alignItems: 'flex-end' },
+  msgList: { padding: 12 },
+  row: { marginVertical: 4, flexDirection: 'row', alignItems: 'flex-end' },
   userRow: { justifyContent: 'flex-end' },
   aiRow: { justifyContent: 'flex-start', gap: 6 },
-  avatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  avatarTxt: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  bubble: { maxWidth: '72%', borderRadius: 10, padding: 10, paddingBottom: 6, elevation: 1 },
-  userBubble: { backgroundColor: '#DCF8C6', borderTopRightRadius: 2 },
-  aiBubble: { backgroundColor: '#fff', borderTopLeftRadius: 2 },
-  senderName: { fontSize: 12, fontWeight: 'bold', marginBottom: 2 },
-  msgText: { fontSize: 14, lineHeight: 20, color: '#111' },
-  timeTxt: { fontSize: 10, color: '#888', alignSelf: 'flex-end', marginTop: 3 },
+  avatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#A855F7' },
+  avatarTxt: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  bubble: {
+    maxWidth: '76%', borderRadius: 20, padding: 12, paddingBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    elevation: 0, shadowOpacity: 0,
+  },
+  userBubble: { borderBottomRightRadius: 4, borderColor: 'rgba(147, 51, 234, 0.6)' },
+  aiBubble: { borderBottomLeftRadius: 4 },
+  senderName: { fontSize: 12, fontWeight: '800', marginBottom: 3, color: '#9333EA' },
+  msgText: { fontSize: 14, lineHeight: 20, color: '#1E1B4B', fontWeight: '600' },
+  timeTxt: { fontSize: 10, color: '#312E81', alignSelf: 'flex-end', marginTop: 4, fontWeight: '700' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, paddingLeft: 14 },
-  loadingTxt: { color: '#075E54', fontSize: 12 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, backgroundColor: '#F0F0F0', borderTopWidth: 1, borderTopColor: '#ddd', gap: 8 },
-  input: { flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100, color: '#111', borderWidth: 1, borderColor: '#ddd' },
-  sendBtn: { backgroundColor: '#25D366', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  sendBtnDisabled: { backgroundColor: '#a8d5b5' },
+  loadingTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '700' },
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end', padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.75)', gap: 8,
+  },
+  input: {
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 24,
+    paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100,
+    color: '#1E1B4B', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)', fontWeight: '600',
+  },
+  sendBtn: { backgroundColor: '#9333EA', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 0 },
+  sendBtnDisabled: { backgroundColor: '#C084FC', opacity: 0.5 },
   sendIcon: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
 
   // Modal
