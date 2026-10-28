@@ -937,52 +937,39 @@ Then write these prompts:
     if (characterViewMode === 'grid') {
       return (
         <TouchableOpacity
-          style={[s.gridCard, { borderColor: rowPalette.edge, shadowColor: rowPalette.edge }]}
+          style={s.gridCard}
           onPress={() => goChat(p)}
           onLongPress={() => openActionSheet(p)}
           activeOpacity={0.78}
           accessibilityRole="button"
           accessibilityLabel={`Open chat with ${p.name}`}
         >
-          <View style={[s.gridPhoto, { backgroundColor: p.avatarColor }]}>
-            {p.avatarPhotoUri
-              ? <Image source={{ uri: p.avatarPhotoUri }} style={s.gridPhotoImage} resizeMode="cover" />
-              : <LinearGradient colors={rowPalette.fill} style={s.gridPhotoFallback}>
-                  <Text style={s.gridPhotoEmoji}>{p.emoji}</Text>
-                </LinearGradient>
-            }
-            <LinearGradient
-              pointerEvents="none"
-              colors={['rgba(5, 8, 20, 0.04)', 'rgba(5, 8, 20, 0.82)']}
-              locations={[0.35, 1]}
-              style={[StyleSheet.absoluteFillObject, s.gridPhotoShade]}
-            />
-            <View style={s.gridPhotoTop}>
-              <Text style={s.gridTime}>{p.time}</Text>
-              <View style={s.gridPhotoActions}>
-                {autoMsgEnabled && iv ? <Text style={s.gridTimerBadge}>{iv}m</Text> : null}
-                {(hasAutoUnread || (p.unread ?? 0) > 0) && (
-                  <View style={s.badge}>
-                    <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={s.gridUrlButton}
-                  onPress={() => openUrlSettings(p)}
-                  accessibilityLabel={`Manage URLs for ${p.name}`}
-                  accessibilityRole="button"
-                  testID={`grid-character-urls-${p.id}`}
-                >
-                  <Text style={s.gridUrlText}>🔗</Text>
-                </TouchableOpacity>
+          <View style={s.gridTopRow}>
+            <View style={s.activeBadgeSmall}>
+              <View style={s.activeDot} />
+              <Text style={s.activeTxtSmall}>Active</Text>
+            </View>
+            {(hasAutoUnread || (p.unread ?? 0) > 0) && (
+              <View style={s.badge}>
+                <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
               </View>
+            )}
+          </View>
+
+          <View style={s.avatarGlowRing}>
+            <View style={[s.avatar, { backgroundColor: p.avatarColor }]}>
+              {p.avatarPhotoUri
+                ? <Image source={{ uri: p.avatarPhotoUri }} style={s.avatarImg} />
+                : <Text style={s.avatarTxt}>{p.emoji}</Text>
+              }
             </View>
-            <View style={s.gridPhotoBottom}>
-              <Text style={s.gridName} numberOfLines={1}>{p.name}</Text>
-              <Text style={s.gridSub} numberOfLines={2}>
-                {p.editedRelationship ?? p.relationship} · {p.profession}
-              </Text>
-            </View>
+          </View>
+
+          <View style={s.gridBottomInfo}>
+            <Text style={s.gridName} numberOfLines={1}>{p.name}</Text>
+            <Text style={s.gridSub} numberOfLines={1}>
+              {p.editedRelationship ?? p.relationship}
+            </Text>
           </View>
         </TouchableOpacity>
       );
@@ -992,7 +979,9 @@ Then write these prompts:
       <TouchableOpacity
         style={s.chatRow}
         onPress={() => goChat(p)}
-        onLongPress={() => openActionSheet(p)} activeOpacity={0.7}>
+        onLongPress={() => openActionSheet(p)}
+        activeOpacity={0.7}
+      >
         <View style={s.avatarGlowRing}>
           <View style={[s.avatar, { backgroundColor: p.avatarColor }]}>
             {p.avatarPhotoUri
@@ -1022,7 +1011,6 @@ Then write these prompts:
               <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
             </View>
           )}
-        </View>
       </TouchableOpacity>
     );
   };
@@ -1550,7 +1538,7 @@ const s = StyleSheet.create({
   header: {
     backgroundColor: 'rgba(255, 255, 255, 0.00)',
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: 16, paddingVertical: 10,
     gap: 6,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
   },
@@ -1652,78 +1640,69 @@ const s = StyleSheet.create({
 
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
   list: { flex: 1, backgroundColor: 'transparent' },
-  listContent: { paddingTop: 10, paddingBottom: 120 },
-  gridListContent: { paddingTop: 10, paddingBottom: 120, paddingLeft: 12, paddingRight: 12 },
+  listContent: { paddingTop: 4, paddingBottom: 40 },
+  gridListContent: { paddingTop: 6, paddingBottom: 40, paddingLeft: 10, paddingRight: 10 },
   gridColumn: { justifyContent: 'space-between' },
-  gridSeparator: { height: 12 },
+  gridSeparator: { height: 6 },
   gridCard: {
-    width: '48%', height: 184, borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1.2, backgroundColor: '#11172F', marginBottom: 1,
-    shadowOpacity: 0.32, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 4,
+    width: '48.5%', height: 136, borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    paddingHorizontal: 8, paddingVertical: 5,
+    alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: 'transparent', shadowOpacity: 0, elevation: 0,
   },
-  gridPhoto: { flex: 1, overflow: 'hidden' },
-  gridPhotoImage: StyleSheet.absoluteFillObject,
-  gridPhotoFallback: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  gridPhotoEmoji: { fontSize: 52 },
-  gridPhotoShade: { borderRadius: 14 },
-  gridPhotoTop: {
-    position: 'absolute', top: 8, left: 8, right: 8,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4,
+  gridTopRow: {
+    width: '100%', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center',
+    gap: 4, minHeight: 18,
   },
-  gridTime: {
-    color: '#F4F6FF', fontSize: 10, fontWeight: '700',
-    backgroundColor: 'rgba(8, 11, 24, 0.72)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 10,
+  activeBadgeSmall: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(220, 252, 231, 0.7)',
+    borderWidth: 1, borderColor: 'rgba(134, 239, 172, 0.8)',
+    borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1.5, gap: 3.5,
   },
-  gridPhotoActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  gridTimerBadge: {
-    color: '#F2CF68', fontSize: 9, fontWeight: '800',
-    backgroundColor: 'rgba(8, 11, 24, 0.72)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 9,
-  },
-  gridUrlButton: {
-    width: 26, height: 26, justifyContent: 'center', alignItems: 'center',
-    borderRadius: 13, backgroundColor: 'rgba(8, 11, 24, 0.72)',
-  },
-  gridUrlText: { fontSize: 13 },
-  gridPhotoBottom: { position: 'absolute', left: 9, right: 9, bottom: 9 },
-  gridName: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 3 },
-  gridSub: { color: '#E0E5F5', fontSize: 10, lineHeight: 14 },
+  activeTxtSmall: { color: '#15803D', fontSize: 9, fontWeight: '700' },
+  gridBottomInfo: { alignItems: 'center', width: '100%', minWidth: 0, marginTop: 2 },
+  gridName: { color: '#1E1B4B', fontSize: 13.5, fontWeight: '800', textAlign: 'center' },
+  gridSub: { color: '#1E1B4B', opacity: 0.85, fontSize: 10, fontWeight: '600', textAlign: 'center' },
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    marginHorizontal: 16, marginVertical: 8,
-    paddingHorizontal: 14, paddingVertical: 14,
-    borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
+    marginHorizontal: 12, marginVertical: 2,
+    paddingHorizontal: 10, paddingVertical: 3.5,
+    borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.75)',
     shadowColor: 'transparent', shadowOpacity: 0, elevation: 0,
   },
   avatarGlowRing: {
-    width: 66, height: 66, borderRadius: 33,
-    padding: 2.5, borderWidth: 2.5, borderColor: '#A855F7',
+    width: 64, height: 64, borderRadius: 32,
+    padding: 2, borderWidth: 2, borderColor: '#A855F7',
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   avatar: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarImg: { width: 56, height: 56, borderRadius: 28 },
   avatarTxt: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  chatMid: { flex: 1, marginLeft: 14, marginRight: 8, justifyContent: 'center' },
-  chatNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginBottom: 3 },
-  chatName: { flexShrink: 1, fontSize: 18, fontWeight: '800', color: '#1E1B4B', letterSpacing: 0.15 },
-  chatSub: { fontSize: 13, color: '#1E1B4B', opacity: 0.9, lineHeight: 18, fontWeight: '600' },
-  chatRight: { alignItems: 'flex-end', justifyContent: 'space-between', height: 56 },
+  chatMid: { flex: 1, marginLeft: 10, marginRight: 6, justifyContent: 'center' },
+  chatNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, marginBottom: 2 },
+  chatName: { flexShrink: 1, fontSize: 16, fontWeight: '800', color: '#1E1B4B', letterSpacing: 0.15 },
+  chatSub: { fontSize: 12, color: '#1E1B4B', opacity: 0.9, lineHeight: 16, fontWeight: '600' },
+  chatRight: { alignItems: 'flex-end', justifyContent: 'center', gap: 3 },
   activeBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(220, 252, 231, 0.7)',
     borderWidth: 1, borderColor: 'rgba(134, 239, 172, 0.8)',
-    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 3, gap: 5,
+    borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, gap: 4,
   },
-  activeDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22C55E' },
-  activeTxt: { color: '#15803D', fontSize: 11, fontWeight: '700' },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  activeTxt: { color: '#15803D', fontSize: 10, fontWeight: '700' },
   urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
   urlSettingsTxt: { fontSize: 16 },
   timerBadge: { fontSize: 10, color: '#1E1B4B', fontWeight: '700', backgroundColor: 'rgba(255, 255, 255, 0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
   badge: { backgroundColor: '#24C980', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#A1FFD0', marginTop: 4 },
   badgeTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  sep: { height: 9 },
+  sep: { height: 2 },
 
   fab: { position: 'absolute', right: 10, bottom: 20, gap: 8, alignItems: 'center' },
   fabBtn: {
