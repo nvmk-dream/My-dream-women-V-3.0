@@ -2279,46 +2279,6 @@ export default function ChatScreen() {
           </TouchableOpacity>
         )}
         <View style={{ position: 'relative' }}>
-          {/* Floating action buttons — 3D glossy style with labels */}
-          <View style={styles.chatFabs}>
-            <View style={styles.fabWithLabel}>
-              <TouchableOpacity
-                style={[styles.chatFab3D, { backgroundColor: '#F5EEFD', borderColor: '#D8B4FE' }]}
-                onPress={() => setShowGenModal(true)}
-                disabled={generatingPhoto}
-              >
-                {generatingPhoto
-                  ? <ActivityIndicator color="#7C3AED" size="small" />
-                  : <Ionicons name="camera" size={22} color="#334155" />
-                }
-              </TouchableOpacity>
-              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Camera</Text></View>
-            </View>
-
-            <View style={styles.fabWithLabel}>
-              <TouchableOpacity
-                style={[styles.chatFab3D, { backgroundColor: '#E0F2FE', borderColor: '#7DD3FC' }]}
-                onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
-              >
-                <Ionicons name="cloud" size={22} color="#0284C7" />
-              </TouchableOpacity>
-              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Cloud</Text></View>
-            </View>
-
-            <View style={styles.fabWithLabel}>
-              <TouchableOpacity
-                style={[styles.chatFab3D, { backgroundColor: '#FDF2F8', borderColor: '#F472B6' }]}
-                onPress={() => handleTranslate(input)}
-                disabled={translateLoading}
-              >
-                {translateLoading
-                  ? <ActivityIndicator color="#DB2777" size="small" />
-                  : <Ionicons name="language" size={22} color="#1E293B" />
-                }
-              </TouchableOpacity>
-              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Translate</Text></View>
-            </View>
-          </View>
           {/* Elegant White-Lavender Pill input bar (No smiley on left, attach on right) */}
           <View style={styles.inputBar}>
             <View style={styles.inputWrapper}>
@@ -3073,7 +3033,7 @@ const styles = StyleSheet.create({
   chatFab3D: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, elevation: 4, shadowColor: '#7C3AED', shadowOpacity: 0.2, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
   fabPillBadge: { backgroundColor: 'rgba(15, 23, 42, 0.85)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
   fabPillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: theme.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerAvatarImg: { width: 52, height: 52, borderRadius: 26, borderWidth: 2.5, borderColor: '#D946EF' },

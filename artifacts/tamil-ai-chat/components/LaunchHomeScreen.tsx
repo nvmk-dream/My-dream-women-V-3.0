@@ -72,21 +72,20 @@ export default function LaunchHomeScreen() {
   const topInset = Platform.OS === 'web' ? 67 : 4;
   const bottomInset = Platform.OS === 'web' ? 34 : 4;
   const compact = pageHeight < 700;
-  const verticalGap = compact ? 8 : 10;
-  const headerHeight = Math.max(50, Math.min(64, Math.round(pageHeight * 0.075)));
-  const gridRowGap = compact ? 8 : 10;
+  const verticalGap = compact ? 4 : 6;
+  const headerHeight = Math.max(50, Math.min(62, Math.round(pageHeight * 0.072)));
+  const gridRowGap = compact ? 6 : 8;
   const availableCardsAndHero = Math.max(
     380,
     pageHeight - topInset - bottomInset - headerHeight - verticalGap * 2 - gridRowGap,
   );
   const tileWidth = Math.max(0, Math.floor((pageWidth - 32 - 16) / 3));
   // Responsive card height: expands to fill screen space evenly without empty bottom gap
-  const heroHeight = Math.max(180, Math.min(Math.round(availableCardsAndHero * 0.44), 320));
+  const heroHeight = Math.max(190, Math.min(Math.round(availableCardsAndHero * 0.45), 330));
   const remainingForCards = Math.max(180, availableCardsAndHero - heroHeight - gridRowGap);
-  const cardHeight = Math.max(Math.round(tileWidth * 0.92), Math.floor((remainingForCards - gridRowGap) / 2));
-  const iconRingSize = Math.max(36, Math.min(72, Math.round(cardHeight * 0.4)));
+  const cardHeight = Math.max(Math.round(tileWidth * 0.95), Math.floor((remainingForCards - gridRowGap) / 2));
   const smallText = cardHeight < 126;
-  const headerIconSize = Math.max(42, Math.min(62, headerHeight - 4));
+  const headerIconSize = Math.max(40, Math.min(54, headerHeight - 6));
 
   const checkRenderServer = async () => {
     try {
@@ -219,7 +218,7 @@ export default function LaunchHomeScreen() {
         <View style={[styles.header, { height: headerHeight, marginBottom: verticalGap }]}>
           <Image
             source={require('../assets/images/icon.png')}
-            style={[styles.logo, { width: headerIconSize, height: headerIconSize, borderRadius: headerIconSize * 0.29 }]}
+            style={[styles.logo, { width: headerIconSize, height: headerIconSize, borderRadius: headerIconSize * 0.28 }]}
           />
           <View style={styles.headerText}>
             <Text numberOfLines={1} style={[styles.headerTitle, { fontSize: Math.min(22, headerHeight * 0.35) }]}>My Dream Women</Text>
@@ -231,22 +230,23 @@ export default function LaunchHomeScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Settings"
-            style={[styles.settingsButton, { width: headerIconSize, height: headerIconSize, borderRadius: headerIconSize / 2 }]}
+            style={[styles.settingsButton, { width: headerIconSize, height: headerIconSize }]}
             onPress={() => router.push('/settings')}
           >
-            <Ionicons name="settings-outline" size={Math.min(26, headerIconSize * 0.46)} color="#18204E" />
+            <Image
+              source={require('../assets/images/header_butterfly_icon.png')}
+              style={{ width: headerIconSize, height: headerIconSize, borderRadius: headerIconSize / 2 }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
 
         <View style={[styles.hero, { height: heroHeight, marginBottom: verticalGap }]}>
           <ImageBackground
-            source={heroImageUrl ? { uri: heroImageUrl } : require('../assets/images/splash.png')}
+            source={heroImageUrl ? { uri: heroImageUrl } : require('../assets/images/home_hero_banner.png')}
             resizeMode="cover"
             style={styles.heroImage}
-            imageStyle={[
-              styles.heroImageStyle,
-              !heroImageUrl && { left: 0, right: undefined, width: '61%' },
-            ]}
+            imageStyle={styles.heroImageStyle}
           >
             <Pressable
               accessibilityRole="button"
@@ -254,64 +254,117 @@ export default function LaunchHomeScreen() {
               onPress={handleHeroSurfaceTap}
               style={StyleSheet.absoluteFill}
             />
-            <LinearGradient
-              colors={['rgba(3, 7, 25, 0.02)', 'rgba(3, 7, 25, 0.10)', 'rgba(3, 7, 25, 0.30)']}
-              start={{ x: 0.1, y: 0.05 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-            <View style={[styles.heroStatusRow, { top: compact ? 8 : 12, right: compact ? 8 : 12, gap: compact ? 6 : 8 }]}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={toggleOnline}
-                activeOpacity={0.82}
-                style={[
-                  styles.statusButton,
-                  { minHeight: compact ? 34 : 42, paddingHorizontal: compact ? 9 : 13 },
-                  isOnline ? styles.onlineButton : styles.offlineButton,
-                ]}
-              >
-                <View style={[styles.statusDot, { width: compact ? 8 : 10, height: compact ? 8 : 10, backgroundColor: isOnline ? '#35E5B2' : '#F59E0B' }]} />
-                <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{isOnline ? 'Online' : 'Offline'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={wakeRenderServer}
-                disabled={wakingServer}
-                activeOpacity={0.82}
-                style={[styles.wakeButton, { minWidth: compact ? 62 : 76, height: compact ? 34 : 42, paddingHorizontal: compact ? 9 : 13 }]}
-              >
-                {wakingServer
-                  ? <ActivityIndicator size="small" color="#FFFFFF" />
-                  : <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{serverStatus === 'ok' ? 'Server' : 'Wake'}</Text>}
-              </TouchableOpacity>
-            </View>
 
-            <View style={[styles.heroCopy, { top: compact ? 44 : 62, right: compact ? 10 : 14, bottom: compact ? 10 : 18, width: '43%' }]}>
-              <View style={styles.heroTextGroup}>
-                <Text style={[styles.heroTitle, { fontSize: compact ? 23 : Math.min(33, pageHeight * 0.039), lineHeight: compact ? 27 : Math.min(38, pageHeight * 0.045) }]}>Your Dream.</Text>
-                <Text style={[styles.heroTitleCyan, { fontSize: compact ? 22 : Math.min(32, pageHeight * 0.038), lineHeight: compact ? 26 : Math.min(37, pageHeight * 0.044) }]}>Our Creation.</Text>
-                <Text style={[styles.heroEyebrow, { fontSize: compact ? 8 : 10, marginTop: compact ? 6 : 10 }]}>CREATE  ·  CHAT  ·  EXPLORE</Text>
-                <Text style={[styles.heroSubtitle, { fontSize: compact ? 10 : 13, marginTop: compact ? 4 : 7, marginBottom: compact ? 8 : 12 }]}>Your Perfect AI partner</Text>
-              </View>
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => router.push('/ai-girls')}
-                activeOpacity={0.86}
-              >
+            {heroImageUrl ? (
+              <>
                 <LinearGradient
-                  colors={['#E52EFF', '#8A46FF', '#348CFF']}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={[styles.startChatButton, { minHeight: compact ? 42 : 54, paddingHorizontal: compact ? 10 : 16, gap: compact ? 6 : 9 }]}
+                  colors={['rgba(3, 7, 25, 0.02)', 'rgba(3, 7, 25, 0.10)', 'rgba(3, 7, 25, 0.30)']}
+                  start={{ x: 0.1, y: 0.05 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+                <View style={[styles.heroStatusRow, { top: compact ? 8 : 12, right: compact ? 8 : 12, gap: compact ? 6 : 8 }]}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={toggleOnline}
+                    activeOpacity={0.82}
+                    style={[
+                      styles.statusButton,
+                      { minHeight: compact ? 34 : 40, paddingHorizontal: compact ? 9 : 13 },
+                      isOnline ? styles.onlineButton : styles.offlineButton,
+                    ]}
+                  >
+                    <View style={[styles.statusDot, { width: compact ? 8 : 10, height: compact ? 8 : 10, backgroundColor: isOnline ? '#35E5B2' : '#F59E0B' }]} />
+                    <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{isOnline ? 'Online' : 'Offline'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={wakeRenderServer}
+                    disabled={wakingServer}
+                    activeOpacity={0.82}
+                    style={[styles.wakeButton, { minWidth: compact ? 62 : 76, height: compact ? 34 : 40, paddingHorizontal: compact ? 9 : 13 }]}
+                  >
+                    {wakingServer
+                      ? <ActivityIndicator size="small" color="#FFFFFF" />
+                      : <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{serverStatus === 'ok' ? 'Server' : 'Wake'}</Text>}
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.heroCopy, { top: compact ? 44 : 62, right: compact ? 10 : 14, bottom: compact ? 10 : 18, width: '43%' }]}>
+                  <View style={styles.heroTextGroup}>
+                    <Text style={[styles.heroTitle, { fontSize: compact ? 23 : Math.min(33, pageHeight * 0.039), lineHeight: compact ? 27 : Math.min(38, pageHeight * 0.045) }]}>Your Dream.</Text>
+                    <Text style={[styles.heroTitleCyan, { fontSize: compact ? 22 : Math.min(32, pageHeight * 0.038), lineHeight: compact ? 26 : Math.min(37, pageHeight * 0.044) }]}>Our Creation.</Text>
+                    <Text style={[styles.heroEyebrow, { fontSize: compact ? 8 : 10, marginTop: compact ? 6 : 10 }]}>CREATE  ·  CHAT  ·  EXPLORE</Text>
+                    <Text style={[styles.heroSubtitle, { fontSize: compact ? 10 : 13, marginTop: compact ? 4 : 7, marginBottom: compact ? 8 : 12 }]}>Your Perfect AI partner</Text>
+                  </View>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={() => router.push('/ai-girls')}
+                    activeOpacity={0.86}
+                  >
+                    <LinearGradient
+                      colors={['#E52EFF', '#8A46FF', '#348CFF']}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      style={[styles.startChatButton, { minHeight: compact ? 40 : 50, paddingHorizontal: compact ? 10 : 16, gap: compact ? 6 : 9 }]}
+                    >
+                      <Ionicons name="chatbox-ellipses" size={compact ? 17 : 21} color="#FFFFFF" />
+                      <Text style={[styles.startChatText, { fontSize: compact ? 12 : 16 }]}>Start Chat</Text>
+                      <Ionicons name="arrow-forward" size={compact ? 16 : 20} color="#FFFFFF" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={[styles.heroStatusRow, { top: compact ? 8 : 12, right: compact ? 8 : 12, gap: compact ? 6 : 8 }]}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={toggleOnline}
+                    activeOpacity={0.82}
+                    style={[
+                      styles.statusButton,
+                      { minHeight: compact ? 34 : 40, paddingHorizontal: compact ? 9 : 13 },
+                      isOnline ? styles.onlineButton : styles.offlineButton,
+                    ]}
+                  >
+                    <View style={[styles.statusDot, { width: compact ? 8 : 10, height: compact ? 8 : 10, backgroundColor: isOnline ? '#35E5B2' : '#F59E0B' }]} />
+                    <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{isOnline ? 'Online' : 'Offline'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={wakeRenderServer}
+                    disabled={wakingServer}
+                    activeOpacity={0.82}
+                    style={[styles.wakeButton, { minWidth: compact ? 62 : 76, height: compact ? 34 : 40, paddingHorizontal: compact ? 9 : 13 }]}
+                  >
+                    {wakingServer
+                      ? <ActivityIndicator size="small" color="#FFFFFF" />
+                      : <Text style={[styles.statusText, { fontSize: compact ? 12 : 14 }]}>{serverStatus === 'ok' ? 'Server' : 'Wake'}</Text>}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => router.push('/ai-girls')}
+                  activeOpacity={0.86}
+                  style={[styles.heroStartChatHitBox, { right: compact ? 10 : 14, bottom: compact ? 10 : 16 }]}
                 >
-                  <Ionicons name="chatbox-ellipses" size={compact ? 17 : 21} color="#FFFFFF" />
-                  <Text style={[styles.startChatText, { fontSize: compact ? 12 : 16 }]}>Start Chat</Text>
-                  <Ionicons name="arrow-forward" size={compact ? 16 : 20} color="#FFFFFF" />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+                  <LinearGradient
+                    colors={['#E52EFF', '#8A46FF', '#348CFF']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={[styles.startChatButton, { minHeight: compact ? 38 : 46, paddingHorizontal: compact ? 12 : 18, gap: compact ? 6 : 9 }]}
+                  >
+                    <Ionicons name="chatbox-ellipses" size={compact ? 17 : 20} color="#FFFFFF" />
+                    <Text style={[styles.startChatText, { fontSize: compact ? 13 : 15 }]}>Start Chat</Text>
+                    <Ionicons name="arrow-forward" size={compact ? 15 : 18} color="#FFFFFF" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Change hero background"
@@ -352,6 +405,16 @@ export default function LaunchHomeScreen() {
                 style={styles.cardImage}
                 resizeMode="cover"
               />
+              <LinearGradient
+                colors={['transparent', 'rgba(10, 16, 36, 0.45)', 'rgba(5, 11, 28, 0.88)']}
+                style={styles.cardGradientOverlay}
+              >
+                <View style={styles.cardTextCol}>
+                  <Text numberOfLines={1} style={[styles.cardTitle, smallText && { fontSize: 11 }]}>{feature.title}</Text>
+                  <Text numberOfLines={1} style={[styles.cardSubtitle, smallText && { fontSize: 8.5 }]}>{feature.subtitle}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={smallText ? 12 : 14} color="#FFFFFF" style={styles.cardArrow} />
+              </LinearGradient>
             </TouchableOpacity>
           ))}
         </View>
@@ -362,34 +425,45 @@ export default function LaunchHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, justifyContent: 'space-between' },
+  page: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6, justifyContent: 'space-between' },
   webPage: { paddingTop: 67, paddingBottom: 34 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logo: { width: 62, height: 62, borderRadius: 18, borderWidth: 1.5, borderColor: '#D64DFF' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(184, 247, 255, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  logo: { width: 52, height: 52, borderRadius: 16, borderWidth: 1.5, borderColor: '#D64DFF' },
   headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { color: '#18204E', fontSize: 22, fontWeight: '800' },
-  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, minWidth: 0 },
-  headerSubtitle: { color: '#4B5573', fontSize: 10, flexShrink: 1 },
-  headerVersion: { color: '#4B5573', fontSize: 10, flexShrink: 0 },
-  settingsButton: { width: 54, height: 54, borderRadius: 28, borderWidth: 1.5, borderColor: '#A5B4D6', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.88)' },
+  headerTitle: { color: '#18204E', fontSize: 20, fontWeight: '800' },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2, minWidth: 0 },
+  headerSubtitle: { color: '#3A4566', fontSize: 10, fontWeight: '600', flexShrink: 1 },
+  headerVersion: { color: '#3A4566', fontSize: 10, fontWeight: '600', flexShrink: 0 },
+  settingsButton: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   hero: { width: '100%', borderRadius: 24, borderWidth: 1.5, borderColor: '#35DFFF', overflow: 'hidden', backgroundColor: '#10172F', shadowColor: '#16CFFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   heroImage: { width: '100%', height: '100%' },
   heroImageStyle: { borderRadius: 22 },
-  heroStatusRow: { position: 'absolute', top: 14, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusButton: { minHeight: 42, paddingHorizontal: 13, borderRadius: 22, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: 'rgba(5, 13, 35, 0.72)' },
+  heroStatusRow: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusButton: { minHeight: 38, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(5, 13, 35, 0.75)' },
   onlineButton: { borderColor: '#35E5B2' },
   offlineButton: { borderColor: '#F59E0B' },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  wakeButton: { minWidth: 76, height: 42, paddingHorizontal: 13, borderRadius: 22, borderWidth: 1.5, borderColor: '#63B6FF', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5, 13, 35, 0.72)' },
-  statusText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  heroCopy: { position: 'absolute', top: 76, right: 14, bottom: 18, width: '61%', alignItems: 'flex-end', justifyContent: 'space-between' },
+  statusDot: { width: 9, height: 9, borderRadius: 5 },
+  wakeButton: { minWidth: 70, height: 38, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1.5, borderColor: '#63B6FF', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5, 13, 35, 0.75)' },
+  statusText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  heroCopy: { position: 'absolute', top: 68, right: 14, bottom: 16, width: '55%', alignItems: 'flex-end', justifyContent: 'space-between' },
   heroTextGroup: { alignItems: 'flex-end' },
-  heroTitle: { color: '#FFF1FF', fontFamily: 'DreamScript', fontSize: 33, lineHeight: 38, textAlign: 'right', textShadowColor: '#F55CFF', textShadowRadius: 9 },
-  heroTitleCyan: { color: '#8AF4FF', fontFamily: 'DreamScript', fontSize: 32, lineHeight: 37, textAlign: 'right', textShadowColor: '#2EDCFF', textShadowRadius: 10 },
-  heroEyebrow: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 1.35, marginTop: 10, textAlign: 'right' },
-  heroSubtitle: { color: '#E1E7F7', fontSize: 13, marginTop: 7, marginBottom: 12, textAlign: 'right' },
-  startChatButton: { minHeight: 54, borderRadius: 29, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, shadowColor: '#C832FF', shadowOpacity: 0.55, shadowRadius: 12, elevation: 6 },
-  startChatText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  heroTitle: { color: '#FFF1FF', fontFamily: 'DreamScript', fontSize: 32, lineHeight: 37, textAlign: 'right', textShadowColor: '#F55CFF', textShadowRadius: 9 },
+  heroTitleCyan: { color: '#8AF4FF', fontFamily: 'DreamScript', fontSize: 31, lineHeight: 36, textAlign: 'right', textShadowColor: '#2EDCFF', textShadowRadius: 10 },
+  heroEyebrow: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800', letterSpacing: 1.3, marginTop: 8, textAlign: 'right' },
+  heroSubtitle: { color: '#E1E7F7', fontSize: 12, marginTop: 6, marginBottom: 10, textAlign: 'right' },
+  heroStartChatHitBox: { position: 'absolute' },
+  startChatButton: { minHeight: 46, borderRadius: 26, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#C832FF', shadowOpacity: 0.55, shadowRadius: 12, elevation: 6 },
+  startChatText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   changeBackgroundButton: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(2,8,24,0.72)' },
   changeBackgroundText: { color: '#FFFFFF', fontWeight: '700' },
   safe: { flex: 1, backgroundColor: '#E8EEFB' },
@@ -399,12 +473,54 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 0,
+    borderColor: 'rgba(255,255,255,0.00)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
   cardImage: {
     width: '100%',
     height: '100%',
     borderRadius: 22,
+  },
+  cardGradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 8,
+    paddingBottom: 6,
+    paddingTop: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+  },
+  cardTextCol: {
+    flex: 1,
+    marginRight: 4,
+  },
+  cardTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 3,
+  },
+  cardSubtitle: {
+    color: '#E0E7FF',
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 2,
+  },
+  cardArrow: {
+    marginBottom: 2,
   },
 });
