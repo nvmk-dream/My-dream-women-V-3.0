@@ -43,12 +43,12 @@ type Feature = {
   color: string;
   bgImage: any;
   route?: string;
-  launchIntent?: 'group-chat' | 'image-to-script';
+  launchIntent?: 'group-chat' | 'image-to-script' | 'add-character';
 };
 
 const FEATURES: Feature[] = [
   { title: 'Text to Image', subtitle: 'Create Images', icon: 'image-outline', color: '#E64BFF', bgImage: CARD_IMAGES.textToImage, route: '/prompt-image' },
-  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF', bgImage: CARD_IMAGES.aiCharacters },
+  { title: 'AI Characters', subtitle: 'Meet AI Girls', icon: 'person-outline', color: '#42D9FF', bgImage: CARD_IMAGES.aiCharacters, route: '/ai-girls', launchIntent: 'add-character' },
   { title: 'Group Chat', subtitle: 'Chat Together', icon: 'people-outline', color: '#38E6A1', bgImage: CARD_IMAGES.groupChat, route: '/ai-girls', launchIntent: 'group-chat' },
   { title: 'Image to Script', subtitle: 'Photo Stories', icon: 'document-text-outline', color: '#F5D845', bgImage: CARD_IMAGES.imageToScript, route: '/ai-girls', launchIntent: 'image-to-script' },
   { title: 'Face Swap', subtitle: 'Swap Faces', icon: 'swap-horizontal-outline', color: '#E64BFF', bgImage: CARD_IMAGES.faceSwap, route: '/face-swap' },

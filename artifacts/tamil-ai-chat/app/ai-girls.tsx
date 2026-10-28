@@ -888,6 +888,13 @@ Then write these prompts:
     void handlePhotoToScript();
   }, [launch, handlePhotoToScript]);
 
+  // When launched from Home Screen "AI Characters" card, open Add Character modal immediately
+  useEffect(() => {
+    if (launch !== 'add-character' || launchHandledRef.current === launch) return;
+    launchHandledRef.current = launch;
+    setShowAddCharModal(true);
+  }, [launch]);
+
     // ── Settings helpers ──────────────────────────────────────────
   const wakeRenderServer = async () => {
     if (wakingServer) return;

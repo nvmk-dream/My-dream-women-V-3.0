@@ -85,3 +85,22 @@
 4. **ஒற்றை ஒருங்கிணைந்த நிலை (Consolidated Verification) & GitHub Build:**
    - அனைத்து மாற்றங்களையும் முடித்த பின் `ACTION_PLAN_HISTORY.md` மற்றும் Git-ல் commit செய்து, Rule 2-ன்படி GitHub Actions workflow (`build-apk.yml`) மூலம் புதிய APK பில்ட் செய்தல்.
 
+
+
+---
+
+## 🏷️ Feature 4: Home Screen "AI Characters" கார்டில் Add Character வசதி இணைப்பு
+
+### 1. பயனரின் கோரிக்கை:
+- Header-ல் உள்ள `+ (Add Character)`-ன் முழு function-யையும் Home Screen-ல் உள்ள "AI Characters" கார்டிற்கு நகர்த்த வேண்டும்.
+- `app/ai-girls.tsx` Header-ல் உள்ள `+` பட்டன் இப்போது அப்படியே இருக்க வேண்டும். பயனர் Home Screen-ல் உள்ள "AI Characters" கார்டில் சோதித்துப் பார்த்த பிறகு Header-லிருந்து நீக்கப்படும்.
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **`components/LaunchHomeScreen.tsx`:**
+   - `Feature` டைப்பில் `launchIntent?: 'group-chat' | 'image-to-script' | 'add-character'` சேர்க்கப்பட்டது.
+   - `AI Characters` கார்டிற்கு `route: '/ai-girls'` மற்றும் `launchIntent: 'add-character'` இணைக்கப்பட்டது.
+2. **`app/ai-girls.tsx`:**
+   - Home Screen-லிருந்து `launch === 'add-character'` வரும்போது, `setShowAddCharModal(true)` மூலமாக "+ புது Character" modal உடனடியாகத் திறக்கப்பட்டு புதிய character-ஐ எளிதாக உருவாக்க வகை செய்யப்பட்டது.
+   - Header-ல் உள்ள `+` பட்டன் பயனரின் அறிவுறுத்தலின்படி தொடர்ந்து இயங்கும் நிலையில் தக்கவைக்கப்பட்டது.
+3. **GitHub Build:**
+   - அனைத்து மாற்றங்களும் GitHub-ல் push செய்யப்பட்டு Actions workflow (`build-apk.yml`) ட்ரிக்கர் செய்யப்பட்டது.
