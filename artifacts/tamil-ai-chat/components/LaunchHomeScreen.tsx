@@ -77,14 +77,14 @@ export default function LaunchHomeScreen() {
   const gridRowGap = compact ? 6 : 8;
   const availableCardsAndHero = Math.max(
     380,
-    pageHeight - topInset - bottomInset - headerHeight - verticalGap * 2 - gridRowGap,
+    pageHeight - headerHeight - verticalGap * 2 - 12,
   );
   const tileWidth = Math.max(0, Math.floor((pageWidth - 32 - 16) / 3));
-  // Responsive card height: expands to fill screen space evenly without empty bottom gap
-  const heroHeight = Math.max(190, Math.min(Math.round(availableCardsAndHero * 0.45), 330));
-  const remainingForCards = Math.max(180, availableCardsAndHero - heroHeight - gridRowGap);
-  const cardHeight = Math.max(Math.round(tileWidth * 0.95), Math.floor((remainingForCards - gridRowGap) / 2));
-  const smallText = cardHeight < 126;
+  // Oblong card ratio: cards are portrait rectangles (~1.3x to 1.5x width) filling screen height to prevent bottom mt space
+  const heroHeight = Math.max(175, Math.min(Math.round(availableCardsAndHero * 0.38), 240));
+  const remainingForCards = Math.max(220, availableCardsAndHero - heroHeight - verticalGap);
+  const cardHeight = Math.max(Math.round(tileWidth * 1.32), Math.floor((remainingForCards - gridRowGap) / 2));
+  const smallText = cardHeight < 135;
   const headerIconSize = Math.max(40, Math.min(54, headerHeight - 6));
 
   const checkRenderServer = async () => {
@@ -470,11 +470,11 @@ const styles = StyleSheet.create({
   safeInner: { flex: 1 },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   featureCard: {
-    borderRadius: 22,
+    borderRadius: 28,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'rgba(255,255,255,0.00)',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderWidth: 2,
+    borderColor: 'rgba(180, 220, 255, 0.00)',
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.18,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 22,
+    borderRadius: 28,
   },
   cardGradientOverlay: {
     position: 'absolute',
@@ -492,13 +492,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 8,
-    paddingBottom: 6,
-    paddingTop: 16,
+    paddingBottom: 8,
+    paddingTop: 18,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   cardTextCol: {
     flex: 1,
