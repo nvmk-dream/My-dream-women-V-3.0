@@ -127,3 +127,18 @@
    - Pure Transparent Glass வடிவமைப்பு, White translucent border (`rgba(255, 255, 255, 0.75)`), Dark Navy எழுத்துக்கள் (`#1E1B4B`) மற்றும் Mint Green Active Badge கச்சிதமாகப் பொருத்தப்பட்டது.
 3. **GitHub Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு, GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK பில்ட் ட்ரிக்கர் செய்யப்பட்டது.
+
+---
+
+## 🏷️ Bugfix: `ai-girls.tsx` JSX SyntaxError Fix (GitHub Build Failure)
+
+### 1. பிரச்சனை:
+- GitHub Actions `Build APK` workflow-ல் `Bundle JS with expo export:embed` படியில் SyntaxError:
+  `SyntaxError: Expected corresponding JSX closing tag for <View>. (1014:6)`.
+
+### 2. மூலக் காரணம் (Root Cause):
+- `ai-girls.tsx`-ல் `renderChatItem`-ன் `chatRight` கண்டெய்னருக்கான `<View style={s.chatRight}>` திறக்கப்பட்டிருந்தது, ஆனால் வரி 1013-க்கு அடுத்து அதை மூடும் `</View>` டேக் விடுபட்டிருந்தது.
+
+### 3. சரிசெய்த முறை:
+- `ai-girls.tsx`-ல் வரி 1014-ல் `</View>` closing tag சேர்க்கப்பட்டு `</TouchableOpacity>`-க்கு முன் மூடப்பட்டது.
+- Rule 2-ன்படி GitHub-ல் commit & push செய்யப்பட்டு புதிய APK Build ட்ரிக்கர் செய்யப்பட்டது.

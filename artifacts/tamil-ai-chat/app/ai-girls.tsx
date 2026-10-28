@@ -1011,6 +1011,7 @@ Then write these prompts:
               <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
             </View>
           )}
+        </View>
       </TouchableOpacity>
     );
   };
