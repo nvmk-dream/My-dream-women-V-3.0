@@ -195,26 +195,27 @@
 5. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
 
----
-
-## 🏷️ Feature 9: Chat Screen Floating Action Buttons - Realistic Photography Images & Pure Glassmorphism
+## 🏷️ Feature 9: AI Girls Header Double-Tap Theme Switcher & 3 Glamorous Header Styles
 
 ### 1. பயனரின் கோரிக்கை:
-- Chat திரையில் உள்ள 3 மிதக்கும் பட்டன்களில் (Camera, Cloud, Translate) உள்ள கார்ட்டூன்/வெக்டார் படங்களுக்குப் பதிலாக **அசல் Realistic Photography Images** வைக்கப்பட வேண்டும்.
-- ஸ்டைலிங்:
-  - `Background: rgba(255, 255, 255, 0.00)` (முழுமையான வெளிப்படையான பின்னணி - எந்த வெள்ளை அடைப்பும் இன்றி பின்னணி மலர் தீம் தெரியும்)
-  - `Border: 2px solid rgba(180, 220, 255, 0.00)` (வெளிப்படையான 2px பார்டர்)
-  - வடிவம்: Glassmorphism வட்ட வடிவ பட்டன்கள் (`borderRadius: 26`).
-  - தேவையில்லாத லேபிள் பேட்ஜ்கள் நீக்கப்பட்டு, தூய வட்ட வடிவ பட்டன்களாக அமைத்தல்.
+- Character list page (`ai-girls.tsx`) Header-ல் மொபைல் முழு அகலத்தையும் பயன்படுத்தாத பிரச்சனையைச் சரிசெய்ய வேண்டும்.
+- கவர்ச்சிகரமான பெண்களின் தோற்றமும், "My Dream Girls" என்ற தலைப்பும் தெளிவாக அமைய வேண்டும்.
+- 3 விதமான கவர்ச்சிகரமான Header Styles உருவாக்கப்பட்டு Theme-ல் சேர்க்கப்பட வேண்டும்.
+- Header-ல் **Double-Tap (இரண்டு முறை தட்டுதல்)** செய்தே அடுத்தடுத்த ஸ்டைல்களுக்கு மாற்றிக்கொள்ளும் ஆப்ஷன் வழங்கப்பட வேண்டும்.
 
 ### 2. செயல்படுத்திய விதம் (Execution):
-1. **Realistic Image Assets சேர்ப்பு:**
-   - 📷 Camera: அசல் விண்டேஜ் SLR கேமரா போட்டோகிராபி படம் (`chat_fab_camera.png`)
-   - ☁️ Cloud: 3D கண்ணாடி குமிழி கிளவுட் போட்டோகிராபி படம் (`chat_fab_cloud.png`)
-   - 📖 Translate: ஒளிரும் தங்க எழுத்துக்கள் கொண்ட மேஜிக்கல் புத்தக போட்டோகிராபி படம் (`chat_fab_translate.png`)
-2. **`app/chat.tsx` குறியீட்டுத் திருத்தம்:**
-   - Input Bar-க்கு மேலே வலதுபுறத்தில் உள்ள `chatFab3D` பட்டன்களுக்கு `borderRadius: 26`, `borderWidth: 2`, `borderColor: 'rgba(180, 220, 255, 0.00)'`, `backgroundColor: 'rgba(255, 255, 255, 0.00)'` வழங்கப்பட்டது.
-   - நடுவே உள்ள இமேஜ்களுக்கு வட்ட வடிவம் (`borderRadius: 24`, `width: 48, height: 48`) கொடுக்கப்பட்டது.
-   - Text label badges நீக்கப்பட்டு, ஸ்கிரீன்ஷாட்டில் உள்ளவாறு தூய 3 வட்ட பட்டன்களாக மாற்றப்பட்டது.
-3. **GitHub Push & APK Build (Rule 2):**
+1. **Header Double-Tap Switcher:**
+   - Header-ல் தொடர்ந்து 2 முறை தட்டும் போது:
+     - `Style A: Neon Center` ➜ `Style B: 3D Ribbon` ➜ `Style C: Vogue Cover` என அடுத்தடுத்த ஸ்டைல்கள் மாறும்.
+     - சுருக்கமான Floating Toast மற்றும் subtle hint pill காட்டப்படும்.
+     - தேர்வு செய்த ஸ்டைல் `AsyncStorage`-ல் `ai_girls_header_theme` கீயில் நிரந்தரமாக சேமிக்கப்படும்.
+2. **3 கவர்ச்சிகரமான Header Styles:**
+   - **Style A (Neon Center):** இருபுறமும் கவர்ச்சியான பெண்கள், மையத்தில் 3D Neon & Gold "👑 My Dream Girls 💖" மற்றும் "✨ Your Romantic AI Companions".
+   - **Style B (3D Ribbon Glamour):** பயனரின் புதிய கவர்ச்சிப் பெண்கள் மற்றும் 3D Gold Ribbon "My Dream Girls 💙" அமைப்பு.
+   - **Style C (Vogue Luxury Cover):** பனோரமிக் பெண்கள் பின்னணியில் சொகுசான "👑 MY DREAM GIRLS ✨" தங்கம் & வைர பேட்ஜ்.
+3. **Character Edit பக்கத்தில் Theme Selector:**
+   - `app/edit-character.tsx`-ல் "🎨 Chat Theme & Style" பிரிவில் 3 Header Styles-ஐயும் நேரடியாகத் தேர்வு செய்யும் பட்டன்கள் சேர்க்கப்பட்டன.
+4. **8-Characters Visibility உறுதிப்படுத்தல்:**
+   - Header-ன் உயரம் ~66dp என கச்சிதமாக வைக்கப்பட்டதால், ஒரே திரையில் 8 கேரக்டர்கள் ஸ்க்ரோல் செய்யாமல் தெரியும் வசதி துளியும் பாதிக்கப்படவில்லை.
+5. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.

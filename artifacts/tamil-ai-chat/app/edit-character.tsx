@@ -243,23 +243,26 @@ export default function EditCharacterScreen() {
   const [bubbleStyle, setBubbleStyle] = useState('classic');
   const [birthday, setBirthday] = useState('');
   const [avatarAsBg, setAvatarAsBg] = useState(false);
+  const [headerTheme, setHeaderTheme] = useState('neon');
 
   useEffect(() => {
     const load = async () => {
       if (!base) return;
       try {
-        const [saved, moodRaw, savedWallpaper, savedBubble, savedBday, savedAvatarBg] = await AsyncStorage.multiGet([
+        const [saved, moodRaw, savedWallpaper, savedBubble, savedBday, savedAvatarBg, savedHTheme] = await AsyncStorage.multiGet([
           `persona_edit_${base.id}`,
           `mood_mode_${base.id}`,
           `chat_wallpaper_${base.id}`,
           `bubble_style_${base.id}`,
           `birthday_${base.id}`,
           `avatar_as_bg_${base.id}`,
+          'ai_girls_header_theme',
         ]);
         if (savedWallpaper[1]) setChatWallpaper(savedWallpaper[1]);
         if (savedBubble[1]) setBubbleStyle(savedBubble[1]);
         if (savedBday[1]) setBirthday(savedBday[1]);
         if (savedAvatarBg[1]) setAvatarAsBg(savedAvatarBg[1] === 'true');
+        if (savedHTheme[1]) setHeaderTheme(savedHTheme[1]);
         let data: Record<string, any> = saved[1] ? JSON.parse(saved[1]) : {};
         // Restore from cloud if local data missing (reinstall recovery)
         if (!saved[1]) {
@@ -451,6 +454,7 @@ export default function EditCharacterScreen() {
         [`bubble_style_${persona.id}`, bubbleStyle],
         [`birthday_${persona.id}`, birthday],
         [`avatar_as_bg_${persona.id}`, String(avatarAsBg)],
+        ['ai_girls_header_theme', headerTheme],
       ]);
       setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
@@ -868,6 +872,25 @@ export default function EditCharacterScreen() {
               trackColor={{ false: '#E2E8F0', true: '#C084FC' }}
               thumbColor={avatarAsBg ? '#7C3AED' : '#f4f3f4'}
             />
+          </View>
+
+          {/* AI Girls Header Style */}
+          <Text style={[styles.themeSectionLabel, { marginTop: 14 }]}>👑 AI Girls Header Style</Text>
+          <Text style={styles.switchHint}>Character List Header-ல் Double-Tap செய்தும் மாற்றலாம்</Text>
+          <View style={styles.bubbleStyleRow}>
+            {[
+              { id: 'neon', label: '✨ Neon Center' },
+              { id: 'glamour', label: '💎 3D Ribbon' },
+              { id: 'vogue', label: '👑 Vogue Cover' },
+            ].map(t => (
+              <TouchableOpacity
+                key={t.id}
+                style={[styles.bubbleStyleChip, headerTheme === t.id && styles.bubbleStyleChipActive]}
+                onPress={() => setHeaderTheme(t.id)}
+              >
+                <Text style={[styles.bubbleStyleTxt, headerTheme === t.id && styles.bubbleStyleTxtActive]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </SectionCard>
 

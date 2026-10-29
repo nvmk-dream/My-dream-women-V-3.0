@@ -16,9 +16,9 @@ import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions
 import { LinearGradient } from 'expo-linear-gradient';
 import { projectTwoTheme as theme } from '../constants/project-two-theme';
 
-const FAB_CAMERA_IMG = require('../assets/images/chat_fab_camera.png');
-const FAB_CLOUD_IMG = require('../assets/images/chat_fab_cloud.png');
-const FAB_TRANSLATE_IMG = require('../assets/images/chat_fab_translate.png');
+const FAB_CAMERA_IMG = require('../assets/images/chat_fab_camera.jpg');
+const FAB_CLOUD_IMG = require('../assets/images/chat_fab_cloud.jpg');
+const FAB_TRANSLATE_IMG = require('../assets/images/chat_fab_translate.jpg');
 
 function cloudVideoThumbnail(videoUrl: string): string {
   try {
@@ -2308,49 +2308,58 @@ export default function ChatScreen() {
           </TouchableOpacity>
         )}
         <View style={{ position: 'relative' }}>
-          {/* Floating action buttons — Realistic Photography Glassmorphism */}
+          {/* Floating action buttons — 3D crystal glass style with labels */}
           <View style={styles.chatFabs}>
-            <TouchableOpacity
-              style={styles.chatFab3D}
-              onPress={() => setShowGenModal(true)}
-              disabled={generatingPhoto}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Generate Photo"
-            >
-              <Image source={FAB_CAMERA_IMG} style={styles.chatFabImg} resizeMode="cover" />
-              {generatingPhoto && (
-                <View style={styles.fabLoadingOverlay}>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={styles.chatFab3D}
+                onPress={() => setShowGenModal(true)}
+                disabled={generatingPhoto}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Generate Photo"
+              >
+                <Image source={FAB_CAMERA_IMG} style={styles.chatFabImg} resizeMode="cover" />
+                {generatingPhoto && (
+                  <View style={styles.fabLoadingOverlay}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Camera</Text></View>
+            </View>
 
-            <TouchableOpacity
-              style={styles.chatFab3D}
-              onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Cloud Photos"
-            >
-              <Image source={FAB_CLOUD_IMG} style={styles.chatFabImg} resizeMode="cover" />
-            </TouchableOpacity>
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={styles.chatFab3D}
+                onPress={() => persona && router.push(('/ai-girls-cloud?charId=' + persona.id) as any)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Cloud Photos"
+              >
+                <Image source={FAB_CLOUD_IMG} style={styles.chatFabImg} resizeMode="cover" />
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Cloud</Text></View>
+            </View>
 
-            <TouchableOpacity
-              style={styles.chatFab3D}
-              onPress={() => handleTranslate(input)}
-              disabled={translateLoading}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Translate"
-            >
-              <Image source={FAB_TRANSLATE_IMG} style={styles.chatFabImg} resizeMode="cover" />
-              {translateLoading && (
-                <View style={styles.fabLoadingOverlay}>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.fabWithLabel}>
+              <TouchableOpacity
+                style={styles.chatFab3D}
+                onPress={() => handleTranslate(input)}
+                disabled={translateLoading}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Translate"
+              >
+                <Image source={FAB_TRANSLATE_IMG} style={styles.chatFabImg} resizeMode="cover" />
+                {translateLoading && (
+                  <View style={styles.fabLoadingOverlay}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <View style={styles.fabPillBadge}><Text style={styles.fabPillText}>Translate</Text></View>
+            </View>
           </View>
 
           {/* Elegant White-Lavender Pill input bar (No smiley on left, attach on right) */}
@@ -3103,23 +3112,24 @@ const styles = StyleSheet.create({
   headerActionItem: { alignItems: 'center', justifyContent: 'center', minWidth: 38 },
   headerActionIcon: { fontSize: 18 },
   headerActionLabel: { fontSize: 9.5, fontWeight: '600', color: '#4338CA', marginTop: 1 },
+  fabWithLabel: { alignItems: 'center', gap: 3 },
   chatFab3D: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(180, 220, 255, 0.00)',
-    backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    elevation: 4,
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FFFFFF',
+    elevation: 5,
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.25,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  chatFabImg: { width: 48, height: 48, borderRadius: 24 },
+  chatFabImg: { width: '100%', height: '100%' },
   fabLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',

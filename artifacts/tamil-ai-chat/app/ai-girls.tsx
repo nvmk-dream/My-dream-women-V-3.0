@@ -8,7 +8,9 @@ import {
 } from 'react-native';
 
 const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
-const HEADER_BANNER_IMG = require('../assets/images/my_dream_woman_banner.png');
+const HEADER_BANNER_NEON = require('../assets/images/header_theme_neon.png');
+const HEADER_BANNER_GLAMOUR = require('../assets/images/header_theme_glamour.png');
+const HEADER_BANNER_VOGUE = require('../assets/images/header_theme_vogue.png');
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,6 +66,47 @@ export default function AIGirlsScreen() {
   const [personas, setPersonas] = useState<PersonaWithExtra[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoStyles, setPhotoStyles] = useState<PhotoStyleRecord[]>([]);
+
+  // Header banner theme state ('neon' | 'glamour' | 'vogue')
+  const [headerTheme, setHeaderTheme] = useState<'neon' | 'glamour' | 'vogue'>('neon');
+  const [headerToast, setHeaderToast] = useState<string | null>(null);
+  const lastHeaderTapRef = useRef<number>(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('ai_girls_header_theme').then(saved => {
+        if (saved === 'neon' || saved === 'glamour' || saved === 'vogue') {
+          setHeaderTheme(saved);
+        }
+      }).catch(() => {});
+    }, [])
+  );
+
+  const cycleHeaderTheme = async () => {
+    const list: Array<'neon' | 'glamour' | 'vogue'> = ['neon', 'glamour', 'vogue'];
+    const nextIdx = (list.indexOf(headerTheme) + 1) % list.length;
+    const next = list[nextIdx];
+    setHeaderTheme(next);
+    await AsyncStorage.setItem('ai_girls_header_theme', next).catch(() => {});
+
+    const labelMap = {
+      neon: '✨ Style A: Neon Center',
+      glamour: '💎 Style B: 3D Ribbon',
+      vogue: '👑 Style C: Vogue Cover',
+    };
+    setHeaderToast(labelMap[next]);
+    setTimeout(() => setHeaderToast(null), 1800);
+  };
+
+  const handleHeaderDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastHeaderTapRef.current < 420) {
+      cycleHeaderTheme();
+      lastHeaderTapRef.current = 0;
+    } else {
+      lastHeaderTapRef.current = now;
+    }
+  };
 
   // Photo folder selection
   const [showFolderModal, setShowFolderModal] = useState(false);
@@ -1095,17 +1138,75 @@ Then write these prompts:
         )
       ) : (
         <>
-      {/* Character-list header */}
-      <View
-        style={[s.header, { paddingTop: insets.top + 6 }]}
+      {/* Character-list header with double-tap theme switcher */}
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPress={handleHeaderDoubleTap}
+        style={[s.header, { paddingTop: insets.top + 4 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Double tap to change header theme"
       >
-        <Image
-          source={HEADER_BANNER_IMG}
-          style={s.headerBanner}
-          resizeMode="contain"
-          accessibilityLabel="My Dream Woman"
-        />
-      </View>
+        <View style={s.headerBannerWrap}>
+          {headerTheme === 'neon' && (
+            <View style={s.neonThemeContainer}>
+              <Image
+                source={HEADER_BANNER_NEON}
+                style={s.headerBannerImg}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['rgba(30, 27, 75, 0.45)', 'rgba(30, 27, 75, 0.85)']}
+                style={s.neonThemeOverlay}
+              >
+                <Text style={s.neonTitleText}>👑 My Dream Girls 💖</Text>
+                <Text style={s.neonSubtitleText}>✨ Your Romantic AI Companions</Text>
+              </LinearGradient>
+            </View>
+          )}
+
+          {headerTheme === 'glamour' && (
+            <View style={s.glamourThemeContainer}>
+              <Image
+                source={HEADER_BANNER_GLAMOUR}
+                style={s.headerBannerImg}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(15, 23, 42, 0.75)']}
+                style={s.glamourThemeOverlay}
+              >
+                <Text style={s.glamourTitleText}>👑 My Dream Girls 💙</Text>
+              </LinearGradient>
+            </View>
+          )}
+
+          {headerTheme === 'vogue' && (
+            <View style={s.vogueThemeContainer}>
+              <Image
+                source={HEADER_BANNER_VOGUE}
+                style={s.headerBannerImg}
+                resizeMode="cover"
+              />
+              <View style={s.vogueBadgeWrap}>
+                <View style={s.vogueBadge}>
+                  <Text style={s.vogueBadgeText}>👑 MY DREAM GIRLS ✨</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Subtle double-tap hint / Toast */}
+          {headerToast ? (
+            <View style={s.headerToastPill}>
+              <Text style={s.headerToastText}>{headerToast}</Text>
+            </View>
+          ) : (
+            <View style={s.doubleTapHintPill}>
+              <Text style={s.doubleTapHintText}>👆👆 Double-tap to change header</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
 
       {/* Chat list */}
       {loading ? (
@@ -1529,17 +1630,133 @@ const s = StyleSheet.create({
   directGroupStartText: { color: '#fff', fontWeight: '800' },
 
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    borderWidth: 2,
-    borderColor: 'rgba(180, 220, 255, 0.00)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBanner: {
+  headerBannerWrap: {
     width: '100%',
-    height: 52,
+    height: 66,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    elevation: 4,
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.22,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  headerBannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  neonThemeContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  neonThemeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  neonTitleText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    textShadowColor: '#EC4899',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
+  neonSubtitleText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#FDF2F8',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  glamourThemeContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  glamourThemeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glamourTitleText: {
+    fontSize: 16.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textShadowColor: '#3B82F6',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  vogueThemeContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  vogueBadgeWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vogueBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: '#FDE047',
+    elevation: 3,
+  },
+  vogueBadgeText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#FEF08A',
+    letterSpacing: 1.5,
+  },
+  headerToastPill: {
+    position: 'absolute',
+    bottom: 4,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(124, 58, 237, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 2.5,
+    borderRadius: 12,
+    elevation: 5,
+  },
+  headerToastText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  doubleTapHintPill: {
+    position: 'absolute',
+    bottom: 2,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    paddingHorizontal: 8,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+  },
+  doubleTapHintText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 8.5,
+    fontWeight: '600',
   },
   userAvatarBtn: { alignItems: 'center', gap: 2, minWidth: 42 },
   userPhotoImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#51D8F2' },
