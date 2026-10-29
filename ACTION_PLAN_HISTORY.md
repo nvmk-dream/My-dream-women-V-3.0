@@ -194,3 +194,27 @@
    - `headerLeft` Back Arrow (`router.back()`) எந்த மாற்றமுமின்றி துல்லியமாகப் பாதுகாக்கப்பட்டது.
 5. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
+
+---
+
+## 🏷️ Feature 9: Chat Screen Floating Action Buttons - Realistic Photography Images & Pure Glassmorphism
+
+### 1. பயனரின் கோரிக்கை:
+- Chat திரையில் உள்ள 3 மிதக்கும் பட்டன்களில் (Camera, Cloud, Translate) உள்ள கார்ட்டூன்/வெக்டார் படங்களுக்குப் பதிலாக **அசல் Realistic Photography Images** வைக்கப்பட வேண்டும்.
+- ஸ்டைலிங்:
+  - `Background: rgba(255, 255, 255, 0.00)` (முழுமையான வெளிப்படையான பின்னணி - எந்த வெள்ளை அடைப்பும் இன்றி பின்னணி மலர் தீம் தெரியும்)
+  - `Border: 2px solid rgba(180, 220, 255, 0.00)` (வெளிப்படையான 2px பார்டர்)
+  - வடிவம்: Glassmorphism வட்ட வடிவ பட்டன்கள் (`borderRadius: 26`).
+  - தேவையில்லாத லேபிள் பேட்ஜ்கள் நீக்கப்பட்டு, தூய வட்ட வடிவ பட்டன்களாக அமைத்தல்.
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **Realistic Image Assets சேர்ப்பு:**
+   - 📷 Camera: அசல் விண்டேஜ் SLR கேமரா போட்டோகிராபி படம் (`chat_fab_camera.png`)
+   - ☁️ Cloud: 3D கண்ணாடி குமிழி கிளவுட் போட்டோகிராபி படம் (`chat_fab_cloud.png`)
+   - 📖 Translate: ஒளிரும் தங்க எழுத்துக்கள் கொண்ட மேஜிக்கல் புத்தக போட்டோகிராபி படம் (`chat_fab_translate.png`)
+2. **`app/chat.tsx` குறியீட்டுத் திருத்தம்:**
+   - Input Bar-க்கு மேலே வலதுபுறத்தில் உள்ள `chatFab3D` பட்டன்களுக்கு `borderRadius: 26`, `borderWidth: 2`, `borderColor: 'rgba(180, 220, 255, 0.00)'`, `backgroundColor: 'rgba(255, 255, 255, 0.00)'` வழங்கப்பட்டது.
+   - நடுவே உள்ள இமேஜ்களுக்கு வட்ட வடிவம் (`borderRadius: 24`, `width: 48, height: 48`) கொடுக்கப்பட்டது.
+   - Text label badges நீக்கப்பட்டு, ஸ்கிரீன்ஷாட்டில் உள்ளவாறு தூய 3 வட்ட பட்டன்களாக மாற்றப்பட்டது.
+3. **GitHub Push & APK Build (Rule 2):**
+   - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
