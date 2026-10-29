@@ -148,3 +148,22 @@
    - Header-ன் உயரம் compact-ஆக (height: 52px, paddingTop: insets.top + 6) வைக்கப்பட்டதால், ஒரே திரையில் 8 கேரக்டர்கள் ஸ்க்ரோல் செய்யாமல் தெரியும் வசதி துளியும் பாதிக்கப்படவில்லை.
 4. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
+
+## 🏷️ Feature 7: Build Error Fix (ai-girls.tsx) & 3D Crystal Floating Buttons (Camera, Cloud, Translate in chat.tsx)
+
+### 1. பயனரின் கோரிக்கை & பிழை விவரம்:
+- **Build Error:** `girls.tsx: Expected corresponding JSX closing tag for <View>. (1015:6)`
+- **Feature Request:** Chat Text Area-ல் விடுபட்ட Camera, Cloud, Translate பொத்தான்களை பழைய அதே இடத்தில் மிதக்கும்படி (Floating Action Buttons) வைக்க வேண்டும்; அதற்காக பயனர் அனுப்பிய 3D Crystal Glass படங்களைப் பயன்படுத்த வேண்டும்.
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **Build Error சரிசெய்தல் (ai-girls.tsx):**
+   - `<View style={s.chatRight}>` ஓபன் செய்யப்பட்ட இடத்தில் விடுபட்ட `</View>` மூடும் டேக் சரியாகப் பொருத்தப்பட்டு JSX syntax பிழையின்றிச் சரிசெய்யப்பட்டது.
+2. **3D Crystal Images சேர்ப்பு:**
+   - 📷 Crystal Camera ➜ `chat_fab_camera.jpg`
+   - ☁️ Crystal Cloud ➜ `chat_fab_cloud.jpg`
+   - 📖 Crystal Translate Book ➜ `chat_fab_translate.jpg`
+3. **Chat திரையில் Floating பட்டன்கள் பொருத்தம் (chat.tsx):**
+   - Input Bar-க்கு மேலே வலதுபுறத்தில் பழைய அதே இடத்தில் 3D Crystal Glass பட்டன்களாக இணைக்கப்பட்டது (`borderRadius: 14`, `overflow: 'hidden'`, shadow & elevation).
+   - Photo Generate அல்லது Translate ஆகும் போது அதன் மேல் சுழலும் Loading Indicator பொருத்தப்பட்டது.
+4. **GitHub Push & APK Build (Rule 2):**
+   - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
