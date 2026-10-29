@@ -2139,67 +2139,92 @@ export default function ChatScreen() {
     </TouchableOpacity>
   );
 
-  const headerTitle = () => (
-    <View style={styles.headerTitleWrap}>
-      <TouchableOpacity
-        style={styles.headerAvatarWrap}
-        onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}
-      >
-        <LinearGradient
-          colors={['#C084FC', '#818CF8', '#E879F9']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerAvatarRing}
+  const headerTitle = () => {
+    const rawName = persona?.name ?? '...';
+    const rel = (persona as any)?.editedRelationship || persona?.relationship || '';
+    let pureName = rawName;
+    if (rel && pureName.startsWith(rel)) {
+      pureName = pureName.slice(rel.length).replace(/^[\s·:_-]+/, '');
+    }
+    if (!pureName) pureName = rawName;
+
+    return (
+      <View style={styles.headerTitleWrap}>
+        <TouchableOpacity
+          style={styles.headerAvatarWrap}
+          onPress={() => { if (activeAvatarUri) { setFullViewImg(activeAvatarUri); } else { pickAvatarPhoto(); } }}
         >
-          {activeAvatarUri
-            ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
-            : persona
-              ? <View style={[styles.headerAvatar, { backgroundColor: persona.avatarColor }]}>
-                  <Text style={styles.headerAvatarText}>{persona.avatarLetter || persona.emoji}</Text>
-                </View>
-              : null
-          }
-        </LinearGradient>
-        <View style={styles.headerOnlineDot} />
-      </TouchableOpacity>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={styles.headerName}>{(persona?.name ?? '...') + ' 👑'}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={styles.onlineBadge}>
-            <View style={styles.onlineInnerDot} />
-            <Text style={styles.onlineText}>Online</Text>
+          <LinearGradient
+            colors={['#C084FC', '#818CF8', '#E879F9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerAvatarRing}
+          >
+            {activeAvatarUri
+              ? <Image source={{ uri: activeAvatarUri }} style={styles.headerAvatarImg} />
+              : persona
+                ? <View style={[styles.headerAvatar, { backgroundColor: persona.avatarColor }]}>
+                    <Text style={styles.headerAvatarText}>{persona.avatarLetter || persona.emoji}</Text>
+                  </View>
+                : null
+            }
+          </LinearGradient>
+        </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <Text numberOfLines={1} style={styles.headerName}>{pureName + ' 👑'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
+            {!!rel && (
+              <Text numberOfLines={1} style={styles.headerRoleSub}>
+                {rel}
+              </Text>
+            )}
+            <TouchableOpacity onPress={toggleMood} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Text style={styles.headerMoodPill}>
+                {moodMode === 'normal' ? '😇' : moodMode === 'whatsapp' ? '💬' : moodMode === 'story' ? '📖' : '😈'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={toggleMood} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Text style={styles.headerMoodPill}>
-              {moodMode === 'normal' ? '😇' : moodMode === 'whatsapp' ? '💬' : moodMode === 'story' ? '📖' : '😈'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const headerRight = () => (
     <View style={styles.headerBtns}>
-      <TouchableOpacity style={styles.headerActionItem} onPress={() => setShowStyleSheet(true)}>
-        <Text style={styles.headerActionIcon}>🎨</Text>
-        <Text style={styles.headerActionLabel}>Theme</Text>
-      </TouchableOpacity>
       {persona && (
-        <TouchableOpacity style={styles.headerActionItem} onPress={() => {
-          ParamsStore.setEditPersonaId(persona.id);
-          router.push('/edit-character');
-        }}>
-          <Text style={styles.headerActionIcon}>✏️</Text>
-          <Text style={styles.headerActionLabel}>Edit</Text>
+        <TouchableOpacity
+          style={styles.realisticHeaderBtn}
+          onPress={() => {
+            ParamsStore.setEditPersonaId(persona.id);
+            router.push('/edit-character');
+          }}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Edit Character"
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#F5EEFD']}
+            style={styles.realisticBtnInner}
+          >
+            <Ionicons name="create-outline" size={17} color="#7C3AED" />
+          </LinearGradient>
+          <Text style={styles.realisticBtnLabel}>Edit</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={styles.headerActionItem} onPress={clearChat}>
-        <Text style={styles.headerActionIcon}>🗑️</Text>
-        <Text style={styles.headerActionLabel}>Delete</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.headerActionItem} onPress={() => setShowStyleSheet(true)}>
-        <Ionicons name="ellipsis-vertical" size={18} color="#4338CA" />
+      <TouchableOpacity
+        style={styles.realisticHeaderBtn}
+        onPress={clearChat}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Clear Chat"
+      >
+        <LinearGradient
+          colors={['#FFFFFF', '#FFF1F2']}
+          style={[styles.realisticBtnInner, { borderColor: 'rgba(254, 205, 211, 0.9)' }]}
+        >
+          <Ionicons name="trash-outline" size={16} color="#E11D48" />
+        </LinearGradient>
+        <Text style={[styles.realisticBtnLabel, { color: '#E11D48' }]}>Delete</Text>
       </TouchableOpacity>
     </View>
   );
@@ -3118,12 +3143,29 @@ const styles = StyleSheet.create({
   headerAvatarImg: { width: 52, height: 52, borderRadius: 26, borderWidth: 2.5, borderColor: '#D946EF' },
   headerAvatar: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#D946EF' },
   headerAvatarText: { color: theme.background, fontSize: 20, fontWeight: 'bold' },
-  headerName: { color: theme.background, fontSize: 18, fontWeight: 'bold', letterSpacing: 0.3 },
+  headerName: { color: theme.background, fontSize: 16.5, fontWeight: '800', letterSpacing: 0.2 },
+  headerRoleSub: { color: '#6366F1', fontSize: 11.5, fontWeight: '700' },
   headerOnline: { color: '#39300F', fontSize: 11 },
   headerDialectBadge: { color: theme.background, fontSize: 13, fontWeight: '700', marginTop: 2 },
   headerMoodBadge: { color: theme.background, fontSize: 13, fontWeight: '700', marginTop: 2 },
   headerMoodNormal: { color: '#39300F' },
-  headerBtns: { flexDirection: 'row', alignItems: 'center', marginRight: 8, gap: 10 },
+  headerBtns: { flexDirection: 'row', alignItems: 'center', marginRight: 4, gap: 10 },
+  realisticHeaderBtn: { alignItems: 'center', justifyContent: 'center', minWidth: 42 },
+  realisticBtnInner: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.2,
+    borderColor: 'rgba(216, 180, 254, 0.7)',
+    elevation: 2,
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  realisticBtnLabel: { fontSize: 9.5, fontWeight: '700', color: '#7C3AED', marginTop: 2 },
   headerBtn: { padding: 6 },
   headerBtnIcon: { fontSize: 22 },
   msgList: { padding: 10, paddingBottom: 4 },

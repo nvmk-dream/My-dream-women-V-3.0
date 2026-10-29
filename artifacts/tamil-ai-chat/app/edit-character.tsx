@@ -40,6 +40,7 @@ const stripHtml = (html: string): string =>
 
 const SECTION_BADGES: Record<string, { gradient: [string, string]; iconName: keyof typeof Ionicons.glyphMap; defaultEmoji: string }> = {
   basicDetails: { gradient: ['#C084FC', '#7E22CE'], iconName: 'person', defaultEmoji: '👤' },
+  chatThemeStyle: { gradient: ['#EC4899', '#BE185D'], iconName: 'color-palette', defaultEmoji: '🎨' },
   todayStory: { gradient: ['#A78BFA', '#6D28D9'], iconName: 'book', defaultEmoji: '📖' },
   userStyle: { gradient: ['#60A5FA', '#1D4ED8'], iconName: 'person-circle', defaultEmoji: '👤' },
   avatarReflection: { gradient: ['#818CF8', '#4338CA'], iconName: 'image', defaultEmoji: '🖼️' },
@@ -51,6 +52,22 @@ const SECTION_BADGES: Record<string, { gradient: [string, string]; iconName: key
   kallaatamEngine: { gradient: ['#FBBF24', '#D97706'], iconName: 'game-controller', defaultEmoji: '🎲' },
   modeAvatarsImageGen: { gradient: ['#FB7185', '#E11D48'], iconName: 'sparkles', defaultEmoji: '✨' },
 };
+
+const WALLPAPERS = [
+  { id: 'default', label: '✦ Black + Gold', bg: '#0A0812', dark: true },
+  { id: 'dark',    label: '🌙 Dark',     bg: '#1C1C1E', dark: true  },
+  { id: 'pink',    label: '🌸 Pink',     bg: '#F48FB1', dark: false },
+  { id: 'blue',    label: '💙 Blue',     bg: '#90CAF9', dark: false },
+  { id: 'purple',  label: '💜 Purple',   bg: '#CE93D8', dark: false },
+  { id: 'green',   label: '🌿 Forest',   bg: '#A5D6A7', dark: false },
+  { id: 'saffron', label: '🏵️ Tamil',    bg: '#FFE0B2', dark: false },
+];
+
+const BUBBLE_STYLES_LIST = [
+  { id: 'classic', label: '💬 Classic' },
+  { id: 'round',   label: '🫧 Round'   },
+  { id: 'modern',  label: '✨ Modern'  },
+];
 
 // SectionCard defined outside component so re-renders do not remount it (fixes keyboard dismiss bug).
 function SectionCard({ sectionKey, icon, title, subtitle, color, children, openSections, onToggle, headerExtra }: {
@@ -198,6 +215,7 @@ export default function EditCharacterScreen() {
   // Collapsible section state — each section toggles independently, multiple can stay open at once
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     basicDetails: true,
+    chatThemeStyle: false,
     todayStory: false,
     userStyle: false,
     avatarReflection: false,
@@ -221,15 +239,27 @@ export default function EditCharacterScreen() {
   const [charFontSize, setCharFontSize] = useState(0);
   const [promptFontSize, setPromptFontSize] = useState(0);
   const [promptFontColor, setPromptFontColor] = useState('');
+  const [chatWallpaper, setChatWallpaper] = useState('default');
+  const [bubbleStyle, setBubbleStyle] = useState('classic');
+  const [birthday, setBirthday] = useState('');
+  const [avatarAsBg, setAvatarAsBg] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       if (!base) return;
       try {
-        const [saved, moodRaw] = await AsyncStorage.multiGet([
+        const [saved, moodRaw, savedWallpaper, savedBubble, savedBday, savedAvatarBg] = await AsyncStorage.multiGet([
           `persona_edit_${base.id}`,
           `mood_mode_${base.id}`,
+          `chat_wallpaper_${base.id}`,
+          `bubble_style_${base.id}`,
+          `birthday_${base.id}`,
+          `avatar_as_bg_${base.id}`,
         ]);
+        if (savedWallpaper[1]) setChatWallpaper(savedWallpaper[1]);
+        if (savedBubble[1]) setBubbleStyle(savedBubble[1]);
+        if (savedBday[1]) setBirthday(savedBday[1]);
+        if (savedAvatarBg[1]) setAvatarAsBg(savedAvatarBg[1] === 'true');
         let data: Record<string, any> = saved[1] ? JSON.parse(saved[1]) : {};
         // Restore from cloud if local data missing (reinstall recovery)
         if (!saved[1]) {
@@ -416,6 +446,12 @@ export default function EditCharacterScreen() {
         await AsyncStorage.removeItem(userPrasanaKey).catch(() => {});
         setCloudinaryMeta(userPrasanaKey, null).catch(() => {}); // clear cloud backup too
       }
+      await AsyncStorage.multiSet([
+        [`chat_wallpaper_${persona.id}`, chatWallpaper],
+        [`bubble_style_${persona.id}`, bubbleStyle],
+        [`birthday_${persona.id}`, birthday],
+        [`avatar_as_bg_${persona.id}`, String(avatarAsBg)],
+      ]);
       setCloudinaryMeta(`persona_edit_${persona.id}`, data).catch(() => {}); // cloud backup
       Alert.alert('Saved', `${name} character update ஆச்சு!`);
       router.back();
@@ -766,6 +802,71 @@ export default function EditCharacterScreen() {
               onChangeText={setRelationship}
               placeholder="e.g. மனைவி, தோழி, மாமியார், அக்கா, முன்னாள் காதலி..."
               placeholderTextColor="#94A3B8"
+            />
+          </View>
+        </SectionCard>
+
+        <SectionCard
+          sectionKey="chatThemeStyle"
+          icon="🎨"
+          title="Chat Theme & Style"
+          subtitle="வால்பேப்பர், பபிள் ஸ்டைல் & பிறந்தநாள்"
+          openSections={openSections}
+          onToggle={toggleSection}
+        >
+          {/* Wallpaper Selection */}
+          <Text style={styles.themeSectionLabel}>🖼 Chat Wallpaper</Text>
+          <View style={styles.wallpaperGrid}>
+            {WALLPAPERS.map(w => (
+              <TouchableOpacity
+                key={w.id}
+                style={[styles.wallpaperChip, { backgroundColor: w.bg }, chatWallpaper === w.id && styles.wallpaperChipActive]}
+                onPress={() => setChatWallpaper(w.id)}
+              >
+                <Text style={[styles.wallpaperChipTxt, { color: w.dark ? '#FFFFFF' : '#1E1B4B' }]}>{w.label}</Text>
+                {chatWallpaper === w.id && <Text style={styles.wallpaperCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Bubble Style */}
+          <Text style={[styles.themeSectionLabel, { marginTop: 14 }]}>💬 Bubble Style</Text>
+          <View style={styles.bubbleStyleRow}>
+            {BUBBLE_STYLES_LIST.map(b => (
+              <TouchableOpacity
+                key={b.id}
+                style={[styles.bubbleStyleChip, bubbleStyle === b.id && styles.bubbleStyleChipActive]}
+                onPress={() => setBubbleStyle(b.id)}
+              >
+                <Text style={[styles.bubbleStyleTxt, bubbleStyle === b.id && styles.bubbleStyleTxtActive]}>{b.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Birthday */}
+          <Text style={[styles.themeSectionLabel, { marginTop: 14 }]}>🎂 Birthday (MM-DD)</Text>
+          <Text style={styles.switchHint}>இந்த தேதியில் special message தானாக வரும்</Text>
+          <TextInput
+            style={styles.fieldBoxInput}
+            value={birthday}
+            onChangeText={setBirthday}
+            placeholder="05-15"
+            placeholderTextColor="#94A3B8"
+            maxLength={5}
+            keyboardType="numbers-and-punctuation"
+          />
+
+          {/* Avatar Background */}
+          <View style={[styles.switchRow, { marginTop: 14 }]}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={styles.switchLabel}>🖼️ Avatar Theme (Soft Blur)</Text>
+              <Text style={styles.switchHint}>Avatar photo-ஐ chat background-ஆ வை</Text>
+            </View>
+            <Switch
+              value={avatarAsBg}
+              onValueChange={setAvatarAsBg}
+              trackColor={{ false: '#E2E8F0', true: '#C084FC' }}
+              thumbColor={avatarAsBg ? '#7C3AED' : '#f4f3f4'}
             />
           </View>
         </SectionCard>
@@ -1532,4 +1633,18 @@ const styles = StyleSheet.create({
   modeAvatarImg: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#7C3AED' },
   modeAvatarPlaceholder: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderStyle: 'dashed', borderColor: '#C084FC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
   modeRemoveBtn: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#FDA4AF', backgroundColor: '#FFF1F2' },
+  themeSectionLabel: { fontSize: 13, fontWeight: '700', color: '#4338CA', marginBottom: 8 },
+  wallpaperGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  wallpaperChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1.5, borderColor: '#DDD', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  wallpaperChipActive: { borderColor: '#7C3AED', borderWidth: 2.5 },
+  wallpaperChipTxt: { fontSize: 12, fontWeight: '700' },
+  wallpaperCheck: { fontSize: 13, fontWeight: 'bold', color: '#7C3AED' },
+  bubbleStyleRow: { flexDirection: 'row', gap: 8 },
+  bubbleStyleChip: { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', borderWidth: 1.5, borderColor: '#CBD5E1' },
+  bubbleStyleChipActive: { backgroundColor: '#F3E8FF', borderColor: '#7C3AED' },
+  bubbleStyleTxt: { fontSize: 12.5, fontWeight: '600', color: '#475569' },
+  bubbleStyleTxtActive: { color: '#7C3AED', fontWeight: '800' },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  switchLabel: { fontSize: 13, fontWeight: '700', color: '#1E1B4B' },
+  switchHint: { fontSize: 11, color: '#64748B', marginTop: 2, marginBottom: 4 },
 });

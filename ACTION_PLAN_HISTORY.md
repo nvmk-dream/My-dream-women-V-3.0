@@ -167,3 +167,30 @@
    - Photo Generate அல்லது Translate ஆகும் போது அதன் மேல் சுழலும் Loading Indicator பொருத்தப்பட்டது.
 4. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
+
+## 🏷️ Feature 8: Chat Header Clean-up & Theme Relocation
+
+### 1. பயனரின் கோரிக்கை:
+- ⁝ (Three dots menu) நீக்கப்பட வேண்டும்.
+- Online நிலை குறிப்பு (மற்றும் பச்சை புள்ளி) Chat Header-ல் இருந்து நீக்கப்பட வேண்டும்.
+- 🎨 Theme பட்டன் Chat Header-ல் இருந்து நீக்கப்பட்டு `app/edit-character.tsx` பக்கத்தில் சேர்க்கப்பட வேண்டும்.
+- Chat Header வலதுபுறத்தில் Edit மற்றும் Delete மட்டுமே இருக்க வேண்டும்.
+- சாதாரண ✏️ ஈமோஜிக்கு பதிலாக பார்க்க அழகான Realistic Simple Edit பட்டனாக வைக்க வேண்டும்.
+- Back பட்டன் செயல்பாடு (`router.back()`) மாறக்கூடாது.
+- கேரக்டர் பெயர் முழுமையாகத் தெரிய 2 வரிகளில் அமைக்கப்பட வேண்டும்: முதல் வரி பெயர் பெரிய எழுத்துக்களில் (உதா: "ராம்யா 👑"), கீழ் வரி உறவுமுறை சிறிய எழுத்துக்களில் (உதா: "மனைவி").
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **Chat Header பெயர் & உறவுமுறை (2-line layout):**
+   - முதல் வரி: கேரக்டர் பெயர் (`pureName + ' 👑'`, `fontSize: 16.5, fontWeight: '800'`).
+   - இரண்டாம் வரி: உறவுமுறை / ரோல் (`rel`, `fontSize: 11.5, fontWeight: '700'`) மற்றும் Mood Pill.
+   - பெயர் சுருங்கிப்போன ("ம...") பிரச்சனை தீர்க்கப்பட்டு, முழுப் பெயரும் தெளிவாகத் தெரியும் வண்ணம் அகலப்படுத்தப்பட்டது.
+2. **Chat Header Right பட்டன்கள் சீரமைப்பு:**
+   - ⁝ (Three dots menu) மற்றும் 🎨 Theme பொத்தான்கள் நீக்கப்பட்டன.
+   - நவீன Realistic Edit (மென்மையான Gradient, Glass Border, Outline Pencil Icon) மற்றும் Realistic Delete பொத்தான்கள் மட்டுமே வைக்கப்பட்டன.
+3. **Theme வசதி Character Edit பக்கத்திற்கு நகர்த்தல் (`edit-character.tsx`):**
+   - "🎨 Chat Theme & Style" என்ற தனிப் பிரிவாக (SectionCard) சேர்க்கப்பட்டது.
+   - வால்பேப்பர், பபிள் ஸ்டைல், பிறந்தநாள், அவதார் பின்னணி (Soft blur) ஆகிய அனைத்தும் எடிட் பக்கத்திலேயே நிர்வகிக்கப்பட்டு சேமிக்கப்படுகின்றன.
+4. **Back Functionality பாதுகாப்பு:**
+   - `headerLeft` Back Arrow (`router.back()`) எந்த மாற்றமுமின்றி துல்லியமாகப் பாதுகாக்கப்பட்டது.
+5. **GitHub Push & APK Build (Rule 2):**
+   - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
