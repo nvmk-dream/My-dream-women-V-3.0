@@ -232,7 +232,15 @@ export default function RootLayout() {
             <Stack.Screen name="group-chat" options={{ title: 'Group Chat' }} />
             <Stack.Screen name="face-swap" options={{ title: 'Face Swap' }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="edit-character" options={{ title: 'Edit Character' }} />
+            <Stack.Screen
+              name="edit-character"
+              options={{
+                title: 'Edit Character',
+                headerStyle: { backgroundColor: '#FDF2F4' },
+                headerTintColor: '#1E1B4B',
+                headerTitleStyle: { fontWeight: 'bold', color: '#1E1B4B' },
+              }}
+            />
             <Stack.Screen name="cloud-storage" options={{ headerShown: false }} />
             <Stack.Screen name="ai-girls-cloud" options={{ headerShown: false }} />
             <Stack.Screen name="offline-chat" options={{ title: 'Offline AI' }} />

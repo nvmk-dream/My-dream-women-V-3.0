@@ -163,11 +163,12 @@ export default function EditCharacterScreen() {
   const personaId = ParamsStore.getEditPersonaId() ?? '';
   const base = ALL_PERSONAS.find(p => p.id === personaId);
 
-  const [persona, setPersona] = useState<Persona | null>(null);
-  const [name, setName] = useState('');
-  const [avatarLetter, setAvatarLetter] = useState('');
-  const [greeting, setGreeting] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [persona, setPersona] = useState<Persona | null>(base ?? null);
+  const [name, setName] = useState(base?.name ?? '');
+  const [avatarLetter, setAvatarLetter] = useState(base?.avatarLetter ?? base?.emoji ?? '');
+  const [greeting, setGreeting] = useState(base?.greeting ?? '');
+  const [systemPrompt, setSystemPrompt] = useState(base?.prompt ?? '');
+  const [relationship, setRelationship] = useState(base?.relationship ?? '');
   const [charOnly, setCharOnly] = useState('');
   const [defaultPromptExists, setDefaultPromptExists] = useState(false);
   const [faceDesc, setFaceDesc] = useState('');
@@ -617,14 +618,6 @@ export default function EditCharacterScreen() {
   const [wordInputs, setWordInputs] = useState<Record<string, string>>({});
 
 
-  if (!persona) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator  />
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{
@@ -650,6 +643,11 @@ export default function EditCharacterScreen() {
         ),
       }} />
       <ImageBackground source={require('../assets/images/chat_rose_bg.png')} style={styles.bgImage} resizeMode="cover">
+      {!persona ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator color="#7C3AED" size="large" />
+        </View>
+      ) : (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         {/* ── AVATAR ── */}
@@ -1474,6 +1472,7 @@ export default function EditCharacterScreen() {
           }
         </TouchableOpacity>
       </ScrollView>
+      )}
       </ImageBackground>
     </SafeAreaView>
   );
