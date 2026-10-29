@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
+const HEADER_BANNER_IMG = require('../assets/images/my_dream_woman_banner.png');
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1011,7 +1012,6 @@ Then write these prompts:
               <Text style={s.badgeTxt}>{hasAutoUnread ? '1' : p.unread}</Text>
             </View>
           )}
-        </View>
       </TouchableOpacity>
     );
   };
@@ -1096,23 +1096,14 @@ Then write these prompts:
         <>
       {/* Character-list header */}
       <View
-        style={[s.header, { paddingTop: insets.top + 14 }]}
+        style={[s.header, { paddingTop: insets.top + 6 }]}
       >
-        <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 8 }}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1E1B4B' }}>←</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E1B4B' }}>Meet AI Girls</Text>
-        <View style={s.headerSpacer} />
-        <View style={s.headerIcons}>
-          <TouchableOpacity
-            onPress={() => setShowAddCharModal(true)}
-            style={s.headerAddCharBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Add new character"
-          >
-            <Text style={s.headerAddCharTxt}>+</Text>
-          </TouchableOpacity>
-        </View>
+        <Image
+          source={HEADER_BANNER_IMG}
+          style={s.headerBanner}
+          resizeMode="contain"
+          accessibilityLabel="My Dream Woman"
+        />
       </View>
 
       {/* Chat list */}
@@ -1538,10 +1529,16 @@ const s = StyleSheet.create({
 
   header: {
     backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 10,
-    gap: 6,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.75)',
+    borderWidth: 2,
+    borderColor: 'rgba(180, 220, 255, 0.00)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBanner: {
+    width: '100%',
+    height: 52,
   },
   userAvatarBtn: { alignItems: 'center', gap: 2, minWidth: 42 },
   userPhotoImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#51D8F2' },

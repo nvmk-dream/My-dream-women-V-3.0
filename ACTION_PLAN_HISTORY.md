@@ -73,17 +73,17 @@
 
 ### 2. Feature 3-க்கான முழுமையான தீர்வுத் திட்டம் (Action Plan):
 1. **Hero Banner Asset Re-creation (தூய கலை வடிவம்):**
-   - பெண்களின் உருவங்கள் மற்றும் மலர் பின்னணி மட்டுமே கொண்ட தூய 16:9 / மொபைல் பேனர் படத்தை உருவாக்குதல்.
-   - பட்டன்கள் மற்றும் வாசகங்கள் code வழியாக responsive-ஆக அமைத்தல்.
+   - பெண்களின் உருவங்கள் மற்றும் மலர் பின்னணி மட்டுமே கொண்ட தூய 16:9 / மொபைல் பேனர் படத்தை உருவாக்குதல் (எந்தவொரு பட்டன்களோ, போலி எழுத்துக்களோ இல்லாமல்).
+   - பட்டன்கள் ("Online", "Wake", "Start Chat") மற்றும் வாசகங்கள் ("Your Dream. Our Creation.") அனைத்தையும் Code வழியாகவே responsive-ஆக, எந்த மொபைலிலும் வெட்டப்படாமல் பிக்சல் துல்லியமாக அமைத்தல்.
 2. **Feature Cards Text & Layout சீரமைப்பு:**
-   - கார்டு தலைப்புகள் ("Text to Image", "AI Characters", "Image to Script") எலிப்சிஸ் (`...`) இல்லாமல் முழுமையாகத் தெரியும்படி அமைத்தல்.
+   - கார்டு தலைப்புகள் ("Text to Image", "AI Characters", "Image to Script") எலிப்சிஸ் (`...`) இல்லாமல் முழுமையாகத் தெரியும்படி:
+     - அம்பு குறியை (Arrow) சரியான இடத்தில் வைப்பது அல்லது டெக்ஸ்ட் அளவை (10.5-11px) இரண்டு வரிகளாகவோ அல்லது அளவைக் குறைத்தோ முழுப் பெயர் தெரியும்படி வடிவமைத்தல்.
 3. **Card Images Re-generation & Re-cropping:**
-   - Face Swap கார்டுக்கு பயனர் புதிதாக அளித்த split face HD படம் (`30432d42-73c0-4753-8d00-462dc90b3d90_9050af41.png`) 450x600 oblong விகிதத்தில் கச்சிதமாக பொருத்தப்பட்டது.
-   - கார்டுகள் சதுரம் (Square ⬜) முற்றிலும் நீக்கப்பட்டு **Oblong (நீள்செவ்வக / Portrait Rectangle)** ஆக மாற்றப்பட்டன.
-   - `cardHeight` கணக்கீடு screen-ன் மீதமுள்ள உயரத்தை முழுமையாகப் பயன்படுத்தி, 6 கார்டுகளுக்கும் கீழே எந்தவித வெற்று இடமும் (mt space) விழாமல் முழுமையாக நிறைக்கிறது.
-   - கார்டு CSS: `borderRadius: 28`, `backgroundColor: 'rgba(255, 255, 255, 0.00)'`, `borderWidth: 2`, `borderColor: 'rgba(180, 220, 255, 0.00)'`.
-4. **GitHub Build (Rule 2):**
-   - அனைத்து மாற்றங்களையும் முடித்த பின் `ACTION_PLAN_HISTORY.md` மற்றும் Git-ல் commit செய்து, Rule 2-ன்படி GitHub Actions workflow (`build-apk.yml`) மூலம் புதிய APK பில்ட் ட்ரிக்கர் செய்யப்பட்டது.
+   - 3 பெண்கள் உள்ள Group Chat படத்தை முழுமையாக 3 பெண்களும் திரையில் தெரியும்படி மறுவடிவமைப்பு செய்தல்.
+   - Cloud கார்டில் உள்ள கூடுதல் அசிங்கமான ஐகானை நீக்குதல்.
+   - கார்டுகளின் உயரத்தை அளவுக்கு அதிகமாக நீட்டாமல், சீரான 1:1 / 0.95 விகிதத்தில் பொருத்துதல்.
+4. **ஒற்றை ஒருங்கிணைந்த நிலை (Consolidated Verification) & GitHub Build:**
+   - அனைத்து மாற்றங்களையும் முடித்த பின் `ACTION_PLAN_HISTORY.md` மற்றும் Git-ல் commit செய்து, Rule 2-ன்படி GitHub Actions workflow (`build-apk.yml`) மூலம் புதிய APK பில்ட் செய்தல்.
 
 
 
@@ -128,17 +128,23 @@
 3. **GitHub Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு, GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK பில்ட் ட்ரிக்கர் செய்யப்பட்டது.
 
----
+## 🏷️ Feature 6: AI Girls Header Redesign - "My Dream Woman" Banner Image & Button Removal
 
-## 🏷️ Bugfix: `ai-girls.tsx` JSX SyntaxError Fix (GitHub Build Failure)
+### 1. பயனரின் கோரிக்கை:
+- `ai-girls.tsx`-ல் உள்ள பின்னோக்கிச் செல்லும் அம்பு (⬅️ Back) மற்றும் புது character சேர்க்கும் (+ Add) ஆகிய இரண்டு பொத்தான்களையும் நீக்க வேண்டும்.
+- அதற்குப் பதிலாக Header-ல் பயனர் வழங்கிய "My Dream Woman" தலைப்புப் படத்தை (மலர் மற்றும் பட்டாம்பூச்சிகள் சூழ 3 அழகிய பெண்கள் தோற்றம்) வைக்க வேண்டும்.
+- Header-ன் ஸ்டைல்:
+  - `Background: rgba(255, 255, 255, 0.00)`
+  - `Border: 2px solid rgba(180, 220, 255, 0.00)`
 
-### 1. பிரச்சனை:
-- GitHub Actions `Build APK` workflow-ல் `Bundle JS with expo export:embed` படியில் SyntaxError:
-  `SyntaxError: Expected corresponding JSX closing tag for <View>. (1014:6)`.
-
-### 2. மூலக் காரணம் (Root Cause):
-- `ai-girls.tsx`-ல் `renderChatItem`-ன் `chatRight` கண்டெய்னருக்கான `<View style={s.chatRight}>` திறக்கப்பட்டிருந்தது, ஆனால் வரி 1013-க்கு அடுத்து அதை மூடும் `</View>` டேக் விடுபட்டிருந்தது.
-
-### 3. சரிசெய்த முறை:
-- `ai-girls.tsx`-ல் வரி 1014-ல் `</View>` closing tag சேர்க்கப்பட்டு `</TouchableOpacity>`-க்கு முன் மூடப்பட்டது.
-- Rule 2-ன்படி GitHub-ல் commit & push செய்யப்பட்டு புதிய APK Build ட்ரிக்கர் செய்யப்பட்டது.
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **Banner Image Asset சேர்ப்பு:**
+   - வழங்கப்பட்ட banner image `artifacts/tamil-ai-chat/assets/images/my_dream_woman_banner.png`-ஆக சேர்க்கப்பட்டது.
+2. **Header JSX சீரமைப்பு:**
+   - `router.back()` (←) மற்றும் `setShowAddCharModal` (+) பொத்தான்கள் மற்றும் பழைய "Meet AI Girls" உரை நீக்கப்பட்டது.
+   - அதற்குப் பதிலாக `<Image source={HEADER_BANNER_IMG} style={s.headerBanner} resizeMode="contain" />` வைக்கப்பட்டது.
+3. **Styling & 8-Character Visibility உறுதிப்படுத்தல்:**
+   - Header container-க்கு `backgroundColor: 'rgba(255, 255, 255, 0.00)'`, `borderWidth: 2`, `borderColor: 'rgba(180, 220, 255, 0.00)'` நிர்ணயிக்கப்பட்டது.
+   - Header-ன் உயரம் compact-ஆக (height: 52px, paddingTop: insets.top + 6) வைக்கப்பட்டதால், ஒரே திரையில் 8 கேரக்டர்கள் ஸ்க்ரோல் செய்யாமல் தெரியும் வசதி துளியும் பாதிக்கப்படவில்லை.
+4. **GitHub Push & APK Build (Rule 2):**
+   - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
