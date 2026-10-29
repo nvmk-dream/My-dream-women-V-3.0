@@ -179,7 +179,6 @@ export default function EditCharacterScreen() {
   const [presanaAvatarUri, setPresanaAvatarUri] = useState<string | undefined>(undefined);
   const [showModeCloud, setShowModeCloud] = useState<'normal' | 'presana' | null>(null);
   const [modeCloudInput, setModeCloudInput] = useState('');
-  const [relationship, setRelationship] = useState('');
   const baseRulesEditorRef = useRef<RichEditor>(null);
   const charPromptEditorRef = useRef<RichEditor>(null);
   const [saving, setSaving] = useState(false);
