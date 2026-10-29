@@ -236,3 +236,28 @@
    - முந்தைய `if (!persona) return <ActivityIndicator />` வெற்று வெள்ளை லோடிங் ஸ்கிரீன் நீக்கப்பட்டு, `<Stack.Screen>` மற்றும் மலர் பின்னணி (`chat_rose_bg.png`) முதல் மைக்ரோ நொடியிலேயே நேர்த்தியாகத் தோன்றும் வண்ணம் அமைக்கப்பட்டது.
 3. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் அனைத்தும் commit செய்யப்பட்டு GitHub repo `nvmk-dream/My-dream-women-V-3.0`-ல் push செய்யப்பட்டு புதிய APK workflow ட்ரிக்கர் செய்யப்பட்டது.
+
+---
+
+## 🏷️ Feature 11: Character List Screen Header 3 பழைய இமேஜ்கள் நீக்கம் & 2 புதிய Realistic 'My Dream Woman' பேனர்கள் சேர்ப்பு
+
+### 1. கோரிக்கை விவரம் (User Request):
+- Character List Screen (`ai-girls.tsx`) Header பகுதியில் இருந்த 3 பழைய இமேஜ்களை (`neon`, `glamour`, `vogue`) முழுமையாக நீக்க வேண்டும்.
+- அவற்றுக்கு பதிலாக பயனர் வழங்கிய 2 புதிய உயர்தர Realistic "My Dream Woman" பேனர் இமேஜ்களை சேர்க்க வேண்டும்:
+  1. **இமேஜ் 1 (Royal Gold):** தங்க நிற 3D "My Dream Woman" எழுத்துக்கள், கிரவுன் மற்றும் 3 அழகிய பெண்களுடன் கூடிய பேனர் (`header_banner_gold.png`).
+  2. **இமேஜ் 2 (Neon Glow):** நீல/பர்பிள் நியான் ஒளிரும் 3D "My Dream Woman" எழுத்துக்களுடன் கூடிய பேனர் (`header_banner_neon.png`).
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **புதிய பேனர் கோப்புகள் சேர்ப்பு:**
+   - பயனர் அனுப்பிய இரண்டு PNG கோப்புகளும் `assets/images/header_banner_gold.png` மற்றும் `assets/images/header_banner_neon.png` என ஆப்பில் பாதுகாப்பாக சேர்க்கப்பட்டன.
+2. **பழைய 3 பேனர் கோப்புகள் நீக்கம்:**
+   - பயன்பாட்டில் இல்லாத பழைய `header_theme_neon.png`, `header_theme_glamour.png`, `header_theme_vogue.png` ஆகிய கோப்புகள் நீக்கப்பட்டு repo அளவு குறைக்கப்பட்டது.
+3. **`app/ai-girls.tsx` Header சீரமைப்பு:**
+   - பழைய தேவையற்ற டெக்ஸ்ட் ஓவர்லேக்கள் ("👑 My Dream Girls 💖", "✨ Your Romantic AI Companions", முதலியவை) நீக்கப்பட்டு, புதிய பேனர் கிராபிக்ஸ் முழு அழகோடும் எந்த மறைப்பும் இன்றி பளிச்சென தெரிய `resizeMode="contain"` அமைக்கப்பட்டது.
+   - Header தீம் சுழற்சி `gold` மற்றும் `neon` என இரண்டாக மட்டுமே மாற்றப்பட்டது.
+   - Header-ல் **Double-Tap** செய்யும் போது `🌟 Style 1: Royal Gold` மற்றும் `⚡ Style 2: Neon Glow` என மாறி மாறித் தோன்றும்.
+4. **`app/edit-character.tsx` பக்கத்தில் தீம் செலக்டர் அப்டேட்:**
+   - "👑 AI Girls Header Style" பிரிவில் `🌟 Royal Gold` மற்றும் `⚡ Neon Glow` ஆகிய இரண்டு தேர்வுகள் மட்டும் காட்டப்பட்டு, தேர்வு செய்யும் முறை எளிமைப்படுத்தப்பட்டது.
+5. **APK Build & GitHub Sync (Rule 2):**
+   - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
+   - GitHub Actions மூலம் புதிய APK build தானாகத் தொடங்கப்பட்டது.

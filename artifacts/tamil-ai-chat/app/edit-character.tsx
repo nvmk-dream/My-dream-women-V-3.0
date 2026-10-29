@@ -244,7 +244,7 @@ export default function EditCharacterScreen() {
   const [bubbleStyle, setBubbleStyle] = useState('classic');
   const [birthday, setBirthday] = useState('');
   const [avatarAsBg, setAvatarAsBg] = useState(false);
-  const [headerTheme, setHeaderTheme] = useState('neon');
+  const [headerTheme, setHeaderTheme] = useState('gold');
 
   useEffect(() => {
     const load = async () => {
@@ -263,7 +263,7 @@ export default function EditCharacterScreen() {
         if (savedBubble[1]) setBubbleStyle(savedBubble[1]);
         if (savedBday[1]) setBirthday(savedBday[1]);
         if (savedAvatarBg[1]) setAvatarAsBg(savedAvatarBg[1] === 'true');
-        if (savedHTheme[1]) setHeaderTheme(savedHTheme[1]);
+        if (savedHTheme[1]) setHeaderTheme(savedHTheme[1] === 'neon' ? 'neon' : 'gold');
         let data: Record<string, any> = saved[1] ? JSON.parse(saved[1]) : {};
         // Restore from cloud if local data missing (reinstall recovery)
         if (!saved[1]) {
@@ -877,9 +877,8 @@ export default function EditCharacterScreen() {
           <Text style={styles.switchHint}>Character List Header-ல் Double-Tap செய்தும் மாற்றலாம்</Text>
           <View style={styles.bubbleStyleRow}>
             {[
-              { id: 'neon', label: '✨ Neon Center' },
-              { id: 'glamour', label: '💎 3D Ribbon' },
-              { id: 'vogue', label: '👑 Vogue Cover' },
+              { id: 'gold', label: '🌟 Royal Gold' },
+              { id: 'neon', label: '⚡ Neon Glow' },
             ].map(t => (
               <TouchableOpacity
                 key={t.id}
