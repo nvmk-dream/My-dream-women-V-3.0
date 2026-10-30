@@ -1217,14 +1217,14 @@ export default function GalleryScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={s.newFolderBtn} disabled={uploading || backingUp} onPress={() => { setFolderName(''); setFolderDialog(true); }}>
               <View style={s.actionContent}>
-                <MaterialCommunityIcons name="folder-plus-outline" size={20} color={ct.gold} />
+                <MaterialCommunityIcons name="folder-plus-outline" size={20} color="#38BDF8" />
                 <Text style={s.newFolderTxt}>New Folder</Text>
               </View>
             </TouchableOpacity>
             {albumKey === 'projects' && depth === 0 && (
               <TouchableOpacity style={s.backupBtn} disabled={uploading || backingUp} onPress={confirmProjectBackup}>
                 <View style={s.actionContent}>
-                  <MaterialCommunityIcons name="content-save-outline" size={20} color={ct.background} />
+                  <MaterialCommunityIcons name="content-save-outline" size={20} color="#FFFFFF" />
                   <Text style={s.backupBtnTxt}>Backup</Text>
                 </View>
               </TouchableOpacity>
@@ -1631,12 +1631,12 @@ const s = StyleSheet.create({
   actionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
   uploadBtn:      { flex: 1, backgroundColor: ct.cyan, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.gold },
   uploadBtnTxt:   { color: ct.background, fontSize: 15, fontWeight: 'bold' },
-  newFolderBtn:   { flex: 1, backgroundColor: ct.surfaceRaised, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.goldLine },
-  backupBtn:      { width: '100%', backgroundColor: ct.gold, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  backupBtnTxt:   { color: ct.background, fontSize: 16, fontWeight: 'bold' },
+  newFolderBtn:   { flex: 1, backgroundColor: '#0B2032', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#38BDF8' },
+  backupBtn:      { width: '100%', backgroundColor: '#0284C7', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  backupBtnTxt:   { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: ct.cyanDeep, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   iconCropBtnTxt: { color: ct.text, fontSize: 14, fontWeight: '800' },
-  newFolderTxt:   { color: ct.gold, fontSize: 15, fontWeight: '600' },
+  newFolderTxt:   { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   actionContent:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   foldersRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
   folderChip:     { backgroundColor: ct.surfaceRaised, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: ct.goldLine },

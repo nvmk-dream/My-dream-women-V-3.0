@@ -1061,21 +1061,21 @@ export default function AIGirlsCloudScreen() {
         <TouchableOpacity style={s.uploadBtn} onPress={handleUpload} disabled={uploading}>
           {uploading
             ? <ActivityIndicator color={ct.text} size="small" />
-            : <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.background} /><Text style={s.uploadBtnTxt}>Upload</Text></View>
+            : <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" /><Text style={s.uploadBtnTxt}>Upload</Text></View>
           }
         </TouchableOpacity>
       ) : (
         <View style={[s.uploadBtn, s.disabledButton]}>
-          <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.muted} /><Text style={[s.uploadBtnTxt, { color: ct.muted }]}>Upload</Text></View>
+          <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color="#64748B" /><Text style={[s.uploadBtnTxt, { color: "#64748B" }]}>Upload</Text></View>
         </View>
       )}
       {depth !== 2 ? (
         <TouchableOpacity style={s.newFolderBtn} onPress={handleNewFolder}>
-          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.gold} /><Text style={s.newFolderTxt}>New Folder</Text></View>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color="#6D28D9" /><Text style={s.newFolderTxt}>New Folder</Text></View>
         </TouchableOpacity>
       ) : (
-        <View style={[s.newFolderBtn, { opacity: 0.45 }]}>
-          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.muted} /><Text style={[s.newFolderTxt, { color: ct.muted }]}>New Folder</Text></View>
+        <View style={[s.newFolderBtn, s.disabledButton]}>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color="#64748B" /><Text style={[s.newFolderTxt, { color: "#64748B" }]}>New Folder</Text></View>
         </View>
       )}
     </View>
@@ -1434,13 +1434,13 @@ const s = StyleSheet.create({
     shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3,
   },
   uploadBtnTxt: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
-  disabledButton: { backgroundColor: 'rgba(255, 255, 255, 0.6)', borderWidth: 1, borderColor: '#CBD5E1', opacity: 0.55 },
+  disabledButton: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1', opacity: 0.8 },
   newFolderBtn: {
     flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.90)', borderRadius: 14, borderWidth: 1.5, borderColor: '#C4B5FD',
     paddingVertical: 12, alignItems: 'center',
     shadowColor: '#E91E8C', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  newFolderTxt: { color: '#6B46C1', fontWeight: '700', fontSize: 14 },
+  newFolderTxt: { color: '#6D28D9', fontWeight: '800', fontSize: 14 },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
 
   // Section label
