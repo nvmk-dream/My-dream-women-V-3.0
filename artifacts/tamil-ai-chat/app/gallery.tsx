@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
   ActivityIndicator, Image, Dimensions, ScrollView, FlatList,
   Platform, TextInput, Modal, BackHandler, StatusBar, Linking,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -1110,23 +1111,28 @@ export default function GalleryScreen() {
     : isChatSelectMode ? 'Select Photo / Video' : meta.label;
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={s.bgImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={s.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: ct.surface, paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity onPress={depth === 1 ? goUp : () => router.back()} style={s.backBtn}>
-          <MaterialCommunityIcons name="chevron-left" size={24} color={ct.cyan} />
-          <Text style={s.backTxt}>Back</Text>
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        {cloudSelMode
-          ? <TouchableOpacity onPress={() => { setCloudSelMode(false); setCloudSelIds(new Set()); }} style={s.backBtn}>
-              <MaterialCommunityIcons name="close" size={22} color={ct.gold} />
-            </TouchableOpacity>
-          : <View style={{ width: 60 }} />}
-      </View>
+        {/* Header */}
+        <View style={[s.header, { paddingTop: insets.top + 14 }]}>
+          <TouchableOpacity onPress={depth === 1 ? goUp : () => router.back()} style={s.backBtn}>
+            <MaterialCommunityIcons name="chevron-left" size={24} color="#1E1B4B" />
+            <Text style={s.backTxt}>Back</Text>
+          </TouchableOpacity>
+          <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+          {cloudSelMode
+            ? <TouchableOpacity onPress={() => { setCloudSelMode(false); setCloudSelIds(new Set()); }} style={s.backBtn}>
+                <MaterialCommunityIcons name="close" size={22} color="#1E1B4B" />
+              </TouchableOpacity>
+            : <View style={{ width: 60 }} />}
+        </View>
 
       {!isChatSelectMode && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.breadcrumbs}>
@@ -1575,97 +1581,99 @@ export default function GalleryScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe:           { flex: 1, backgroundColor: ct.background },
-  header:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: ct.goldLine },
+  bgImage:        { flex: 1, width: '100%', height: '100%' },
+  safe:           { flex: 1, backgroundColor: 'transparent' },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderBottomWidth: 0, borderColor: 'transparent' },
   backBtn:        { minWidth: 68, flexDirection: 'row', alignItems: 'center' },
-  backTxt:        { color: ct.text, fontSize: 14, fontWeight: '600' },
-  headerTitle:    { flex: 1, color: ct.gold, fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
-  breadcrumbs:    { maxHeight: 42, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: ct.surface, borderBottomWidth: 1, borderBottomColor: ct.line },
+  backTxt:        { color: '#1E1B4B', fontSize: 14, fontWeight: '700' },
+  headerTitle:    { flex: 1, color: '#1E1B4B', fontSize: 19, fontWeight: '900', textAlign: 'center', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
+  breadcrumbs:    { maxHeight: 42, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderBottomWidth: 0, borderColor: 'transparent' },
   breadcrumbItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  breadcrumbText: { color: ct.cyan, fontSize: 12, fontWeight: '600' },
-  breadcrumbCurrent: { color: ct.gold },
+  breadcrumbText: { color: '#7C3AED', fontSize: 13, fontWeight: '700' },
+  breadcrumbCurrent: { color: '#1E1B4B', fontWeight: '900' },
   doneBtn:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, minWidth: 80, alignItems: 'center' },
-  doneBtnTxt:     { color: ct.text, fontSize: 14, fontWeight: 'bold' },
-  uploadBar:      { flexDirection: 'row', backgroundColor: ct.cyanDeep, padding: 10, gap: 10, alignItems: 'center' },
-  uploadBarTxt:   { color: ct.text, fontSize: 14 },
-  backupFileBarBg: { height: 6, flex: 1, minWidth: 90, marginLeft: 8, borderRadius: 3, backgroundColor: ct.surfaceSoft, overflow: 'hidden' },
+  doneBtnTxt:     { color: '#1E1B4B', fontSize: 14, fontWeight: 'bold' },
+  uploadBar:      { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.00)', padding: 10, gap: 10, alignItems: 'center' },
+  uploadBarTxt:   { color: '#1E1B4B', fontSize: 14, fontWeight: '700' },
+  backupFileBarBg: { height: 6, flex: 1, minWidth: 90, marginLeft: 8, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.1)', overflow: 'hidden' },
   backupFileBarFill: { height: '100%', borderRadius: 3, backgroundColor: ct.cyan },
-  backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: ct.surfaceRaised, borderRadius: 18, borderWidth: 1, borderColor: ct.goldLine },
-  backupProgressTitle: { color: ct.gold, fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  backupProgressRow: { color: ct.text, fontSize: 14, marginBottom: 7 },
+  backupProgressCard: { marginHorizontal: 14, marginTop: 10, padding: 18, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 18, borderWidth: 0 },
+  backupProgressTitle: { color: '#1E1B4B', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  backupProgressRow: { color: '#1E1B4B', fontSize: 14, marginBottom: 7 },
   backupDone: { color: ct.success, fontSize: 18, fontWeight: '800', marginLeft: 8 },
-  backupProgressValue: { color: ct.cyan, marginLeft: 18 },
-  backupBarBg: { height: 12, backgroundColor: ct.surfaceSoft, borderRadius: 6, overflow: 'hidden', marginTop: 10 },
+  backupProgressValue: { color: '#7C3AED', marginLeft: 18 },
+  backupBarBg: { height: 12, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 6, overflow: 'hidden', marginTop: 10 },
   backupBarFill: { height: '100%', backgroundColor: ct.cyan, borderRadius: 6 },
-  backupProgressHint: { color: ct.muted, fontSize: 12, marginTop: 9 },
-  backupCancelBtn: { marginTop: 12, backgroundColor: ct.surfaceSoft, borderRadius: 10, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: ct.danger },
-  backupCancelTxt: { color: ct.text, fontSize: 13, fontWeight: '800' },
-  backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: ct.surface, borderRadius: 14, borderWidth: 1, borderColor: ct.line },
-  driveSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: ct.surface, borderRadius: 14, borderWidth: 1, borderColor: ct.goldLine },
+  backupProgressHint: { color: '#6B7280', fontSize: 12, marginTop: 9 },
+  backupCancelBtn: { marginTop: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 0 },
+  backupCancelTxt: { color: '#DC2626', fontSize: 13, fontWeight: '800' },
+  backupsSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 14, borderWidth: 0 },
+  driveSection: { marginHorizontal: 14, marginBottom: 12, padding: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 14, borderWidth: 0 },
   backupsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  backupsTitle: { color: ct.gold, fontSize: 15, fontWeight: '800' },
-  backupsCount: { color: ct.gold, fontWeight: '800' },
-  driveFolderLink: { color: ct.cyan, fontSize: 12, fontWeight: '700' },
-  driveFolderPath: { color: ct.muted, fontSize: 11, marginBottom: 4 },
-  backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: ct.surfaceRaised, borderRadius: 10, padding: 10, marginTop: 7, borderWidth: 1, borderColor: ct.line },
-  backupFileIcon: { color: ct.gold, fontSize: 11, fontWeight: '900', borderWidth: 1, borderColor: ct.goldLine, borderRadius: 5, padding: 5, marginRight: 10 },
-  driveFileIcon: { color: ct.cyan, fontSize: 9, fontWeight: '900', borderWidth: 1, borderColor: ct.line, borderRadius: 5, padding: 5, marginRight: 10 },
+  backupsTitle: { color: '#1E1B4B', fontSize: 15, fontWeight: '800' },
+  backupsCount: { color: '#B45309', fontWeight: '800' },
+  driveFolderLink: { color: '#7C3AED', fontSize: 12, fontWeight: '700' },
+  driveFolderPath: { color: '#6B7280', fontSize: 11, marginBottom: 4 },
+  backupFileRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, padding: 10, marginTop: 7, borderWidth: 0 },
+  backupFileIcon: { color: '#B45309', fontSize: 11, fontWeight: '900', borderRadius: 5, padding: 5, marginRight: 10 },
+  driveFileIcon: { color: '#7C3AED', fontSize: 9, fontWeight: '900', borderRadius: 5, padding: 5, marginRight: 10 },
   backupFileInfo: { flex: 1 },
-  backupFileName: { color: ct.text, fontSize: 13, fontWeight: '700' },
-  backupFileMeta: { color: ct.muted, fontSize: 10, marginTop: 3 },
-  backupDownload: { color: ct.cyan, fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
-  driveHint: { color: ct.muted, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  backupFileName: { color: '#1E1B4B', fontSize: 13, fontWeight: '700' },
+  backupFileMeta: { color: '#6B7280', fontSize: 10, marginTop: 3 },
+  backupDownload: { color: '#7C3AED', fontSize: 26, fontWeight: '700', paddingHorizontal: 6 },
+  driveHint: { color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 4 },
   driveConnection: { color: ct.success, fontSize: 11, lineHeight: 16, marginBottom: 4 },
-  selBar:         { flexDirection: 'row', backgroundColor: ct.surface, padding: 10, alignItems: 'center', gap: 12 },
-  selCount:       { color: ct.text, fontSize: 14, flex: 1 },
+  selBar:         { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.00)', padding: 10, alignItems: 'center', gap: 12 },
+  selCount:       { color: '#1E1B4B', fontSize: 14, flex: 1 },
   selDelBtn:      { backgroundColor: ct.danger, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  selDelTxt:      { color: ct.text, fontSize: 13, fontWeight: '600' },
-  pickerSelBar:   { flexDirection: 'row', backgroundColor: ct.surface, padding: 10, alignItems: 'center', gap: 12 },
-  pickerSelTxt:   { color: ct.text, fontSize: 14, flex: 1 },
-  actionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 },
-  uploadBtn:      { flex: 1, backgroundColor: ct.cyan, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.gold },
-  uploadBtnTxt:   { color: ct.background, fontSize: 15, fontWeight: 'bold' },
-  newFolderBtn:   { flex: 1, backgroundColor: ct.surfaceRaised, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: ct.goldLine },
-  backupBtn:      { width: '100%', backgroundColor: ct.gold, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  backupBtnTxt:   { color: ct.background, fontSize: 16, fontWeight: 'bold' },
-  iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: ct.cyanDeep, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  iconCropBtnTxt: { color: ct.text, fontSize: 14, fontWeight: '800' },
-  newFolderTxt:   { color: ct.gold, fontSize: 15, fontWeight: '600' },
+  selDelTxt:      { color: '#fff', fontSize: 13, fontWeight: '600' },
+  pickerSelBar:   { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.00)', padding: 10, alignItems: 'center', gap: 12 },
+  pickerSelTxt:   { color: '#1E1B4B', fontSize: 14, flex: 1 },
+  actionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14, backgroundColor: 'rgba(255, 255, 255, 0.00)' },
+  uploadBtn:      { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 0 },
+  uploadBtnTxt:   { color: '#1E1B4B', fontSize: 15, fontWeight: '900' },
+  newFolderBtn:   { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 0 },
+  backupBtn:      { width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 0 },
+  backupBtnTxt:   { color: '#1E1B4B', fontSize: 16, fontWeight: '900' },
+  iconCropBtn:    { marginHorizontal: 14, marginBottom: 10, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 0 },
+  iconCropBtnTxt: { color: '#1E1B4B', fontSize: 14, fontWeight: '900' },
+  newFolderTxt:   { color: '#1E1B4B', fontSize: 15, fontWeight: '900' },
   actionContent:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  foldersRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
-  folderChip:     { backgroundColor: ct.surfaceRaised, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: ct.goldLine },
+  foldersRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 14, paddingBottom: 10, backgroundColor: 'rgba(255, 255, 255, 0.00)' },
+  folderChip:     { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 0 },
   folderChipEmoji:{ fontSize: 18 },
-  folderChipLabel:{ color: ct.text, fontSize: 13, fontWeight: '500' },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
+  folderChipLabel:{ color: '#1E1B4B', fontSize: 14, fontWeight: '800' },
+  grid:           { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2, backgroundColor: 'transparent' },
   thumb:          { width: THUMB, height: THUMB, overflow: 'hidden' },
   thumbSel:       { opacity: 0.55 },
   thumbImg:       { width: THUMB, height: THUMB },
-  videoThumb:     { backgroundColor: ct.surfaceRaised, justifyContent: 'center', alignItems: 'center' },
-  videoPlay:      { fontSize: 32, color: ct.text },
-  rawThumb:       { alignItems: 'center', justifyContent: 'center', padding: 6, backgroundColor: ct.surfaceRaised },
-  rawFileType:    { color: ct.gold, fontWeight: '800', fontSize: 12, marginTop: 4 },
-  rawFileLabel:   { color: ct.muted, fontSize: 9, marginTop: 3 },
-  videoTag:       { position: 'absolute', bottom: 4, right: 4, backgroundColor: ct.deepScrim, borderRadius: 4, padding: 3 },
-  videoTagTxt:    { color: ct.text, fontSize: 10 },
-  checkOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: ct.selectionWash, justifyContent: 'center', alignItems: 'center' },
+  videoThumb:     { backgroundColor: 'rgba(255, 255, 255, 0.00)', justifyContent: 'center', alignItems: 'center' },
+  videoPlay:      { fontSize: 32, color: '#1E1B4B' },
+  rawThumb:       { alignItems: 'center', justifyContent: 'center', padding: 6, backgroundColor: 'rgba(255, 255, 255, 0.00)' },
+  rawFileType:    { color: '#B45309', fontWeight: '800', fontSize: 12, marginTop: 4 },
+  rawFileLabel:   { color: '#6B7280', fontSize: 9, marginTop: 3 },
+  videoTag:       { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: 3 },
+  videoTagTxt:    { color: '#fff', fontSize: 10 },
+  checkOverlay:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.4)', justifyContent: 'center', alignItems: 'center' },
   checkTxt:       { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  center:         { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  loadingTxt:     { color: ct.muted, marginTop: 14, fontSize: 14 },
+  center:         { alignItems: 'center', justifyContent: 'center', paddingTop: 80, backgroundColor: 'transparent' },
+  loadingTxt:     { color: '#6B7280', marginTop: 14, fontSize: 14 },
   emptyEmoji:     { fontSize: 56, marginBottom: 12 },
-  emptyTxt:       { color: ct.muted, fontSize: 15, textAlign: 'center', lineHeight: 24 },
-  albumRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: ct.surfaceRaised },
+  emptyTxt:       { color: '#1E1B4B', fontSize: 15, textAlign: 'center', lineHeight: 24, fontWeight: '700' },
+  albumRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderWidth: 0 },
   albumIcon:      { marginRight: 12 },
-  albumName:      { color: ct.text, fontSize: 16, fontWeight: '600' },
-  albumCount:     { color: ct.muted, fontSize: 12, marginTop: 2 },
-  albumArrow:     { color: ct.gold, fontSize: 24 },
-  sep:            { height: 1, backgroundColor: ct.line },
-  previewBg:      { flex: 1, backgroundColor: ct.background, justifyContent: 'center', alignItems: 'center' },
+  albumName:      { color: '#1E1B4B', fontSize: 16.5, fontWeight: '800' },
+  albumCount:     { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  albumArrow:     { color: '#B45309', fontSize: 24 },
+  sep:            { height: 1, backgroundColor: 'rgba(0,0,0,0.05)' },
+  previewBg:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   previewClose:   { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
   previewCloseTxt:{ color: ct.gold, fontSize: 24 },
   previewImg:     { width: '100%', height: '80%' },

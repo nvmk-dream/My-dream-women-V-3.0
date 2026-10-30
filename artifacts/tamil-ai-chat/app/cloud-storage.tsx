@@ -4,6 +4,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   Image, Modal, Dimensions, ActivityIndicator,
   Alert, RefreshControl, TextInput, StatusBar, Linking,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -450,15 +451,20 @@ export default function CloudStorageScreen() {
   const femalePersonas = ALL_PERSONAS.filter((p: any) => p.gender === 'female');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={styles.bgImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="cloud-outline" size={25} color={ct.cyan} />
-          <Text style={styles.headerTitle}>My Cloud</Text>
-        </View>
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+          <View style={styles.headerLeft}>
+            <Ionicons name="cloud-outline" size={25} color="#1E1B4B" />
+            <Text style={styles.headerTitle}>My Cloud</Text>
+          </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.syncBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
             {fetchingCloud
@@ -986,57 +992,59 @@ export default function CloudStorageScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: ct.background },
+  bgImage: { flex: 1, width: '100%', height: '100%' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: ct.surface,
-    borderBottomWidth: 1, borderBottomColor: ct.goldLine,
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderBottomWidth: 0, borderColor: 'transparent',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerCloud: { fontSize: 24 },
-  headerTitle: { color: ct.gold, fontSize: 21, fontWeight: 'bold' },
+  headerTitle: { color: '#1E1B4B', fontSize: 21, fontWeight: '900', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
   headerGear: { fontSize: 22 },
   syncBtn: {
-    backgroundColor: ct.cyan, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6, minWidth: 70, alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 6, minWidth: 70, alignItems: 'center', borderWidth: 0,
   },
-  syncBtnTxt: { color: ct.background, fontSize: 13, fontWeight: '800' },
+  syncBtnTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '900' },
   iconLabel: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  scroll: { flex: 1 },
+  scroll: { flex: 1, backgroundColor: 'transparent' },
   sectionLabel: {
-    color: ct.gold, fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
+    color: '#1E1B4B', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
     paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10,
   },
   catWrap: {
     flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 12, gap: 8, marginBottom: 8,
+    paddingHorizontal: 12, gap: 8, marginBottom: 8, backgroundColor: 'transparent',
   },
   catCard: {
     width: (width - 56) / 3,
     alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4,
-    backgroundColor: ct.surfaceRaised, borderRadius: 15, borderWidth: 1, borderColor: ct.line,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 15, borderWidth: 0,
   },
-  catCardActive: { borderColor: ct.gold, backgroundColor: ct.surfaceSoft },
+  catCardActive: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderWidth: 0 },
   catIcon: { marginBottom: 6 },
-  catLabel: { color: ct.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  catLabelActive: { color: ct.gold },
+  catLabel: { color: '#1E1B4B', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  catLabelActive: { color: '#7C3AED' },
   catBadge: {
-    position: 'absolute', top: 6, right: 6, backgroundColor: ct.cyanDeep,
+    position: 'absolute', top: 6, right: 6, backgroundColor: '#7C3AED',
     borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
   },
-  catBadgeText: { color: ct.text, fontSize: 9, fontWeight: 'bold' },
+  catBadgeText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
   storageInfo: {
-    margin: 16, padding: 14, backgroundColor: ct.surfaceRaised, borderRadius: 14,
-    borderWidth: 1, borderColor: ct.goldLine,
+    margin: 16, padding: 14, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 14,
+    borderWidth: 0,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  storageTitle: { color: ct.text, fontSize: 13, fontWeight: '600' },
+  storageTitle: { color: '#1E1B4B', fontSize: 14, fontWeight: '800' },
   storageCount: { color: ct.cyan, fontSize: 13, fontWeight: 'bold' },
 
   // ── Video styles ──────────────────────────────────────────

@@ -261,3 +261,34 @@
 5. **APK Build & GitHub Sync (Rule 2):**
    - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
    - GitHub Actions மூலம் புதிய APK build தானாகத் தொடங்கப்பட்டது.
+
+---
+
+## 🏷️ Feature 12: Cloudinary & My AI Girls அனைத்து இடைநிலை மற்றும் தொடர்ச்சி பக்கங்களுக்கும் Spring Roses Floral Background & Transparent No-Border Theme அமைத்தல்
+
+### 1. கோரிக்கை விவரம் (User Request):
+- Cloudinary மற்றும் My AI Girls-ன் அனைத்து Tab-களின் இடைநிலைப் பக்கங்கள், அவற்றின் தொடர்ச்சியான பக்கங்கள் அனைத்திலும் புதிய background theme மாற்றப்பட வேண்டும்.
+- பயனர் வழங்கிய உயர்தர வசந்தகால ரோஜா பின்னணி படம் (`file_00000000ec8c8208b709e4925f78ceec_b057391b.png`) முழுத் திரையிலும் மேலிருந்து கீழ் வரை ஒரே தொடர்ச்சியான பின்னணியாக அமைய வேண்டும்.
+- Header, Breadcrumbs, Action bar பகுதிகளிலும் பின்னணித் தோற்றம் முழுமையாகத் தெரிய வேண்டும்.
+- கார்டுகள் மற்றும் கன்டெய்னர்கள்: `Background: rgba(255, 255, 255, 0.00)`, `No border` (பார்டர்கள் இன்றி).
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **புதிய பின்னணிப் படம் தயாரிப்பு (`cloud_spring_bg.png`):**
+   - பயனர் வழங்கிய 940x1672 வசந்தகால மலர் ரோஜா பின்னணிப் படம் `assets/images/cloud_spring_bg.png` என சேர்க்கப்பட்டது.
+2. **`app/ai-girls-cloud.tsx` (My AI Girls Cloud) மாற்றம்:**
+   - அனைத்து 3 நிலைகளிலும் (Depth 0: கேரக்டர்கள் பட்டியல், Depth 1: ஸ்டைல் ஃபோல்டர்கள் பட்டியல், Depth 2: போட்டோ கேலரி மற்றும் எம்டி கேமரா வியூ):
+     - முழுத்திரை `ImageBackground` (`cloud_spring_bg.png`) மூலம் மூடப்பட்டது.
+     - Header, Breadcrumbs, Action Bar, மற்றும் அனைத்து கேரக்டர்/ஸ்டைல் கார்டுகளுக்கும் `backgroundColor: 'rgba(255, 255, 255, 0.00)'` மற்றும் `borderWidth: 0` அமைக்கப்பட்டது.
+     - எழுத்துக்கள் மலர் பின்னணியில் தெளிவாகப் பளிச்சென தெரிய உயர்தர contrast மற்றும் text-shadow சேர்க்கப்பட்டது.
+3. **`app/gallery.tsx` (Pictures, Camera, Movies, Downloads, Documents, Projects, etc.) மாற்றம்:**
+   - அனைத்து ஆல்பங்கள் மற்றும் துணை ஃபோல்டர்களிலும் `ImageBackground` இணைக்கப்பட்டு, கறுப்பு நிறத்திற்கு பதிலாக மலர் பின்னணி அமைக்கப்பட்டது.
+   - Header, Breadcrumbs, Action Row, Folder Chips, Album Rows அனைத்தும் `rgba(255, 255, 255, 0.00)` மற்றும் பார்டர் இன்றி மாற்றப்பட்டன.
+4. **`app/keys.tsx` (Keys & Accounts) மாற்றம்:**
+   - முழுத்திரை மலர் பின்னணி மற்றும் `rgba(255, 255, 255, 0.00)` டிரான்ஸ்பரன்ட் நோ-பார்டர் கார்டுகள் அமைக்கப்பட்டன.
+5. **`app/cloud-storage.tsx` (My Cloud) மாற்றம்:**
+   - Header, Category Cards, Storage Info அனைத்தும் மலர் பின்னணியோடு டிரான்ஸ்பரன்ட் முறையில் மாற்றப்பட்டன.
+6. **Compile & Build சரிபார்ப்பு:**
+   - `compile_applet` வெற்றிகரமாக முடிந்தது.
+7. **GitHub Push & APK Build (Rule 2):**
+   - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
+   - GitHub Actions மூலம் புதிய APK build தானாகத் தொடங்கப்பட்டது.

@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, StatusBar,
   Image, Dimensions, ScrollView, Platform, TextInput, Modal, BackHandler, NativeModules,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -1248,25 +1249,30 @@ export default function AIGirlsCloudScreen() {
     selectedStyle?.label ?? 'Photos';
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={s.bgImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={s.safe} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
-        <TouchableOpacity onPress={goBack} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={ct.gold} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        <TouchableOpacity style={s.refreshBtn} onPress={() => {
-          setRefreshToken(value => value + 1);
-          if (depth === 2 && selectedChar && selectedStyle) {
-            loadPhotos(selectedChar.id, selectedStyle.id);
-          }
-        }}>
-          <Ionicons name="refresh-outline" size={22} color={ct.cyan} />
-        </TouchableOpacity>
-      </View>
+        {/* Header */}
+        <View style={[s.header, { paddingTop: insets.top + 14 }]}>
+          <TouchableOpacity onPress={goBack} style={s.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#1E1B4B" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+          <TouchableOpacity style={s.refreshBtn} onPress={() => {
+            setRefreshToken(value => value + 1);
+            if (depth === 2 && selectedChar && selectedStyle) {
+              loadPhotos(selectedChar.id, selectedStyle.id);
+            }
+          }}>
+            <Ionicons name="refresh-outline" size={22} color="#1E1B4B" />
+          </TouchableOpacity>
+        </View>
 
       {/* Content */}
       <View style={s.content}>
@@ -1380,75 +1386,80 @@ export default function AIGirlsCloudScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: ct.background },
+  bgImage: { flex: 1, width: '100%', height: '100%' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
   header: {
-    backgroundColor: ct.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)',
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: ct.goldLine,
+    paddingHorizontal: 12, paddingVertical: 12,
+    borderBottomWidth: 0,
+    borderColor: 'transparent',
   },
   backBtn: { padding: 8, width: 42, alignItems: 'center' },
-  backTxt: { color: ct.gold, fontSize: 28, fontWeight: 'bold', lineHeight: 30 },
-  headerTitle: { flex: 1, color: ct.gold, fontSize: 19, fontWeight: 'bold', marginLeft: 4 },
+  backTxt: { color: '#B45309', fontSize: 28, fontWeight: 'bold', lineHeight: 30 },
+  headerTitle: { flex: 1, color: '#1E1B4B', fontSize: 20, fontWeight: '900', marginLeft: 4, textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
   refreshBtn: { padding: 8 },
-  refreshTxt: { color: ct.cyan, fontSize: 22, fontWeight: 'bold' },
+  refreshTxt: { color: '#B45309', fontSize: 22, fontWeight: 'bold' },
 
   // Breadcrumb
   breadcrumb: {
-    backgroundColor: ct.surfaceRaised, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: ct.goldLine,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 0, borderColor: 'transparent',
   },
   breadcrumbTrail: { flexDirection: 'row', alignItems: 'center', minHeight: 20 },
-  breadcrumbHome: { color: ct.cyan, fontWeight: '700' },
-  breadcrumbLink: { color: ct.brightGold },
-  breadcrumbSep: { color: ct.muted },
-  breadcrumbCur: { color: ct.gold, fontWeight: '700' },
+  breadcrumbHome: { color: '#7C3AED', fontWeight: '800' },
+  breadcrumbLink: { color: '#B45309', fontWeight: '800' },
+  breadcrumbSep: { color: '#6B7280' },
+  breadcrumbCur: { color: '#1E1B4B', fontWeight: '900' },
 
   // Action bar
   actionBar: {
     flexDirection: 'row', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 14, backgroundColor: ct.background,
-    borderBottomWidth: 1, borderBottomColor: ct.line,
+    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderBottomWidth: 0, borderColor: 'transparent',
   },
   uploadBtn: {
-    flex: 1, backgroundColor: ct.cyan, borderRadius: 12,
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 0,
   },
-  uploadBtnTxt: { color: ct.background, fontWeight: '800', fontSize: 14 },
-  disabledButton: { backgroundColor: ct.surfaceRaised, borderWidth: 1, borderColor: ct.line, opacity: 0.55 },
+  uploadBtnTxt: { color: '#1E1B4B', fontWeight: '900', fontSize: 14 },
+  disabledButton: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderWidth: 0, opacity: 0.55 },
   newFolderBtn: {
-    flex: 1, backgroundColor: ct.surface, borderRadius: 12, borderWidth: 1, borderColor: ct.gold,
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, borderWidth: 0,
     paddingVertical: 12, alignItems: 'center',
   },
-  newFolderTxt: { color: ct.gold, fontWeight: '700', fontSize: 14 },
+  newFolderTxt: { color: '#1E1B4B', fontWeight: '900', fontSize: 14 },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
 
   // Section label
   sectionLabel: {
-    fontSize: 11, fontWeight: '800', color: ct.gold,
+    fontSize: 12, fontWeight: '900', color: '#1E1B4B',
     letterSpacing: 1.5, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
   },
 
   // Row (character or style)
-  content: { flex: 1 },
+  content: { flex: 1, backgroundColor: 'transparent' },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 14, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: ct.surfaceRaised,
-    borderWidth: 1, borderColor: ct.goldLine, borderRadius: 14,
+    marginHorizontal: 14, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderWidth: 0, borderColor: 'transparent', borderRadius: 14,
   },
   rowIcon: {
-    width: 42, height: 42, borderRadius: 21, overflow: 'hidden', backgroundColor: ct.surfaceSoft,
-    borderWidth: 1, borderColor: ct.cyan,
+    width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    borderWidth: 0,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  rowIconTxt: { color: ct.cyan, fontWeight: 'bold', fontSize: 15 },
+  rowIconTxt: { color: '#B45309', fontWeight: 'bold', fontSize: 16 },
   profilePhoto: { width: '100%', height: '100%' },
-  rowName: { flex: 1, fontSize: 16, color: ct.text, fontWeight: '600' },
+  rowName: { flex: 1, fontSize: 16.5, color: '#1E1B4B', fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 2 },
   rowArrow: { marginRight: 8 },
   trashBtn: { padding: 6 },
   trashIcon: { fontSize: 18 },
@@ -1457,25 +1468,25 @@ const s = StyleSheet.create({
 
   // Style row
   styleIcon: { fontSize: 20, marginRight: 14 },
-  styleThumb: { width: 60, height: 48, borderRadius: 8, marginRight: 13, borderWidth: 1, borderColor: ct.gold },
-  styleRowName: { flex: 1, fontSize: 15.5, color: ct.text, fontWeight: '600' },
+  styleThumb: { width: 60, height: 48, borderRadius: 8, marginRight: 13, borderWidth: 0 },
+  styleRowName: { flex: 1, fontSize: 16, color: '#1E1B4B', fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 2 },
 
   sep: { height: 9 },
 
   // Photo grid
-  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 24, backgroundColor: ct.background },
-  loadingTxt: { color: ct.muted, fontSize: 14, textAlign: 'center', marginTop: 10 },
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 24, backgroundColor: 'transparent' },
+  loadingTxt: { color: '#6B7280', fontSize: 14, textAlign: 'center', marginTop: 10 },
   emptyIcon: { fontSize: 60 },
-  emptyArtwork: { width: Math.min(width - 56, 300), height: Math.min(width - 56, 300), borderRadius: 20, borderWidth: 1, borderColor: ct.gold },
-  emptyTxt: { color: ct.gold, fontSize: 15, textAlign: 'center', lineHeight: 26, fontWeight: '700' },
+  emptyArtwork: { width: Math.min(width - 56, 300), height: Math.min(width - 56, 300), borderRadius: 20, borderWidth: 0 },
+  emptyTxt: { color: '#1E1B4B', fontSize: 16, textAlign: 'center', lineHeight: 26, fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
   dateHeader: {
     paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8,
-     backgroundColor: ct.background,
+     backgroundColor: 'transparent',
   },
-   dateHeaderTxt: { color: ct.gold, fontSize: 15, fontWeight: '700' },
-   dateHeaderSub: { color: ct.muted, fontSize: 12, marginTop: 2 },
-   photoList: { flex: 1, backgroundColor: ct.background },
-   photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: ct.background },
+   dateHeaderTxt: { color: '#1E1B4B', fontSize: 15, fontWeight: '800' },
+   dateHeaderSub: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+   photoList: { flex: 1, backgroundColor: 'transparent' },
+   photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: 'transparent' },
   photoRow: { justifyContent: 'space-between', marginBottom: 2 },
   photoSelBar: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: ct.surfaceRaised,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, TextInput, Alert, ActivityIndicator, Modal, Switch, StatusBar,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -496,12 +497,17 @@ export default function KeysScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={s.bgImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
+        {/* Header */}
+        <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <Text style={s.headerIcon}>🔐</Text>
         <Text style={s.headerTitle}>Keys & Accounts</Text>
         <TouchableOpacity style={s.checkAllBtn} onPress={checkAllNow} disabled={checkingAll}>
@@ -787,76 +793,79 @@ export default function KeysScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0d1117' },
+  bgImage: { flex: 1, width: '100%', height: '100%' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
-    backgroundColor: '#0d6e7a', flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', flexDirection: 'row',
     alignItems: 'center', gap: 10,
     paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 0,
   },
   headerIcon: { fontSize: 22 },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', flex: 1 },
+  headerTitle: { color: '#1E1B4B', fontSize: 19, fontWeight: '900', flex: 1, textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
   checkAllBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6, borderWidth: 0,
   },
-  checkAllTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  addBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  addBtnTxt: { color: '#fff', fontSize: 20, fontWeight: 'bold', lineHeight: 26 },
-  scroll: { padding: 14, paddingBottom: 90 },
+  checkAllTxt: { color: '#1E1B4B', fontSize: 13, fontWeight: '900' },
+  addBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255, 255, 255, 0.00)', justifyContent: 'center', alignItems: 'center' },
+  addBtnTxt: { color: '#1E1B4B', fontSize: 22, fontWeight: '900', lineHeight: 26 },
+  scroll: { padding: 14, paddingBottom: 90, backgroundColor: 'transparent' },
 
   summaryBar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#111827', borderRadius: 12, padding: 14, marginBottom: 14,
-    borderWidth: 1, borderColor: '#1f2937',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, padding: 14, marginBottom: 14,
+    borderWidth: 0,
   },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryNum: { color: '#7dd3fc', fontSize: 22, fontWeight: '800' },
-  summaryLbl: { color: '#6b7280', fontSize: 11, marginTop: 2 },
-  summaryDivider: { width: 1, height: 36, backgroundColor: '#1f2937' },
-  recheckBtn: { marginLeft: 12, backgroundColor: '#1e3a4a', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  recheckTxt: { color: '#7dd3fc', fontSize: 12, fontWeight: '700' },
+  summaryNum: { color: '#1E1B4B', fontSize: 22, fontWeight: '900' },
+  summaryLbl: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '700' },
+  summaryDivider: { width: 1, height: 36, backgroundColor: 'rgba(0,0,0,0.08)' },
+  recheckBtn: { marginLeft: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  recheckTxt: { color: '#1E1B4B', fontSize: 16, fontWeight: '900' },
 
   deviceKeyCard: {
-    backgroundColor: '#111827', borderRadius: 14, padding: 16,
-    marginBottom: 14, borderWidth: 1.5, borderColor: '#0d6e7a',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 14, padding: 16,
+    marginBottom: 14, borderWidth: 0,
   },
-  deviceKeyLabel: { color: '#0d6e7a', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 10 },
+  deviceKeyLabel: { color: '#1E1B4B', fontSize: 12, fontWeight: '900', letterSpacing: 0.8, marginBottom: 10 },
   deviceKeyRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1f2937', borderRadius: 10,
-    borderWidth: 1, borderColor: '#374151', marginBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10,
+    borderWidth: 0, marginBottom: 12,
   },
-  deviceKeyInput: { flex: 1, color: '#e5e7eb', fontSize: 14, padding: 12, fontFamily: 'monospace' },
+  deviceKeyInput: { flex: 1, color: '#1E1B4B', fontSize: 14, padding: 12, fontFamily: 'monospace', fontWeight: '800' },
   clearBtn: { paddingHorizontal: 12, paddingVertical: 12 },
   clearBtnTxt: { color: '#6b7280', fontSize: 16 },
   cloudBtns: { flexDirection: 'row', gap: 10 },
-  cloudLoadBtn: { flex: 1, backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  cloudSaveBtn: { flex: 1, backgroundColor: '#374151', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  cloudBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  cloudLoadBtn: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 0 },
+  cloudSaveBtn: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 0 },
+  cloudBtnTxt: { color: '#1E1B4B', fontWeight: '900', fontSize: 14 },
 
   sectionHeader: {
-    backgroundColor: '#0d1f2d', borderRadius: 12, padding: 14,
-    marginBottom: 2, borderWidth: 1.5, borderColor: '#1a4a5a',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, padding: 14,
+    marginBottom: 2, borderWidth: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   sectionHeaderIcon: { fontSize: 26 },
-  sectionHeaderTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  sectionHeaderSub: { color: '#6b9aaa', fontSize: 11, marginTop: 2 },
+  sectionHeaderTitle: { color: '#1E1B4B', fontSize: 15, fontWeight: '800' },
+  sectionHeaderSub: { color: '#6B7280', fontSize: 11, marginTop: 2 },
   sectionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  activeBadge: { backgroundColor: '#333', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  activeBadgeOn: { backgroundColor: '#065f46' },
-  activeBadgeTxt: { color: '#9ca3af', fontSize: 11, fontWeight: '800' },
-  sectionArrow: { color: '#6b7280', fontSize: 14 },
+  activeBadge: { backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  activeBadgeOn: { backgroundColor: '#059669' },
+  activeBadgeTxt: { color: '#1E1B4B', fontSize: 11, fontWeight: '800' },
+  sectionArrow: { color: '#1E1B4B', fontSize: 14 },
 
   geminiSection: {
-    backgroundColor: '#0a1520', borderRadius: 12, marginBottom: 14,
-    borderWidth: 1, borderColor: '#1a4a5a', overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, marginBottom: 14,
+    borderWidth: 0, overflow: 'hidden',
   },
   rotationBar: {
     flexDirection: 'row', alignItems: 'center',
