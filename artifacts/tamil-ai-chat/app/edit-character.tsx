@@ -163,12 +163,11 @@ export default function EditCharacterScreen() {
   const personaId = ParamsStore.getEditPersonaId() ?? '';
   const base = ALL_PERSONAS.find(p => p.id === personaId);
 
-  const [persona, setPersona] = useState<Persona | null>(base ?? null);
-  const [name, setName] = useState(base?.name ?? '');
-  const [avatarLetter, setAvatarLetter] = useState(base?.avatarLetter ?? base?.emoji ?? '');
-  const [greeting, setGreeting] = useState(base?.greeting ?? '');
-  const [systemPrompt, setSystemPrompt] = useState(base?.prompt ?? '');
-  const [relationship, setRelationship] = useState(base?.relationship ?? '');
+  const [persona, setPersona] = useState<Persona | null>(null);
+  const [name, setName] = useState('');
+  const [avatarLetter, setAvatarLetter] = useState('');
+  const [greeting, setGreeting] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [charOnly, setCharOnly] = useState('');
   const [defaultPromptExists, setDefaultPromptExists] = useState(false);
   const [faceDesc, setFaceDesc] = useState('');
@@ -179,6 +178,7 @@ export default function EditCharacterScreen() {
   const [presanaAvatarUri, setPresanaAvatarUri] = useState<string | undefined>(undefined);
   const [showModeCloud, setShowModeCloud] = useState<'normal' | 'presana' | null>(null);
   const [modeCloudInput, setModeCloudInput] = useState('');
+  const [relationship, setRelationship] = useState('');
   const baseRulesEditorRef = useRef<RichEditor>(null);
   const charPromptEditorRef = useRef<RichEditor>(null);
   const [saving, setSaving] = useState(false);
@@ -243,7 +243,7 @@ export default function EditCharacterScreen() {
   const [bubbleStyle, setBubbleStyle] = useState('classic');
   const [birthday, setBirthday] = useState('');
   const [avatarAsBg, setAvatarAsBg] = useState(false);
-  const [headerTheme, setHeaderTheme] = useState('gold');
+  const [headerTheme, setHeaderTheme] = useState('neon');
 
   useEffect(() => {
     const load = async () => {
@@ -262,7 +262,7 @@ export default function EditCharacterScreen() {
         if (savedBubble[1]) setBubbleStyle(savedBubble[1]);
         if (savedBday[1]) setBirthday(savedBday[1]);
         if (savedAvatarBg[1]) setAvatarAsBg(savedAvatarBg[1] === 'true');
-        if (savedHTheme[1]) setHeaderTheme(savedHTheme[1] === 'neon' ? 'neon' : 'gold');
+        if (savedHTheme[1]) setHeaderTheme(savedHTheme[1]);
         let data: Record<string, any> = saved[1] ? JSON.parse(saved[1]) : {};
         // Restore from cloud if local data missing (reinstall recovery)
         if (!saved[1]) {
@@ -617,6 +617,14 @@ export default function EditCharacterScreen() {
   const [wordInputs, setWordInputs] = useState<Record<string, string>>({});
 
 
+  if (!persona) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator  />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{
@@ -642,11 +650,6 @@ export default function EditCharacterScreen() {
         ),
       }} />
       <ImageBackground source={require('../assets/images/chat_rose_bg.png')} style={styles.bgImage} resizeMode="cover">
-      {!persona ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator color="#7C3AED" size="large" />
-        </View>
-      ) : (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         {/* ── AVATAR ── */}
@@ -876,8 +879,9 @@ export default function EditCharacterScreen() {
           <Text style={styles.switchHint}>Character List Header-ல் Double-Tap செய்தும் மாற்றலாம்</Text>
           <View style={styles.bubbleStyleRow}>
             {[
-              { id: 'gold', label: '🌟 Royal Gold' },
-              { id: 'neon', label: '⚡ Neon Glow' },
+              { id: 'neon', label: '✨ Neon Center' },
+              { id: 'glamour', label: '💎 3D Ribbon' },
+              { id: 'vogue', label: '👑 Vogue Cover' },
             ].map(t => (
               <TouchableOpacity
                 key={t.id}
@@ -1470,7 +1474,6 @@ export default function EditCharacterScreen() {
           }
         </TouchableOpacity>
       </ScrollView>
-      )}
       </ImageBackground>
     </SafeAreaView>
   );

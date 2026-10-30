@@ -2,9 +2,11 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +14,9 @@ import {
   View,
 } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ALL_PERSONAS, Persona } from "../constants/personas";
 import { ParamsStore } from "../context/params-store";
@@ -28,6 +32,7 @@ import { openExternalHttpUrl } from "../utils/external-url";
 
 export default function CharacterUrlsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const characterId = ParamsStore.getUrlPersonaId() ?? "";
   const [persona, setPersona] = useState<Persona | null>(null);
   const [urls, setUrls] = useState<CharacterUrl[]>([]);
@@ -184,18 +189,39 @@ export default function CharacterUrlsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <ImageBackground
+      source={require("../assets/images/cloud_spring_bg.png")}
+      style={styles.rootBackground}
+      resizeMode="cover"
+    >
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
+
+      {/* Glass Header Card */}
+      <View style={[styles.headerCard, { marginTop: insets.top + 8 }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.circleBtn}
+          accessibilityLabel="Back"
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#6B46C1" />
         </TouchableOpacity>
+
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Saved URLs</Text>
-          <Text style={styles.subtitle}>{persona?.name ?? "Character"}</Text>
+          <Text style={styles.title} numberOfLines={1}>Saved URLs</Text>
+          <Text style={styles.subtitle} numberOfLines={1}>{persona?.name ?? "Character"}</Text>
         </View>
-        <TouchableOpacity onPress={() => openEditor()} style={styles.addButton}>
-          <Text style={styles.addButtonText}>＋ Add</Text>
+
+        <TouchableOpacity onPress={() => openEditor()} activeOpacity={0.85}>
+          <LinearGradient
+            colors={["#E024A5", "#8B5CF6"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.addBtnGradient}
+          >
+            <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Add</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -205,79 +231,157 @@ export default function CharacterUrlsScreen() {
       >
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#075E54" size="large" />
+            <ActivityIndicator color="#E024A5" size="large" />
           </View>
         ) : (
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.notice}>
-              <Text style={styles.noticeTitle}>🔗 {persona?.name ?? "இந்த character"} URLs</Text>
+            {/* Notice Card */}
+            <View style={styles.noticeCard}>
+              <View style={styles.noticeHeader}>
+                <View style={styles.noticeIconCircle}>
+                  <MaterialCommunityIcons name="link-variant" size={18} color="#E024A5" />
+                </View>
+                <Text style={styles.noticeTitle}>
+                  {persona?.name ?? "இந்த character"} URLs
+                </Text>
+              </View>
               <Text style={styles.noticeText}>
                 Active URLs மட்டும் Chat TXT-ல் வரிசையாக வரும். Disabled URL skip ஆகும்.
               </Text>
             </View>
 
             {urls.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔗</Text>
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconCircle}>
+                  <MaterialCommunityIcons name="link-variant" size={32} color="#8B5CF6" />
+                </View>
                 <Text style={styles.emptyTitle}>URL இன்னும் save செய்யவில்லை</Text>
-                <Text style={styles.emptyText}>இந்த character-க்கு மட்டும் பயன்படுத்தப்படும் URL-ஐ add பண்ணுங்க.</Text>
-                <TouchableOpacity style={styles.emptyButton} onPress={() => openEditor()}>
-                  <Text style={styles.emptyButtonText}>＋ Add URL</Text>
+                <Text style={styles.emptyText}>
+                  இந்த character-க்கு மட்டும் பயன்படுத்தப்படும் URL-ஐ add பண்ணுங்க.
+                </Text>
+                <TouchableOpacity onPress={() => openEditor()} activeOpacity={0.85} style={{ marginTop: 16 }}>
+                  <LinearGradient
+                    colors={["#E024A5", "#8B5CF6"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.emptyAddBtn}
+                  >
+                    <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+                    <Text style={styles.emptyAddBtnText}>Add URL</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             ) : (
               <>
                 {urls.map((item, index) => (
-                  <View key={item.id} style={[styles.urlCard, !item.isActive && styles.urlCardDisabled]}>
+                  <View
+                    key={item.id}
+                    style={[styles.urlCard, !item.isActive && styles.urlCardDisabled]}
+                  >
+                    {/* Order Controls */}
                     <View style={styles.orderColumn}>
-                      <Text style={styles.orderText}>{index + 1}</Text>
+                      <View style={styles.orderBadge}>
+                        <Text style={styles.orderText}>{index + 1}</Text>
+                      </View>
                       <TouchableOpacity
                         onPress={() => moveUrl(index, -1)}
                         disabled={index === 0}
                         style={styles.arrowButton}
                       >
-                        <Text style={[styles.arrowText, index === 0 && styles.muted]}>▲</Text>
+                        <MaterialCommunityIcons
+                          name="chevron-up"
+                          size={20}
+                          color={index === 0 ? "#CBD5E1" : "#7C3AED"}
+                        />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => moveUrl(index, 1)}
                         disabled={index === urls.length - 1}
                         style={styles.arrowButton}
                       >
-                        <Text style={[styles.arrowText, index === urls.length - 1 && styles.muted]}>▼</Text>
+                        <MaterialCommunityIcons
+                          name="chevron-down"
+                          size={20}
+                          color={index === urls.length - 1 ? "#CBD5E1" : "#7C3AED"}
+                        />
                       </TouchableOpacity>
                     </View>
+
+                    {/* URL Details */}
                     <View style={styles.urlCopy}>
                       <TouchableOpacity
                         onPress={() => openSavedUrl(item.url)}
                         accessibilityRole="link"
                         testID={`character-url-${item.id}`}
                       >
-                        <Text style={[styles.urlText, !item.isActive && styles.disabledText]} numberOfLines={3}>
+                        <Text
+                          style={[styles.urlText, !item.isActive && styles.disabledText]}
+                          numberOfLines={3}
+                        >
                           {item.url}
                         </Text>
                       </TouchableOpacity>
-                      <Text style={[styles.statusText, item.isActive ? styles.activeText : styles.disabledText]}>
-                        {item.isActive ? "● Active" : "○ Disabled"}
-                      </Text>
+
+                      <View style={styles.metaRow}>
+                        <View style={[styles.statusBadge, item.isActive ? styles.statusActive : styles.statusDisabled]}>
+                          <View style={[styles.statusDot, { backgroundColor: item.isActive ? "#059669" : "#94A3B8" }]} />
+                          <Text style={[styles.statusBadgeText, { color: item.isActive ? "#065F46" : "#64748B" }]}>
+                            {item.isActive ? "Active" : "Disabled"}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
+
+                    {/* Action Buttons */}
                     <View style={styles.actions}>
-                      <TouchableOpacity onPress={() => toggleActive(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>{item.isActive ? "Disable" : "Enable"}</Text>
+                      <TouchableOpacity
+                        onPress={() => toggleActive(item)}
+                        style={styles.actionPill}
+                      >
+                        <Text style={styles.actionPillText}>{item.isActive ? "Disable" : "Enable"}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => openEditor(item)} style={styles.actionButton}>
-                        <Text style={styles.actionText}>Edit</Text>
+                      <TouchableOpacity
+                        onPress={() => openEditor(item)}
+                        style={styles.actionPill}
+                      >
+                        <Text style={styles.actionPillText}>Edit</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteUrl(item)} style={[styles.actionButton, styles.deleteButton]}>
-                        <Text style={styles.deleteText}>Delete</Text>
+                      <TouchableOpacity
+                        onPress={() => deleteUrl(item)}
+                        style={[styles.actionPill, styles.deletePill]}
+                      >
+                        <Text style={styles.deletePillText}>Delete</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity style={styles.saveOrderButton} onPress={saveOrder} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveOrderText}>💾 Save URL Order</Text>}
+
+                {/* Save URL Order Button */}
+                <TouchableOpacity
+                  onPress={saveOrder}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                  style={{ marginTop: 10 }}
+                >
+                  <LinearGradient
+                    colors={["#E024A5", "#8B5CF6"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.saveOrderGradient}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="content-save-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.saveOrderText}>Save URL Order</Text>
+                      </>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
               </>
             )}
@@ -285,15 +389,18 @@ export default function CharacterUrlsScreen() {
         )}
       </KeyboardAvoidingView>
 
+      {/* Editor Modal */}
       {editorVisible && (
         <View style={styles.editorOverlay}>
-          <View style={styles.editor}>
-            <Text style={styles.editorTitle}>{editingUrlId === null ? "Add URL" : "Edit URL"}</Text>
+          <View style={styles.editorCard}>
+            <Text style={styles.editorTitle}>
+              {editingUrlId === null ? "Add URL" : "Edit URL"}
+            </Text>
             <TextInput
               value={draftUrl}
               onChangeText={setDraftUrl}
               placeholder="https://example.com/..."
-              placeholderTextColor="#999"
+              placeholderTextColor="#94A3B8"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
@@ -301,74 +408,391 @@ export default function CharacterUrlsScreen() {
               autoFocus
             />
             <View style={styles.editorActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setEditorVisible(false)}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setEditorVisible(false)}
+              >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={saveUrl} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Save</Text>}
+              <TouchableOpacity
+                onPress={saveUrl}
+                disabled={saving}
+                style={{ flex: 1 }}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={["#E024A5", "#8B5CF6"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.confirmGradient}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.confirmText}>Save</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f7f6" },
-  header: {
+  rootBackground: {
+    flex: 1,
+  },
+  headerCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#075E54",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.95)",
+    shadowColor: "#E91E8C",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  backButton: { paddingHorizontal: 8, paddingVertical: 2 },
-  backText: { color: "#fff", fontSize: 34, lineHeight: 34 },
-  headerCopy: { flex: 1, marginLeft: 6 },
-  title: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  subtitle: { color: "#d7f4ee", fontSize: 13, marginTop: 2 },
-  addButton: { backgroundColor: "#25D366", borderRadius: 18, paddingHorizontal: 13, paddingVertical: 8 },
-  addButtonText: { color: "#073b35", fontSize: 13, fontWeight: "800" },
-  body: { flex: 1 },
-  content: { padding: 16, paddingBottom: 36 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notice: { backgroundColor: "#e6f4f1", borderRadius: 14, padding: 14, marginBottom: 14 },
-  noticeTitle: { color: "#075E54", fontSize: 15, fontWeight: "800" },
-  noticeText: { color: "#38655f", fontSize: 13, lineHeight: 19, marginTop: 5 },
-  empty: { backgroundColor: "#fff", borderRadius: 18, padding: 28, alignItems: "center", marginTop: 12 },
-  emptyIcon: { fontSize: 34, marginBottom: 10 },
-  emptyTitle: { color: "#222", fontSize: 16, fontWeight: "800" },
-  emptyText: { color: "#777", fontSize: 13, textAlign: "center", lineHeight: 19, marginTop: 6 },
-  emptyButton: { backgroundColor: "#075E54", borderRadius: 12, paddingHorizontal: 18, paddingVertical: 11, marginTop: 16 },
-  emptyButtonText: { color: "#fff", fontWeight: "800" },
-  urlCard: { backgroundColor: "#fff", borderRadius: 14, padding: 12, marginBottom: 10, flexDirection: "row", alignItems: "center", elevation: 1 },
-  urlCardDisabled: { opacity: 0.65 },
-  orderColumn: { width: 34, alignItems: "center" },
-  orderText: { color: "#075E54", fontSize: 18, fontWeight: "800" },
-  arrowButton: { padding: 2 },
-  arrowText: { color: "#075E54", fontSize: 12 },
-  muted: { color: "#ccc" },
-  urlCopy: { flex: 1, paddingHorizontal: 8 },
-  urlText: { color: "#222", fontSize: 13, lineHeight: 18 },
-  disabledText: { color: "#999" },
-  statusText: { fontSize: 11, marginTop: 5, fontWeight: "700" },
-  activeText: { color: "#16804c" },
-  actions: { alignItems: "flex-end", gap: 5 },
-  actionButton: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7, backgroundColor: "#e8f5e9" },
-  actionText: { color: "#075E54", fontSize: 11, fontWeight: "700" },
-  deleteButton: { backgroundColor: "#ffebee" },
-  deleteText: { color: "#c62828", fontSize: 11, fontWeight: "700" },
-  saveOrderButton: { backgroundColor: "#075E54", borderRadius: 13, paddingVertical: 14, alignItems: "center", marginTop: 6 },
-  saveOrderText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-  editorOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 },
-  editor: { backgroundColor: "#fff", borderRadius: 18, padding: 20 },
-  editorTitle: { color: "#075E54", fontSize: 19, fontWeight: "800", marginBottom: 14 },
-  input: { borderWidth: 1, borderColor: "#b7d8d2", borderRadius: 11, paddingHorizontal: 12, paddingVertical: 11, color: "#222", fontSize: 15 },
-  editorActions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  cancelButton: { flex: 1, borderWidth: 1, borderColor: "#ccc", borderRadius: 11, paddingVertical: 12, alignItems: "center" },
-  cancelText: { color: "#555", fontWeight: "700" },
-  confirmButton: { flex: 1, backgroundColor: "#075E54", borderRadius: 11, paddingVertical: 12, alignItems: "center" },
-  confirmText: { color: "#fff", fontWeight: "800" },
+  circleBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#EDE9FE",
+    borderWidth: 1,
+    borderColor: "#C4B5FD",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCopy: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  title: {
+    color: "#18204E",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  subtitle: {
+    color: "#7C3AED",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  addBtnGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: "#E024A5",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  addBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  body: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noticeCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.95)",
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: "#E91E8C",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  noticeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  noticeIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FCE7F3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noticeTitle: {
+    color: "#18204E",
+    fontSize: 14,
+    fontWeight: "800",
+    flex: 1,
+  },
+  noticeText: {
+    color: "#475569",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  emptyCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.95)",
+    padding: 30,
+    alignItems: "center",
+    marginTop: 14,
+    shadowColor: "#E91E8C",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    color: "#18204E",
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  emptyText: {
+    color: "#64748B",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  emptyAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+  },
+  emptyAddBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  urlCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.95)",
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#E91E8C",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  urlCardDisabled: {
+    opacity: 0.62,
+    backgroundColor: "rgba(255, 255, 255, 0.72)",
+  },
+  orderColumn: {
+    width: 34,
+    alignItems: "center",
+  },
+  orderBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  orderText: {
+    color: "#6B46C1",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  arrowButton: {
+    padding: 2,
+  },
+  urlCopy: {
+    flex: 1,
+    paddingHorizontal: 10,
+  },
+  urlText: {
+    color: "#18204E",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  disabledText: {
+    color: "#94A3B8",
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusActive: {
+    backgroundColor: "#D1FAE5",
+  },
+  statusDisabled: {
+    backgroundColor: "#F1F5F9",
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  actions: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  actionPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "#EDE9FE",
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+  },
+  actionPillText: {
+    color: "#6B46C1",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  deletePill: {
+    backgroundColor: "#FEE2E2",
+    borderColor: "#FECACA",
+  },
+  deletePillText: {
+    color: "#DC2626",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  saveOrderGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 18,
+    paddingVertical: 14,
+    shadowColor: "#E024A5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveOrderText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  editorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 100,
+  },
+  editorCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: "#EDE9FE",
+    shadowColor: "#E91E8C",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  editorTitle: {
+    color: "#18204E",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 14,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: "#DDD6FE",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#18204E",
+    fontSize: 14,
+    backgroundColor: "rgba(248, 250, 252, 0.9)",
+  },
+  editorActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+  },
+  cancelButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+  },
+  cancelText: {
+    color: "#64748B",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  confirmGradient: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 14,
+  },
 });

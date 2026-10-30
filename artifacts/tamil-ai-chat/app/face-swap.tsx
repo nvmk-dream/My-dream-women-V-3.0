@@ -2,14 +2,17 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, Alert, ActivityIndicator, ScrollView, Dimensions, StatusBar, Switch, Animated, Linking,
+  ImageBackground,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -45,26 +48,27 @@ function ProgressBar({ progress, statusMsg }: { progress: number; statusMsg: str
 
 const pb = StyleSheet.create({
   container: {
-    backgroundColor: '#12103a', borderRadius: 14, padding: 14,
-    marginBottom: 12, borderWidth: 1, borderColor: '#7c3aed55',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 18, padding: 16,
+    marginBottom: 14, borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 8 },
-  statusTxt: { color: '#c4b5fd', fontSize: 12, flex: 1, lineHeight: 18 },
-  pct: { color: '#fff', fontSize: 22, fontWeight: '900', minWidth: 50, textAlign: 'right' },
+  statusTxt: { color: '#18204E', fontSize: 13, flex: 1, lineHeight: 18, fontWeight: '600' },
+  pct: { color: '#9333EA', fontSize: 22, fontWeight: '900', minWidth: 50, textAlign: 'right' },
   track: {
-    height: 10, borderRadius: 6, backgroundColor: '#1e1b4b',
+    height: 10, borderRadius: 6, backgroundColor: '#EDE9FE',
     overflow: 'hidden', marginBottom: 12,
   },
   fill: {
     height: '100%', borderRadius: 6,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#9333EA',
   },
   stepsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   step: { alignItems: 'center', gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#333' },
-  dotActive: { backgroundColor: '#7c3aed' },
-  stepLabel: { color: '#555', fontSize: 9, fontWeight: '600' },
-  stepLabelActive: { color: '#a78bfa' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#CBD5E1' },
+  dotActive: { backgroundColor: '#9333EA' },
+  stepLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '600' },
+  stepLabelActive: { color: '#7C3AED', fontWeight: '700' },
 });
 
 // ── HuggingFace Space Gradio helper ──────────────────────────────────────────
@@ -362,6 +366,8 @@ async function urlToDataUri(url: string): Promise<string | null> {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function FaceSwapScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [targetUri, setTargetUri] = useState<string | null>(null);
   const [targetB64, setTargetB64] = useState<string | null>(null);
   const [faceUri, setFaceUri] = useState<string | null>(null);
@@ -518,210 +524,426 @@ export default function FaceSwapScreen() {
   };
 
   return (
-    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
-      <StatusBar backgroundColor="#1a1a2e" barStyle="light-content" />
-      <Stack.Screen options={{
-        title: '🤳 Face Swap',
-        headerStyle: { backgroundColor: '#1a1a2e' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-      }} />
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={s.root} edges={['top', 'bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-        <Text style={s.title}>AI Face Swap</Text>
-        <Text style={s.sub}>InsightFace · InSwapper128 · GFPGAN · Real-ESRGAN</Text>
-
-        <View style={s.engineCard}>
-          <Text style={s.engineTitle}>🚀 Engine Stack</Text>
-          <Text style={s.engineLine}>🔍 InsightFace — face detection & landmark</Text>
-          <Text style={s.engineLine}>🔄 InSwapper_128 — neural face swap</Text>
-          <Text style={s.engineLine}>✨ GFPGAN — face restoration & detail</Text>
-          <Text style={s.engineLine}>🔬 Real-ESRGAN — 4× resolution upscale</Text>
-        </View>
-
-        <View style={s.tipCard}>
-          <Text style={s.tipTitle}>📸 Best results tips:</Text>
-          <Text style={s.tipText}>• முகம் clearly தெரியும் front-facing photos</Text>
-          <Text style={s.tipText}>• High resolution, bright, blur இல்லாத photos</Text>
-          <Text style={s.tipText}>• Glasses, mask இல்லாமல் clear face</Text>
-          <Text style={s.tipText}>• Both photos similar face size</Text>
-        </View>
-
-        <View style={s.toggleCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.toggleLabel}>✨ GFPGAN + Real-ESRGAN Enhancement</Text>
-            <Text style={s.toggleSub}>Face restore + 4× upscale (slower but higher quality)</Text>
-          </View>
-          <Switch
-            value={enhanceEnabled}
-            onValueChange={setEnhanceEnabled}
-            trackColor={{ false: '#333', true: '#7c3aed' }}
-            thumbColor={enhanceEnabled ? '#fff' : '#888'}
-          />
-        </View>
-
-        {/* Image 1: Target */}
-        <View style={s.card}>
-          <View style={s.badge}><Text style={s.badgeNum}>1</Text></View>
-          <Text style={s.cardLabel}>Target Image — முகம் வைக்க வேண்டிய photo (body/background)</Text>
-          <TouchableOpacity style={[s.picker, targetUri ? s.pickerFilled : null]} onPress={() => pickImage('target')}>
-            {targetUri
-              ? <Image source={{ uri: targetUri }} style={s.pickedImg} />
-              : <View style={s.pickerPlaceholder}>
-                  <Text style={s.pickerIcon}>🖼️</Text>
-                  <Text style={s.pickerHint}>Upload Target Image</Text>
-                  <Text style={s.pickerSub}>Body + background இந்த photo-ல் இருக்கும்</Text>
-                </View>}
-            {targetUri ? <View style={s.changeBadge}><Text style={s.changeTxt}>Change ✏️</Text></View> : null}
-          </TouchableOpacity>
-        </View>
-
-        {/* Image 2: Face source */}
-        <View style={s.card}>
-          <View style={s.badge}><Text style={s.badgeNum}>2</Text></View>
-          <Text style={s.cardLabel}>Face Source — இந்த முகம் target-ல் swap ஆகும்</Text>
-          <TouchableOpacity style={[s.picker, faceUri ? s.pickerFilled : null]} onPress={() => pickImage('face')}>
-            {faceUri
-              ? <Image source={{ uri: faceUri }} style={s.pickedImg} />
-              : <View style={s.pickerPlaceholder}>
-                  <Text style={s.pickerIcon}>🤳</Text>
-                  <Text style={s.pickerHint}>Upload Face Photo</Text>
-                  <Text style={s.pickerSub}>இந்த person-ஓட முகம் target-ல் வரும்</Text>
-                </View>}
-            {faceUri ? <View style={s.changeBadge}><Text style={s.changeTxt}>Change ✏️</Text></View> : null}
-          </TouchableOpacity>
-        </View>
-
-        {/* Progress Bar — shown only while loading */}
-        {loading ? (
-          <ProgressBar progress={progress} statusMsg={statusMsg} />
-        ) : null}
-
-        {/* Swap button */}
-        <TouchableOpacity
-          style={[s.swapBtn, (!targetB64 || !faceB64 || loading) ? s.swapBtnOff : null]}
-          onPress={startSwap}
-          disabled={!targetB64 || !faceB64 || loading}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.swapBtnTxt}>✨ Swap Face ›</Text>}
-        </TouchableOpacity>
-
-        {loading ? (
-          <Text style={s.waitTxt}>
-            {enhanceEnabled ? '60–180 seconds எடுக்கும் (enhancement ON)...' : '30–90 seconds எடுக்கும்...'}
-          </Text>
-        ) : null}
-
-        {/* HF Failed → Vidmage fallback card */}
-        {!loading && statusMsg === 'hf_failed' ? (
-          <View style={s.vidmageCard}>
-            <Text style={s.vidmageTitle}>⚠️ AI Models இப்போது Busy</Text>
-            <Text style={s.vidmageDesc}>
-              HuggingFace free models இப்போது respond ஆகவில்லை.{' '}கீழே உள்ள vidmage.ai-ல் free-ஆக face swap பண்ணலாம்!
-            </Text>
+        {/* ── Glass Header Card ── */}
+        <View style={[s.headerWrap, { paddingTop: insets.top > 0 ? 4 : 10 }]}>
+          <View style={s.headerCard}>
             <TouchableOpacity
-              style={s.vidmageBtn}
-              onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
+              style={s.backBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
             >
-              <Text style={s.vidmageBtnTxt}>🌐 vidmage.ai-ல் Try பண்ணுங்க →</Text>
+              <MaterialCommunityIcons name="chevron-left" size={26} color="#6B46C1" />
             </TouchableOpacity>
-            <Text style={s.vidmageSub}>
-              Free · No signup · Browser-ல் open ஆகும்
+
+            <View style={s.headerCenter}>
+              <Text style={s.headerTitle}>Face Swap</Text>
+              <Text style={s.headerSub}>AI Neural Face Transformation</Text>
+            </View>
+
+            <View style={s.headerBadge}>
+              <MaterialCommunityIcons name="face-recognition" size={20} color="#9333EA" />
+            </View>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+          <View style={s.engineCard}>
+            <View style={s.cardHeaderRow}>
+              <MaterialCommunityIcons name="rocket-launch" size={18} color="#9333EA" />
+              <Text style={s.engineTitle}>Engine Stack</Text>
+            </View>
+            <Text style={s.engineLine}>🔍 InsightFace — face detection & landmark</Text>
+            <Text style={s.engineLine}>🔄 InSwapper_128 — neural face swap</Text>
+            <Text style={s.engineLine}>✨ GFPGAN — face restoration & detail</Text>
+            <Text style={s.engineLine}>🔬 Real-ESRGAN — 4× resolution upscale</Text>
+          </View>
+
+          <View style={s.tipCard}>
+            <View style={s.cardHeaderRow}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="#166534" />
+              <Text style={s.tipTitle}>Best results tips:</Text>
+            </View>
+            <Text style={s.tipText}>• முகம் clearly தெரியும் front-facing photos</Text>
+            <Text style={s.tipText}>• High resolution, bright, blur இல்லாத photos</Text>
+            <Text style={s.tipText}>• Glasses, mask இல்லாமல் clear face</Text>
+            <Text style={s.tipText}>• Both photos similar face size</Text>
+          </View>
+
+          <View style={s.toggleCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.toggleLabel}>✨ GFPGAN + Real-ESRGAN Enhancement</Text>
+              <Text style={s.toggleSub}>Face restore + 4× upscale (slower but higher quality)</Text>
+            </View>
+            <Switch
+              value={enhanceEnabled}
+              onValueChange={setEnhanceEnabled}
+              trackColor={{ false: '#E2E8F0', true: '#C4B5FD' }}
+              thumbColor={enhanceEnabled ? '#9333EA' : '#94A3B8'}
+            />
+          </View>
+
+          {/* Image 1: Target */}
+          <View style={s.card}>
+            <View style={s.badge}><Text style={s.badgeNum}>1</Text></View>
+            <Text style={s.cardLabel}>Target Image — முகம் வைக்க வேண்டிய photo (body/background)</Text>
+            <TouchableOpacity style={[s.picker, targetUri ? s.pickerFilled : null]} onPress={() => pickImage('target')}>
+              {targetUri
+                ? <Image source={{ uri: targetUri }} style={s.pickedImg} />
+                : <View style={s.pickerPlaceholder}>
+                    <Text style={s.pickerIcon}>🖼️</Text>
+                    <Text style={s.pickerHint}>Upload Target Image</Text>
+                    <Text style={s.pickerSub}>Body + background இந்த photo-ல் இருக்கும்</Text>
+                  </View>}
+              {targetUri ? <View style={s.changeBadge}><Text style={s.changeTxt}>Change ✏️</Text></View> : null}
+            </TouchableOpacity>
+          </View>
+
+          {/* Image 2: Face source */}
+          <View style={s.card}>
+            <View style={s.badge}><Text style={s.badgeNum}>2</Text></View>
+            <Text style={s.cardLabel}>Face Source — இந்த முகம் target-ல் swap ஆகும்</Text>
+            <TouchableOpacity style={[s.picker, faceUri ? s.pickerFilled : null]} onPress={() => pickImage('face')}>
+              {faceUri
+                ? <Image source={{ uri: faceUri }} style={s.pickedImg} />
+                : <View style={s.pickerPlaceholder}>
+                    <Text style={s.pickerIcon}>🤳</Text>
+                    <Text style={s.pickerHint}>Upload Face Photo</Text>
+                    <Text style={s.pickerSub}>இந்த person-ஓட முகம் target-ல் வரும்</Text>
+                  </View>}
+              {faceUri ? <View style={s.changeBadge}><Text style={s.changeTxt}>Change ✏️</Text></View> : null}
+            </TouchableOpacity>
+          </View>
+
+          {/* Progress Bar — shown only while loading */}
+          {loading ? (
+            <ProgressBar progress={progress} statusMsg={statusMsg} />
+          ) : null}
+
+          {/* Swap button */}
+          <TouchableOpacity
+            style={[s.swapBtn, (!targetB64 || !faceB64 || loading) ? s.swapBtnOff : null]}
+            onPress={startSwap}
+            disabled={!targetB64 || !faceB64 || loading}
+            activeOpacity={0.88}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <LinearGradient
+                colors={['#E024A5', '#8B5CF6']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={s.swapBtnGradient}
+              >
+                <MaterialCommunityIcons name="auto-fix" size={20} color="#FFFFFF" />
+                <Text style={s.swapBtnTxt}>Swap Face ›</Text>
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
+
+          {loading ? (
+            <Text style={s.waitTxt}>
+              {enhanceEnabled ? '60–180 seconds எடுக்கும் (enhancement ON)...' : '30–90 seconds எடுக்கும்...'}
             </Text>
-            <TouchableOpacity
-              style={s.retryBtn}
-              onPress={() => { setStatusMsg(''); startSwap(); }}
-            >
-              <Text style={s.retryBtnTxt}>🔄 மீண்டும் Try</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+          ) : null}
 
-        {/* Result */}
-        {resultUrl ? (
-          <View style={s.resultCard}>
-            <Text style={s.resultTitle}>✅ Face Swap Complete!</Text>
-            {usedModel ? (
-              <View style={s.modelBadge}>
-                <Text style={s.modelBadgeTxt}>🤖 {usedModel}</Text>
-              </View>
-            ) : null}
-            <Image source={{ uri: resultUrl }} style={s.resultImg} resizeMode="contain" />
-            <TouchableOpacity style={s.saveBtn} onPress={saveResult}>
-              <Text style={s.saveBtnTxt}>⬇ Gallery-ல Save</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+          {/* HF Failed → Vidmage fallback card */}
+          {!loading && statusMsg === 'hf_failed' ? (
+            <View style={s.vidmageCard}>
+              <Text style={s.vidmageTitle}>⚠️ AI Models இப்போது Busy</Text>
+              <Text style={s.vidmageDesc}>
+                HuggingFace free models இப்போது respond ஆகவில்லை.{' '}கீழே உள்ள vidmage.ai-ல் free-ஆக face swap பண்ணலாம்!
+              </Text>
+              <TouchableOpacity
+                style={s.vidmageBtn}
+                onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
+              >
+                <Text style={s.vidmageBtnTxt}>🌐 vidmage.ai-ல் Try பண்ணுங்க →</Text>
+              </TouchableOpacity>
+              <Text style={s.vidmageSub}>
+                Free · No signup · Browser-ல் open ஆகும்
+              </Text>
+              <TouchableOpacity
+                style={s.retryBtn}
+                onPress={() => { setStatusMsg(''); startSwap(); }}
+              >
+                <Text style={s.retryBtnTxt}>🔄 மீண்டும் Try</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
-        {/* Always-visible alternative links */}
-        <TouchableOpacity
-          style={s.altLink}
-          onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
-        >
-          <Text style={s.altLinkTxtBlue}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={s.altLink}
-          onPress={() => Linking.openURL('https://remaker.ai/features/batche-face-swap/')}
-        >
-          <Text style={s.altLinkTxtGreen}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
-        </TouchableOpacity>
+          {/* Result */}
+          {resultUrl ? (
+            <View style={s.resultCard}>
+              <Text style={s.resultTitle}>✅ Face Swap Complete!</Text>
+              {usedModel ? (
+                <View style={s.modelBadge}>
+                  <Text style={s.modelBadgeTxt}>🤖 {usedModel}</Text>
+                </View>
+              ) : null}
+              <Image source={{ uri: resultUrl }} style={s.resultImg} resizeMode="contain" />
+              <TouchableOpacity style={s.saveBtn} onPress={saveResult}>
+                <Text style={s.saveBtnTxt}>⬇ Gallery-ல Save</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+          {/* Always-visible alternative links */}
+          <TouchableOpacity
+            style={s.altLink}
+            onPress={() => Linking.openURL('https://vidmage.ai/face-swap')}
+          >
+            <Text style={s.altLinkTxtBlue}>🌐 Alternative: vidmage.ai Face Swap (browser)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.altLink}
+            onPress={() => Linking.openURL('https://remaker.ai/features/batche-face-swap/')}
+          >
+            <Text style={s.altLinkTxtGreen}>🌐 Alternative: remaker.ai Batch Face Swap (browser)</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f0f1a' },
-  scroll: { padding: 20 },
-  title: { fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 4 },
-  sub: { fontSize: 11, color: '#7c3aed', textAlign: 'center', marginBottom: 16, fontWeight: '700', letterSpacing: 0.5 },
-  engineCard: { backgroundColor: '#1a1232', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#7c3aed55' },
-  engineTitle: { color: '#a78bfa', fontSize: 13, fontWeight: '800', marginBottom: 8 },
-  engineLine: { color: '#ccc', fontSize: 12, marginBottom: 3 },
-  tipCard: { backgroundColor: '#1a2a1a', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#4ade8044' },
-  tipTitle: { color: '#4ade80', fontSize: 13, fontWeight: '700', marginBottom: 6 },
-  tipText: { color: '#aaa', fontSize: 12, marginBottom: 2 },
-  toggleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#7c3aed44', gap: 12 },
-  toggleLabel: { color: '#e0d4ff', fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  toggleSub: { color: '#888', fontSize: 11 },
-  card: { backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16, position: 'relative' },
-  badge: { position: 'absolute', top: -12, left: 16, backgroundColor: '#7c3aed', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1, backgroundColor: 'transparent' },
+  headerWrap: { paddingHorizontal: 16, paddingBottom: 6 },
+  headerCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1.2,
+    borderColor: '#C4B5FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: { flex: 1, marginHorizontal: 12 },
+  headerTitle: { fontSize: 19, fontWeight: '800', color: '#18204E', letterSpacing: 0.3 },
+  headerSub: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  headerBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1.2,
+    borderColor: '#D8B4FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scroll: { padding: 16 },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  engineCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  engineTitle: { color: '#18204E', fontSize: 14, fontWeight: '800' },
+  engineLine: { color: '#4B5563', fontSize: 12, marginBottom: 4 },
+  tipCard: {
+    backgroundColor: 'rgba(240, 253, 244, 0.92)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(187, 247, 208, 0.95)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tipTitle: { color: '#166534', fontSize: 13, fontWeight: '800' },
+  tipText: { color: '#15803D', fontSize: 12, marginBottom: 3 },
+  toggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 12,
+  },
+  toggleLabel: { color: '#18204E', fontSize: 13, fontWeight: '800', marginBottom: 3 },
+  toggleSub: { color: '#6B7280', fontSize: 11 },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 16,
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  badge: {
+    position: 'absolute',
+    top: -12,
+    left: 16,
+    backgroundColor: '#9333EA',
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
   badgeNum: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  cardLabel: { color: '#aaa', fontSize: 13, marginBottom: 10, marginTop: 4 },
-  picker: { height: 200, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0f0f1a', borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#444' },
-  pickerFilled: { borderStyle: 'solid', borderColor: '#7c3aed' },
+  cardLabel: { color: '#18204E', fontSize: 13, fontWeight: '700', marginBottom: 10, marginTop: 4 },
+  picker: {
+    height: 190,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(245, 243, 255, 0.65)',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#C4B5FD',
+  },
+  pickerFilled: { borderStyle: 'solid', borderColor: '#9333EA', borderWidth: 2 },
   pickerPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  pickerIcon: { fontSize: 44 },
-  pickerHint: { color: '#999', fontSize: 15, fontWeight: '700' },
-  pickerSub: { color: '#555', fontSize: 11 },
+  pickerIcon: { fontSize: 40 },
+  pickerHint: { color: '#6B21A8', fontSize: 15, fontWeight: '800' },
+  pickerSub: { color: '#7C3AED', fontSize: 11 },
   pickedImg: { width: '100%', height: '100%', resizeMode: 'cover' },
-  changeBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(124,58,237,0.9)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  changeTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  swapBtn: { backgroundColor: '#7c3aed', borderRadius: 16, paddingVertical: 18, alignItems: 'center', marginTop: 4, elevation: 6, shadowColor: '#7c3aed', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-  swapBtnOff: { backgroundColor: '#2a2a3a', elevation: 0, shadowOpacity: 0 },
+  changeBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(147, 51, 234, 0.92)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  changeTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  swapBtn: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginTop: 4,
+    elevation: 5,
+    shadowColor: '#9333EA',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  swapBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  swapBtnOff: { opacity: 0.45, elevation: 0 },
   swapBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  waitTxt: { color: '#666', fontSize: 12, textAlign: 'center', marginTop: 10 },
-  resultCard: { backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginTop: 20 },
-  resultTitle: { color: '#4ade80', fontSize: 16, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  modelBadge: { backgroundColor: '#1a1232', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#7c3aed55' },
-  modelBadgeTxt: { color: '#a78bfa', fontSize: 10, fontWeight: '700' },
-  resultImg: { width: '100%', height: width - 40, borderRadius: 12, backgroundColor: '#0f0f1a' },
-  saveBtn: { backgroundColor: '#1d4ed8', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  saveBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  vidmageCard: { backgroundColor: '#1a1010', borderRadius: 16, padding: 18, marginTop: 16, borderWidth: 1.5, borderColor: '#f59e0b88' },
-  vidmageTitle: { color: '#f59e0b', fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  vidmageDesc: { color: '#ccc', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 14 },
-  vidmageBtn: { backgroundColor: '#f59e0b', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 8, elevation: 4, shadowColor: '#f59e0b', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
-  vidmageBtnTxt: { color: '#000', fontSize: 15, fontWeight: '900' },
-  vidmageSub: { color: '#888', fontSize: 11, textAlign: 'center', marginBottom: 12 },
-  retryBtn: { backgroundColor: '#1a1a2e', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#7c3aed44' },
-  retryBtnTxt: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
-  altLink: { marginTop: 16, paddingVertical: 10, alignItems: 'center' },
-  altLinkTxtBlue: { color: '#3b82f6', fontSize: 12, textDecorationLine: 'underline' },
-  altLinkTxtGreen: { color: '#22c55e', fontSize: 12, textDecorationLine: 'underline' },
+  waitTxt: { color: '#6B7280', fontSize: 12, textAlign: 'center', marginTop: 10, fontWeight: '600' },
+  resultCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderRadius: 22,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    elevation: 4,
+  },
+  resultTitle: { color: '#166534', fontSize: 16, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  modelBadge: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#D8B4FE',
+  },
+  modelBadgeTxt: { color: '#7C3AED', fontSize: 11, fontWeight: '700' },
+  resultImg: { width: '100%', height: width - 40, borderRadius: 16, backgroundColor: '#F1F5F9' },
+  saveBtn: {
+    backgroundColor: '#9333EA',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  saveBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  vidmageCard: {
+    backgroundColor: 'rgba(255, 251, 235, 0.95)',
+    borderRadius: 20,
+    padding: 18,
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  vidmageTitle: { color: '#B45309', fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  vidmageDesc: { color: '#78350F', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 14 },
+  vidmageBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+    elevation: 3,
+  },
+  vidmageBtnTxt: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  vidmageSub: { color: '#92400E', fontSize: 11, textAlign: 'center', marginBottom: 12 },
+  retryBtn: {
+    backgroundColor: '#EDE9FE',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
+  },
+  retryBtnTxt: { color: '#7C3AED', fontSize: 13, fontWeight: '800' },
+  altLink: { marginTop: 14, paddingVertical: 8, alignItems: 'center' },
+  altLinkTxtBlue: { color: '#7C3AED', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  altLinkTxtGreen: { color: '#059669', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 });

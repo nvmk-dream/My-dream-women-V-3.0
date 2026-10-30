@@ -4,7 +4,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   Image, Modal, Dimensions, ActivityIndicator,
   Alert, RefreshControl, TextInput, StatusBar, Linking,
-  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -451,20 +450,15 @@ export default function CloudStorageScreen() {
   const femalePersonas = ALL_PERSONAS.filter((p: any) => p.gender === 'female');
 
   return (
-    <ImageBackground
-      source={require('../assets/images/cloud_spring_bg.png')}
-      style={styles.bgImage}
-      resizeMode="cover"
-    >
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-        <Stack.Screen options={{ headerShown: false }} />
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <Stack.Screen options={{ headerShown: false }} />
 
-        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <View style={styles.headerLeft}>
-            <Ionicons name="cloud-outline" size={25} color="#1E1B4B" />
-            <Text style={styles.headerTitle}>My Cloud</Text>
-          </View>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <View style={styles.headerLeft}>
+          <Ionicons name="cloud-outline" size={25} color={ct.cyan} />
+          <Text style={styles.headerTitle}>My Cloud</Text>
+        </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.syncBtn} onPress={syncFromCloud} disabled={fetchingCloud}>
             {fetchingCloud
@@ -992,67 +986,58 @@ export default function CloudStorageScreen() {
           </View>
         </View>
       )}
-      </SafeAreaView>
-    </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  bgImage: { flex: 1, width: '100%', height: '100%' },
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: ct.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 10, marginHorizontal: 12, marginTop: 6, marginBottom: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)', borderRadius: 16,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.65)', elevation: 2,
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: ct.surface,
+    borderBottomWidth: 1, borderBottomColor: ct.goldLine,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerCloud: { fontSize: 24 },
-  headerTitle: { color: '#0F172A', fontSize: 20, fontWeight: '900' },
+  headerTitle: { color: ct.gold, fontSize: 21, fontWeight: 'bold' },
   headerGear: { fontSize: 22 },
   syncBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10,
+    backgroundColor: ct.cyan, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 6, minWidth: 70, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
   },
-  syncBtnTxt: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
+  syncBtnTxt: { color: ct.background, fontSize: 13, fontWeight: '800' },
   iconLabel: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  scroll: { flex: 1, backgroundColor: 'transparent' },
+  scroll: { flex: 1 },
   sectionLabel: {
-    color: '#0F172A', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', alignSelf: 'flex-start',
-    marginHorizontal: 12, marginTop: 10, marginBottom: 8,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.6)',
+    color: ct.gold, fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
+    paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10,
   },
   catWrap: {
     flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 12, gap: 8, marginBottom: 8, backgroundColor: 'transparent',
+    paddingHorizontal: 12, gap: 8, marginBottom: 8,
   },
   catCard: {
     width: (width - 56) / 3,
     alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', borderRadius: 15,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', elevation: 2,
+    backgroundColor: ct.surfaceRaised, borderRadius: 15, borderWidth: 1, borderColor: ct.line,
   },
-  catCardActive: { backgroundColor: 'rgba(255, 255, 255, 0.98)', borderColor: '#7C3AED', borderWidth: 1.5 },
+  catCardActive: { borderColor: ct.gold, backgroundColor: ct.surfaceSoft },
   catIcon: { marginBottom: 6 },
-  catLabel: { color: '#0F172A', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  catLabelActive: { color: '#7C3AED' },
+  catLabel: { color: ct.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  catLabelActive: { color: ct.gold },
   catBadge: {
-    position: 'absolute', top: 6, right: 6, backgroundColor: '#7C3AED',
+    position: 'absolute', top: 6, right: 6, backgroundColor: ct.cyanDeep,
     borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
   },
-  catBadgeText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
+  catBadgeText: { color: ct.text, fontSize: 9, fontWeight: 'bold' },
   storageInfo: {
-    marginHorizontal: 12, marginVertical: 10, padding: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', elevation: 2,
+    margin: 16, padding: 14, backgroundColor: ct.surfaceRaised, borderRadius: 14,
+    borderWidth: 1, borderColor: ct.goldLine,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  storageTitle: { color: '#0F172A', fontSize: 14, fontWeight: '800' },
-  storageCount: { color: '#2563EB', fontSize: 13, fontWeight: '800' },
+  storageTitle: { color: ct.text, fontSize: 13, fontWeight: '600' },
+  storageCount: { color: ct.cyan, fontSize: 13, fontWeight: 'bold' },
 
   // ── Video styles ──────────────────────────────────────────
   videoSection: { paddingHorizontal: 14, paddingBottom: 30 },

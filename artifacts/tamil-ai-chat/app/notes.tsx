@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   TextInput, Modal, ScrollView, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, Pressable,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_PERSONAS } from '../constants/personas';
 import { getCloudinaryMeta, setCloudinaryMeta, getPhotoStyles, type PhotoStyleRecord } from '../services/api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const NOTE_CATEGORIES = ['General Notes', 'Chat Ideas', 'Prompts', 'Story Ideas'];
 
@@ -46,20 +49,31 @@ function NotesBottomNav({
   return (
     <SafeAreaView style={s.bottomNavSafe} edges={['bottom']}>
       <View style={s.notesBottomBar}>
-        <TouchableOpacity testID="notes-nav-back" style={s.notesNavSlot} onPress={onBack}>
-          <Text style={s.notesBottomIcon}>←</Text>
+        <TouchableOpacity testID="notes-nav-back" style={s.notesNavBtn} onPress={onBack}>
+          <MaterialCommunityIcons name="chevron-left" size={26} color="#6B46C1" />
         </TouchableOpacity>
         <TouchableOpacity
           testID={middleIsFab ? 'notes-nav-add' : 'notes-nav-home'}
-          style={s.notesNavSlot}
+          style={s.notesNavCenterSlot}
           onPress={onMiddle}
         >
-          <View style={middleIsFab ? s.notesAddFab : s.notesHomeBtn}>
-            <Text style={middleIsFab ? s.notesAddFabTxt : s.notesHomeIcon}>{middleIcon}</Text>
-          </View>
+          {middleIsFab ? (
+            <LinearGradient
+              colors={['#E024A5', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.notesAddFab}
+            >
+              <MaterialCommunityIcons name="plus" size={26} color="#FFFFFF" />
+            </LinearGradient>
+          ) : (
+            <View style={s.notesHomeBtn}>
+              <MaterialCommunityIcons name="home-variant-outline" size={22} color="#6B46C1" />
+            </View>
+          )}
         </TouchableOpacity>
-        <TouchableOpacity testID="notes-nav-right" style={s.notesNavSlot} onPress={onRight}>
-          <Text style={s.notesBottomIcon}>{rightIcon}</Text>
+        <TouchableOpacity testID="notes-nav-right" style={s.notesNavBtn} onPress={onRight}>
+          <MaterialCommunityIcons name="dots-horizontal" size={22} color="#6B46C1" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -356,443 +370,648 @@ export default function NotesScreen() {
   // ── EDITOR ──
   if (view === 'editor' && activePage && activeChar) {
     return (
-      <SafeAreaView style={s.safe} edges={['bottom']}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={[s.editorHeader, { paddingTop: insets.top + 14 }]}>
-          <TouchableOpacity onPress={async () => { await savePage(); setView('pages'); }} style={s.editorBack}>
-            <Text style={s.editorBackTxt}>‹ {activeChar.name}</Text>
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-            <TouchableOpacity onPress={savePage} style={s.editorSaveBtn}>
-              <Text style={s.editorSaveTxt}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => deletePage(activePage)}>
-              <Text style={{ fontSize: 20 }}>🗑️</Text>
-            </TouchableOpacity>
+      <ImageBackground
+        source={require('../assets/images/cloud_spring_bg.png')}
+        style={{ flex: 1 }}
+        resizeMode="cover"
+      >
+        <SafeAreaView style={s.safe} edges={['bottom']}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+          <Stack.Screen options={{ headerShown: false }} />
+
+          {/* Glass Header */}
+          <View style={[s.headerWrap, { paddingTop: insets.top > 0 ? 6 : 14 }]}>
+            <View style={s.headerCard}>
+              <TouchableOpacity onPress={async () => { await savePage(); setView('pages'); }} style={s.backBtn}>
+                <MaterialCommunityIcons name="chevron-left" size={26} color="#6B46C1" />
+              </TouchableOpacity>
+              <View style={s.headerCenter}>
+                <Text style={s.headerTitle} numberOfLines={1}>{activeChar.name}</Text>
+                <Text style={s.headerSub} numberOfLines={1}>{activePage.title || 'Note Editor'}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TouchableOpacity onPress={savePage} style={s.savePillBtn} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={['#E024A5', '#8B5CF6']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={s.savePillGradient}
+                  >
+                    <Text style={s.savePillTxt}>Save</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deletePage(activePage)} style={s.actionCircleBtn}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
 
-        <View style={[s.editorAccentBar, { backgroundColor: activePage.accent ?? '#F5A623' }]} />
+          <View style={s.editorCard}>
+            <View style={[s.editorAccentBar, { backgroundColor: activePage.accent ?? '#F5A623' }]} />
 
-        <View style={s.editorTitleRow}>
-          <TextInput
-            style={s.editorTitleInput}
-            value={editorTitle}
-            onChangeText={setEditorTitle}
-            placeholder="Title..."
-            placeholderTextColor="#bbb"
-          />
-        </View>
+            <View style={s.editorTitleRow}>
+              <TextInput
+                style={s.editorTitleInput}
+                value={editorTitle}
+                onChangeText={setEditorTitle}
+                placeholder="Title..."
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-        <View style={s.translateBar}>
-          <TouchableOpacity
-            style={[s.translateBtn, translating && { opacity: 0.6 }]}
-            onPress={translateText}
-            disabled={translating}
-          >
-            {translating
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.translateBtnTxt}>🌐 Tamil → English Translate</Text>
-            }
-          </TouchableOpacity>
-          <TouchableOpacity style={s.clearBtn2} onPress={() => setShowClearConfirm(true)}>
-            <Text style={s.clearBtn2Txt}>🗑</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={s.translateBar}>
+              <TouchableOpacity
+                style={[s.translateBtn, translating && { opacity: 0.6 }]}
+                onPress={translateText}
+                disabled={translating}
+              >
+                {translating
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={s.translateBtnTxt}>🌐 Tamil → English Translate</Text>
+                }
+              </TouchableOpacity>
+              <TouchableOpacity style={s.clearBtn2} onPress={() => setShowClearConfirm(true)}>
+                <MaterialCommunityIcons name="eraser" size={18} color="#C62828" />
+              </TouchableOpacity>
+            </View>
 
-        {!!translateError && (
-          <View style={s.errorBanner}>
-            <Text style={s.errorBannerTxt}>{translateError}</Text>
+            {!!translateError && (
+              <View style={s.errorBanner}>
+                <Text style={s.errorBannerTxt}>{translateError}</Text>
+              </View>
+            )}
+
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <TextInput
+                style={s.editorBody}
+                value={editorText}
+                onChangeText={setEditorText}
+                multiline
+                textAlignVertical="top"
+                placeholder={`${activePage.title} பத்தி notes எழுதுங்க...\n\nPrompt ideas, photo descriptions, story lines...`}
+                placeholderTextColor="#9CA3AF"
+              />
+            </KeyboardAvoidingView>
+
+            <View style={s.editorFooter}>
+              <Text style={s.editorFooterTxt}>{editorText.length} chars</Text>
+              <Text style={s.editorFooterTxt}>{formatDate(activePage.updatedAt)}</Text>
+            </View>
           </View>
-        )}
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <TextInput
-            style={s.editorBody}
-            value={editorText}
-            onChangeText={setEditorText}
-            multiline
-            textAlignVertical="top"
-            placeholder={`${activePage.title} பத்தி notes எழுதுங்க...\n\nPrompt ideas, photo descriptions, story lines...`}
-            placeholderTextColor="#ccc"
-          />
-        </KeyboardAvoidingView>
-
-        <View style={s.editorFooter}>
-          <Text style={s.editorFooterTxt}>{editorText.length} chars</Text>
-          <Text style={s.editorFooterTxt}>{formatDate(activePage.updatedAt)}</Text>
-        </View>
-
-        <SharedModals />
-      </SafeAreaView>
+          <SharedModals />
+        </SafeAreaView>
+      </ImageBackground>
     );
   }
 
   // ── PAGES LIST ──
   if (view === 'pages' && activeChar) {
     return (
-      <SafeAreaView style={s.safe} edges={['left', 'right']}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-        <Stack.Screen options={{ headerShown: false }} />
+      <ImageBackground
+        source={require('../assets/images/cloud_spring_bg.png')}
+        style={{ flex: 1 }}
+        resizeMode="cover"
+      >
+        <SafeAreaView style={s.safe} edges={['left', 'right']}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+          <Stack.Screen options={{ headerShown: false }} />
 
-        <View style={[s.notesHeader, { paddingTop: insets.top + 16 }]}>
-          {showSearch ? (
-            <TextInput
-              style={s.notesSearchInput}
-              value={searchQ}
-              onChangeText={setSearchQ}
-              placeholder="Search notes..."
-              autoFocus
-              onBlur={() => { if (!searchQ) setShowSearch(false); }}
-            />
-          ) : (
-            <Text style={s.notesHeaderTitle}>{activeChar.emoji} {activeChar.name}</Text>
-          )}
-          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setShowSearch(v => !v)}>
-              <Text style={{ fontSize: 20 }}>🔍</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowOptionsModal(true)}>
-              <Text style={{ fontSize: 20, color: '#333' }}>⋮</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={s.notesBreadcrumb}>
-          <TouchableOpacity onPress={() => { setView('chars'); setActiveChar(null); setSearchQ(''); setShowSearch(false); }}>
-            <Text style={s.breadcrumbBack}>← All Characters</Text>
-          </TouchableOpacity>
-          <Text style={s.breadcrumbCount}>{filteredPages.length} notes</Text>
-        </View>
-
-        <View style={s.notesContent}>
-        {filteredPages.length === 0 ? (
-          <View style={s.emptyPages}>
-            <Text style={s.emptyPagesIcon}>📋</Text>
-            <Text style={s.emptyPagesTxt}>Notes இல்லை</Text>
-            <Text style={s.emptyPagesSub}>+ button tap பண்ணி notes add பண்ணுங்க{'\n'}அல்லது ⋮ → "Add All Photo Styles"</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredPages}
-            keyExtractor={p => p.id}
-            style={s.notesList}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-            renderItem={({ item }) => (
+          {/* Glass Header */}
+          <View style={[s.headerWrap, { paddingTop: insets.top > 0 ? 6 : 14 }]}>
+            <View style={s.headerCard}>
               <TouchableOpacity
-                style={s.noteCard}
-                onPress={() => openPage(item)}
-                onLongPress={() => setLongPressPage(item)}
-                activeOpacity={0.7}
+                onPress={() => { setView('chars'); setActiveChar(null); setSearchQ(''); setShowSearch(false); }}
+                style={s.backBtn}
               >
-                <View style={[s.noteAccent, { backgroundColor: item.accent ?? '#F5A623' }]} />
-                <View style={s.noteContent}>
-                  <Text style={s.noteTitle} numberOfLines={1}>{item.title}</Text>
-                  <View style={s.noteMetaRow}>
-                    <Text style={s.noteDateTxt}>{formatDate(item.updatedAt)}</Text>
-                    <Text style={s.notePreview} numberOfLines={1}>
-                      {item.content ? '  ' + item.content.replace(/\n/g, ' ').trim() : '  (Empty — tap to write)'}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={s.noteDeleteBtn} onPress={() => deletePage(item)}>
-                  <Text style={s.noteDeleteIcon}>🗑️</Text>
-                </TouchableOpacity>
+                <MaterialCommunityIcons name="chevron-left" size={26} color="#6B46C1" />
               </TouchableOpacity>
-            )}
-          />
-        )}
-
-        </View>
-
-        <NotesBottomNav
-          onBack={() => { setView('chars'); setActiveChar(null); }}
-          onMiddle={() => setAddPageModal(true)}
-          middleIcon="+"
-          middleIsFab
-          onRight={() => router.replace('/')}
-          rightIcon="🏠"
-        />
-
-        <Modal visible={addPageModal} transparent animationType="slide" onRequestClose={() => setAddPageModal(false)}>
-          <View style={s.modalOverlay}>
-            <View style={s.modalBox}>
-              <Text style={s.modalTitle}>New Note</Text>
-              <TextInput
-                style={s.modalInput}
-                value={newPageTitle}
-                onChangeText={setNewPageTitle}
-                placeholder="Note title..."
-                autoFocus
-                onSubmitEditing={() => newPageTitle.trim() && addPage(newPageTitle)}
-              />
-              <Text style={s.modalSubLabel}>Quick photo styles:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                {ALL_STYLES.map((st, i) => {
-                  const accent = ACCENT_COLORS[i % ACCENT_COLORS.length];
-                  return (
-                    <TouchableOpacity
-                      key={st + i}
-                      style={[s.styleChip, { borderColor: accent }]}
-                      onPress={() => addPage(st, accent)}
-                    >
-                      <Text style={[s.styleChipTxt, { color: accent }]}>{st}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity style={s.cancelBtn} onPress={() => { setAddPageModal(false); setNewPageTitle(''); }}>
-                  <Text style={s.cancelBtnTxt}>Cancel</Text>
+              {showSearch ? (
+                <TextInput
+                  style={s.notesSearchInput}
+                  value={searchQ}
+                  onChangeText={setSearchQ}
+                  placeholder="Search notes..."
+                  placeholderTextColor="#9CA3AF"
+                  autoFocus
+                  onBlur={() => { if (!searchQ) setShowSearch(false); }}
+                />
+              ) : (
+                <View style={s.headerCenter}>
+                  <Text style={s.headerTitle} numberOfLines={1}>{activeChar.emoji} {activeChar.name}</Text>
+                  <Text style={s.headerSub}>{filteredPages.length} notes saved</Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => setShowSearch(v => !v)} style={s.actionCircleBtn}>
+                  <MaterialCommunityIcons name="magnify" size={20} color="#6B46C1" />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.createBtn, !newPageTitle.trim() && { opacity: 0.4 }]}
-                  onPress={() => addPage(newPageTitle)}
-                  disabled={!newPageTitle.trim()}
-                >
-                  <Text style={s.createBtnTxt}>Create</Text>
+                <TouchableOpacity onPress={() => setShowOptionsModal(true)} style={s.actionCircleBtn}>
+                  <MaterialCommunityIcons name="dots-vertical" size={20} color="#6B46C1" />
                 </TouchableOpacity>
               </View>
             </View>
           </View>
-        </Modal>
 
-        <SharedModals />
-      </SafeAreaView>
+          <View style={s.notesContent}>
+          {filteredPages.length === 0 ? (
+            <View style={s.emptyPages}>
+              <Text style={s.emptyPagesIcon}>📋</Text>
+              <Text style={s.emptyPagesTxt}>Notes இல்லை</Text>
+              <Text style={s.emptyPagesSub}>+ button tap பண்ணி notes add பண்ணுங்க{'\n'}அல்லது ⋮ → "Add All Photo Styles"</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredPages}
+              keyExtractor={p => p.id}
+              style={s.notesList}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 16, paddingTop: 4 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={s.noteCard}
+                  onPress={() => openPage(item)}
+                  onLongPress={() => setLongPressPage(item)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.noteAccent, { backgroundColor: item.accent ?? '#F5A623' }]} />
+                  <View style={s.noteContent}>
+                    <Text style={s.noteTitle} numberOfLines={1}>{item.title}</Text>
+                    <View style={s.noteMetaRow}>
+                      <Text style={s.noteDateTxt}>{formatDate(item.updatedAt)}</Text>
+                      <Text style={s.notePreview} numberOfLines={1}>
+                        {item.content ? '  ' + item.content.replace(/\n/g, ' ').trim() : '  (Empty — tap to write)'}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={s.noteDeleteBtn} onPress={() => deletePage(item)}>
+                    <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+
+          </View>
+
+          <NotesBottomNav
+            onBack={() => { setView('chars'); setActiveChar(null); }}
+            onMiddle={() => setAddPageModal(true)}
+            middleIcon="+"
+            middleIsFab
+            onRight={() => router.replace('/')}
+            rightIcon="🏠"
+          />
+
+          <Modal visible={addPageModal} transparent animationType="slide" onRequestClose={() => setAddPageModal(false)}>
+            <View style={s.modalOverlay}>
+              <View style={s.modalBox}>
+                <Text style={s.modalTitle}>New Note</Text>
+                <TextInput
+                  style={s.modalInput}
+                  value={newPageTitle}
+                  onChangeText={setNewPageTitle}
+                  placeholder="Note title..."
+                  placeholderTextColor="#9CA3AF"
+                  autoFocus
+                  onSubmitEditing={() => newPageTitle.trim() && addPage(newPageTitle)}
+                />
+                <Text style={s.modalSubLabel}>Quick photo styles:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                  {ALL_STYLES.map((st, i) => {
+                    const accent = ACCENT_COLORS[i % ACCENT_COLORS.length];
+                    return (
+                      <TouchableOpacity
+                        key={st + i}
+                        style={[s.styleChip, { borderColor: accent }]}
+                        onPress={() => addPage(st, accent)}
+                      >
+                        <Text style={[s.styleChipTxt, { color: accent }]}>{st}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity style={s.cancelBtn} onPress={() => { setAddPageModal(false); setNewPageTitle(''); }}>
+                    <Text style={s.cancelBtnTxt}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.createBtn, !newPageTitle.trim() && { opacity: 0.4 }]}
+                    onPress={() => addPage(newPageTitle)}
+                    disabled={!newPageTitle.trim()}
+                  >
+                    <Text style={s.createBtnTxt}>Create</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <SharedModals />
+        </SafeAreaView>
+      </ImageBackground>
     );
   }
 
   // ── CHARACTER LIST ──
   return (
-    <SafeAreaView style={s.safe} edges={['left', 'right']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-      <Stack.Screen options={{ headerShown: false }} />
+    <ImageBackground
+      source={require('../assets/images/cloud_spring_bg.png')}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={s.safe} edges={['left', 'right']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={[s.notesHeader, { paddingTop: insets.top + 16 }]}>
-        {showSearch ? (
-          <TextInput
-            style={s.notesSearchInput}
-            value={searchQ}
-            onChangeText={setSearchQ}
-            placeholder="Search character..."
-            autoFocus
-            onBlur={() => { if (!searchQ) setShowSearch(false); }}
-          />
-        ) : (
-          <Text style={s.notesHeaderTitle}>≡  All Notes</Text>
-        )}
-        <TouchableOpacity onPress={() => setShowSearch(v => !v)}>
-          <Text style={{ fontSize: 20 }}>🔍</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={s.notesContent}>
-      <FlatList
-        data={filteredChars}
-        keyExtractor={p => p.id}
-        style={s.notesList}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-        renderItem={({ item, index }) => {
-          const charPages = allNotes[item.id] ?? [];
-          const lastPage = charPages.sort((a, b) => b.updatedAt - a.updatedAt)[0];
-          const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
-          return (
-            <TouchableOpacity style={s.noteCard} onPress={() => openChar(item)} activeOpacity={0.7}>
-              <View style={[s.noteAccent, { backgroundColor: accent }]} />
-              <View style={s.noteContent}>
-                <Text style={s.noteTitle}>{item.emoji} {item.name}</Text>
-                <View style={s.noteMetaRow}>
-                  <Text style={s.noteDateTxt}>
-                    {lastPage ? formatDate(lastPage.updatedAt) : 'No notes yet'}
-                  </Text>
-                  <Text style={s.notePreview} numberOfLines={1}>
-                    {'  '}{charPages.length > 0
-                      ? `${charPages.length} pages${lastPage?.content ? ' • ' + lastPage.content.slice(0, 40).replace(/\n/g, ' ') : ''}`
-                      : '(Tap to add notes)'}
-                  </Text>
-                </View>
-              </View>
+        {/* Glass Header */}
+        <View style={[s.headerWrap, { paddingTop: insets.top > 0 ? 6 : 14 }]}>
+          <View style={s.headerCard}>
+            <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+              <MaterialCommunityIcons name="chevron-left" size={26} color="#6B46C1" />
             </TouchableOpacity>
-          );
-        }}
-      />
+            {showSearch ? (
+              <TextInput
+                style={s.notesSearchInput}
+                value={searchQ}
+                onChangeText={setSearchQ}
+                placeholder="Search character..."
+                placeholderTextColor="#9CA3AF"
+                autoFocus
+                onBlur={() => { if (!searchQ) setShowSearch(false); }}
+              />
+            ) : (
+              <View style={s.headerCenter}>
+                <Text style={s.headerTitle}>Notes</Text>
+                <Text style={s.headerSub}>Characters & Story Notes</Text>
+              </View>
+            )}
+            <TouchableOpacity onPress={() => setShowSearch(v => !v)} style={s.actionCircleBtn}>
+              <MaterialCommunityIcons name="magnify" size={20} color="#6B46C1" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      </View>
+        <View style={s.notesContent}>
+        <FlatList
+          data={filteredChars}
+          keyExtractor={p => p.id}
+          style={s.notesList}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 16, paddingTop: 4 }}
+          renderItem={({ item, index }) => {
+            const charPages = allNotes[item.id] ?? [];
+            const lastPage = charPages.sort((a, b) => b.updatedAt - a.updatedAt)[0];
+            const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
+            return (
+              <TouchableOpacity style={s.noteCard} onPress={() => openChar(item)} activeOpacity={0.75}>
+                <View style={[s.noteAccent, { backgroundColor: accent }]} />
+                <View style={s.noteContent}>
+                  <Text style={s.noteTitle}>{item.emoji} {item.name}</Text>
+                  <View style={s.noteMetaRow}>
+                    <Text style={s.noteDateTxt}>
+                      {lastPage ? formatDate(lastPage.updatedAt) : 'No notes yet'}
+                    </Text>
+                    <Text style={s.notePreview} numberOfLines={1}>
+                      {'  '}{charPages.length > 0
+                        ? `${charPages.length} pages${lastPage?.content ? ' • ' + lastPage.content.slice(0, 40).replace(/\n/g, ' ') : ''}`
+                        : '(Tap to add notes)'}
+                    </Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={22} color="#9CA3AF" style={{ marginRight: 12 }} />
+              </TouchableOpacity>
+            );
+          }}
+        />
 
-      <NotesBottomNav
-        onBack={() => router.back()}
-        onMiddle={() => router.replace('/')}
-        middleIcon="🏠"
-        onRight={() => {}}
-        rightIcon="→"
-      />
+        </View>
 
-      <SharedModals />
-    </SafeAreaView>
+        <NotesBottomNav
+          onBack={() => router.back()}
+          onMiddle={() => router.replace('/')}
+          middleIcon="🏠"
+          onRight={() => {}}
+          rightIcon="→"
+        />
+
+        <SharedModals />
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
 
-  notesHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0', backgroundColor: '#fff',
+  headerWrap: { paddingHorizontal: 16, paddingBottom: 6 },
+  headerCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.90)',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  notesHeaderTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', flex: 1 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1.2,
+    borderColor: '#C4B5FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1.2,
+    borderColor: '#C4B5FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: { flex: 1, marginHorizontal: 12 },
+  headerTitle: { fontSize: 19, fontWeight: '800', color: '#18204E', letterSpacing: 0.3 },
+  headerSub: { fontSize: 11, color: '#6B7280', marginTop: 1 },
   notesSearchInput: {
-    flex: 1, fontSize: 16, color: '#111', paddingVertical: 4,
-    borderBottomWidth: 1.5, borderBottomColor: '#F5A623',
+    flex: 1,
+    fontSize: 15,
+    color: '#18204E',
+    paddingVertical: 4,
+    marginHorizontal: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#9333EA',
   },
-  notesBreadcrumb: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#fafafa',
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+  savePillBtn: { borderRadius: 16, overflow: 'hidden' },
+  savePillGradient: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16 },
+  savePillTxt: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+
+  editorCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 22,
+    margin: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  breadcrumbBack: { color: '#555', fontSize: 13, fontWeight: '600' },
-  breadcrumbCount: { color: '#aaa', fontSize: 12 },
+  editorAccentBar: { height: 4 },
+  editorTitleRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(226, 232, 240, 0.8)',
+  },
+  editorTitleInput: { fontSize: 18, fontWeight: '800', color: '#18204E' },
+  translateBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(248, 250, 252, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(226, 232, 240, 0.8)',
+  },
+  translateBtn: {
+    flex: 1,
+    backgroundColor: '#7C3AED',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  translateBtnTxt: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  clearBtn2: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorBanner: { backgroundColor: '#FEE2E2', paddingHorizontal: 14, paddingVertical: 8 },
+  errorBannerTxt: { color: '#DC2626', fontSize: 13 },
+  editorBody: {
+    flex: 1,
+    padding: 16,
+    fontSize: 15,
+    color: '#1E293B',
+    lineHeight: 24,
+    textAlignVertical: 'top',
+  },
+  editorFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(248, 250, 252, 0.9)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(226, 232, 240, 0.8)',
+  },
+  editorFooterTxt: { fontSize: 11, color: '#64748B', fontWeight: '600' },
 
   noteCard: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
-    minHeight: 70, alignItems: 'center',
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    marginHorizontal: 14,
+    marginVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    minHeight: 72,
+    alignItems: 'center',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
   },
-  noteAccent: { width: 4, minHeight: 70 },
-  noteContent: { flex: 1, paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'center' },
-  noteTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 5 },
+  noteAccent: { width: 5, height: '100%', minHeight: 72 },
+  noteContent: { flex: 1, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' },
+  noteTitle: { fontSize: 16, fontWeight: '800', color: '#18204E', marginBottom: 4 },
   noteMetaRow: { flexDirection: 'row', alignItems: 'center' },
-  noteDateTxt: { fontSize: 12, color: '#888', fontWeight: '500', flexShrink: 0 },
-  notePreview: { fontSize: 12, color: '#aaa', flex: 1 },
+  noteDateTxt: { fontSize: 11, color: '#7C3AED', fontWeight: '700', flexShrink: 0 },
+  notePreview: { fontSize: 12, color: '#4B5563', flex: 1 },
   noteDeleteBtn: { paddingHorizontal: 14, paddingVertical: 14 },
-  noteDeleteIcon: { fontSize: 18 },
 
   emptyPages: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
   emptyPagesIcon: { fontSize: 56, marginBottom: 14 },
-  emptyPagesTxt: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 8 },
-  emptyPagesSub: { fontSize: 13, color: '#999', textAlign: 'center', lineHeight: 20 },
+  emptyPagesTxt: { fontSize: 18, fontWeight: '800', color: '#18204E', marginBottom: 8 },
+  emptyPagesSub: { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
 
   notesContent: { flex: 1, minHeight: 0 },
   notesList: { flex: 1 },
-  bottomNavSafe: { backgroundColor: '#fff' },
+  bottomNavSafe: { backgroundColor: 'transparent' },
   notesBottomBar: {
-    minHeight: 68, flexDirection: 'row', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: '#f0f0f0', backgroundColor: '#fff',
-    paddingHorizontal: 8, paddingVertical: 8,
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 6,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
+    paddingHorizontal: 12,
   },
-  notesNavSlot: {
-    flex: 1, minWidth: 0, minHeight: 52,
-    justifyContent: 'center', alignItems: 'center',
+  notesNavBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  notesBottomIcon: { fontSize: 22, color: '#888' },
+  notesNavCenterSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   notesHomeBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff7eb',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: '#F5A623',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EDE9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.2,
+    borderColor: '#C4B5FD',
   },
-  notesHomeIcon: { fontSize: 21 },
   notesAddFab: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#F5A623',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#E91E8C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
-  notesAddFabTxt: { color: '#fff', fontSize: 28, fontWeight: '300', marginTop: -2 },
 
-  editorHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0', backgroundColor: '#fff',
-  },
-  editorBack: {},
-  editorBackTxt: { fontSize: 16, color: '#555', fontWeight: '600' },
-  editorSaveBtn: { backgroundColor: '#F5A623', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  editorSaveTxt: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  editorAccentBar: { height: 4 },
-  editorTitleRow: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  editorTitleInput: { fontSize: 18, fontWeight: '700', color: '#111' },
-  translateBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 8,
-    backgroundColor: '#fafafa', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
-  },
-  translateBtn: {
-    flex: 1, backgroundColor: '#1565C0', borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center', justifyContent: 'center',
-    flexDirection: 'row', gap: 6,
-  },
-  translateBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  clearBtn2: {
-    backgroundColor: '#fce4ec', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderWidth: 1, borderColor: '#ef9a9a',
-  },
-  clearBtn2Txt: { fontSize: 18 },
-  errorBanner: { backgroundColor: '#FFEBEE', paddingHorizontal: 14, paddingVertical: 8 },
-  errorBannerTxt: { color: '#C62828', fontSize: 13 },
-  editorBody: {
-    flex: 1, padding: 16, fontSize: 15, color: '#222', lineHeight: 24, textAlignVertical: 'top',
-  },
-  editorFooter: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 8,
-    backgroundColor: '#fafafa', borderTopWidth: 1, borderTopColor: '#f0f0f0',
-  },
-  editorFooterTxt: { fontSize: 11, color: '#bbb' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start', paddingTop: 60 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-start', paddingTop: 60 },
   modalBox: {
-    backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    padding: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 14 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#18204E', marginBottom: 14 },
   modalInput: {
-    borderBottomWidth: 2, borderBottomColor: '#F5A623',
-    fontSize: 16, paddingVertical: 8, color: '#111', marginBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#9333EA',
+    fontSize: 16,
+    paddingVertical: 8,
+    color: '#18204E',
+    marginBottom: 16,
   },
-  modalSubLabel: { fontSize: 12, color: '#aaa', marginBottom: 8, fontWeight: '600' },
+  modalSubLabel: { fontSize: 12, color: '#6B7280', marginBottom: 8, fontWeight: '700' },
   styleChip: {
-    borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-    marginRight: 8, backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    backgroundColor: '#FFFFFF',
   },
-  styleChipTxt: { fontSize: 12, fontWeight: '600' },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e0e0e0', alignItems: 'center' },
-  cancelBtnTxt: { color: '#888', fontWeight: '600' },
-  createBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F5A623', alignItems: 'center' },
-  createBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  styleChipTxt: { fontSize: 12, fontWeight: '700' },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  cancelBtnTxt: { color: '#64748B', fontWeight: '700' },
+  createBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#9333EA',
+    alignItems: 'center',
+  },
+  createBtnTxt: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 
   overlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
   confirmBox: {
-    backgroundColor: '#fff', borderRadius: 18, padding: 24, width: 300,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 24,
+    width: 310,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
   },
-  confirmTitle: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 8 },
-  confirmMsg: { fontSize: 14, color: '#555', marginBottom: 20 },
+  confirmTitle: { fontSize: 17, fontWeight: '800', color: '#18204E', marginBottom: 8 },
+  confirmMsg: { fontSize: 14, color: '#4B5563', marginBottom: 20 },
   confirmBtns: { flexDirection: 'row', gap: 10 },
-  confirmCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0', alignItems: 'center' },
-  confirmCancelTxt: { color: '#555', fontWeight: '600' },
-  confirmDelete: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#E53935', alignItems: 'center' },
-  confirmDeleteTxt: { color: '#fff', fontWeight: '700' },
+  confirmCancel: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+  confirmCancelTxt: { color: '#4B5563', fontWeight: '700' },
+  confirmDelete: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center' },
+  confirmDeleteTxt: { color: '#FFFFFF', fontWeight: '800' },
 
   translateModal: {
-    backgroundColor: '#fff', borderRadius: 18, padding: 22, width: 320, maxHeight: '80%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 22,
+    width: 320,
+    maxHeight: '80%',
   },
-  translateModalTitle: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 14 },
-  translateModalText: { fontSize: 14, color: '#333', lineHeight: 22, marginBottom: 16 },
+  translateModalTitle: { fontSize: 17, fontWeight: '800', color: '#18204E', marginBottom: 14 },
+  translateModalText: { fontSize: 14, color: '#334155', lineHeight: 22, marginBottom: 16 },
   translateModalBtns: { gap: 8 },
-  translateModalBtn: { backgroundColor: '#27AE60', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  translateModalBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  translateModalBtn: { backgroundColor: '#10B981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  translateModalBtnTxt: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
 
   optionsBox: {
-    backgroundColor: '#fff', borderRadius: 18, padding: 20, width: 280,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 20,
+    width: 280,
   },
-  optionsTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 14 },
-  optionRow: { paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  optionRowTxt: { fontSize: 15, color: '#222', fontWeight: '500' },
+  optionsTitle: { fontSize: 16, fontWeight: '800', color: '#18204E', marginBottom: 14 },
+  optionRow: { paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  optionRowTxt: { fontSize: 15, color: '#1E293B', fontWeight: '600' },
 
   toast: {
-    position: 'absolute', bottom: 80, left: 20, right: 20,
-    backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center',
+    position: 'absolute',
+    bottom: 80,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(24, 32, 78, 0.9)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignItems: 'center',
   },
-  toastTxt: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  toastTxt: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 });

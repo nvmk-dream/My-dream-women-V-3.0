@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, TextInput, Alert, ActivityIndicator, Modal, Switch, StatusBar,
-  ImageBackground,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -497,17 +496,12 @@ export default function KeysScreen() {
   };
 
   return (
-    <ImageBackground
-      source={require('../assets/images/cloud_spring_bg.png')}
-      style={s.bgImage}
-      resizeMode="cover"
-    >
-      <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-        <Stack.Screen options={{ headerShown: false }} />
+    <SafeAreaView style={s.safe} edges={['left','right','bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <Stack.Screen options={{ headerShown: false }} />
 
-        {/* Header */}
-        <View style={[s.header, { paddingTop: insets.top + 14 }]}>
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <Text style={s.headerIcon}>🔐</Text>
         <Text style={s.headerTitle}>Keys & Accounts</Text>
         <TouchableOpacity style={s.checkAllBtn} onPress={checkAllNow} disabled={checkingAll}>
@@ -793,81 +787,76 @@ export default function KeysScreen() {
           </View>
         </View>
       </Modal>
-      </SafeAreaView>
-    </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  bgImage: { flex: 1, width: '100%', height: '100%' },
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: '#0d1117' },
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.86)', flexDirection: 'row',
+    backgroundColor: '#0d6e7a', flexDirection: 'row',
     alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 10,
-    marginHorizontal: 12, marginTop: 6, marginBottom: 4,
-    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.65)',
-    elevation: 2,
+    paddingHorizontal: 16, paddingVertical: 14,
   },
   headerIcon: { fontSize: 22 },
-  headerTitle: { color: '#0F172A', fontSize: 19, fontWeight: '900', flex: 1 },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', flex: 1 },
   checkAllBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
   },
-  checkAllTxt: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
-  addBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255, 255, 255, 0.9)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  addBtnTxt: { color: '#0F172A', fontSize: 22, fontWeight: '900', lineHeight: 26 },
-  scroll: { padding: 12, paddingBottom: 90, backgroundColor: 'transparent' },
+  checkAllTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  addBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  addBtnTxt: { color: '#fff', fontSize: 20, fontWeight: 'bold', lineHeight: 26 },
+  scroll: { padding: 14, paddingBottom: 90 },
 
   summaryBar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', borderRadius: 14, padding: 14, marginBottom: 12,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', elevation: 2,
+    backgroundColor: '#111827', borderRadius: 12, padding: 14, marginBottom: 14,
+    borderWidth: 1, borderColor: '#1f2937',
   },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryNum: { color: '#0F172A', fontSize: 22, fontWeight: '900' },
-  summaryLbl: { color: '#64748B', fontSize: 11, marginTop: 2, fontWeight: '700' },
-  summaryDivider: { width: 1, height: 36, backgroundColor: 'rgba(0,0,0,0.08)' },
-  recheckBtn: { marginLeft: 12, backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  recheckTxt: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  summaryNum: { color: '#7dd3fc', fontSize: 22, fontWeight: '800' },
+  summaryLbl: { color: '#6b7280', fontSize: 11, marginTop: 2 },
+  summaryDivider: { width: 1, height: 36, backgroundColor: '#1f2937' },
+  recheckBtn: { marginLeft: 12, backgroundColor: '#1e3a4a', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  recheckTxt: { color: '#7dd3fc', fontSize: 12, fontWeight: '700' },
 
   deviceKeyCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 16, padding: 16,
-    marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', elevation: 2,
+    backgroundColor: '#111827', borderRadius: 14, padding: 16,
+    marginBottom: 14, borderWidth: 1.5, borderColor: '#0d6e7a',
   },
-  deviceKeyLabel: { color: '#0F172A', fontSize: 12, fontWeight: '900', letterSpacing: 0.8, marginBottom: 10 },
+  deviceKeyLabel: { color: '#0d6e7a', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 10 },
   deviceKeyRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)', marginBottom: 12,
+    backgroundColor: '#1f2937', borderRadius: 10,
+    borderWidth: 1, borderColor: '#374151', marginBottom: 12,
   },
-  deviceKeyInput: { flex: 1, color: '#0F172A', fontSize: 14, padding: 12, fontFamily: 'monospace', fontWeight: '800' },
+  deviceKeyInput: { flex: 1, color: '#e5e7eb', fontSize: 14, padding: 12, fontFamily: 'monospace' },
   clearBtn: { paddingHorizontal: 12, paddingVertical: 12 },
-  clearBtnTxt: { color: '#64748B', fontSize: 16 },
+  clearBtnTxt: { color: '#6b7280', fontSize: 16 },
   cloudBtns: { flexDirection: 'row', gap: 10 },
-  cloudLoadBtn: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  cloudSaveBtn: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  cloudBtnTxt: { color: '#0F172A', fontWeight: '900', fontSize: 14 },
+  cloudLoadBtn: { flex: 1, backgroundColor: '#1565C0', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  cloudSaveBtn: { flex: 1, backgroundColor: '#374151', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  cloudBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   sectionHeader: {
-    backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 14, padding: 14,
-    marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', elevation: 2,
+    backgroundColor: '#0d1f2d', borderRadius: 12, padding: 14,
+    marginBottom: 2, borderWidth: 1.5, borderColor: '#1a4a5a',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   sectionHeaderIcon: { fontSize: 26 },
-  sectionHeaderTitle: { color: '#0F172A', fontSize: 15, fontWeight: '800' },
-  sectionHeaderSub: { color: '#64748B', fontSize: 11, marginTop: 2 },
+  sectionHeaderTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  sectionHeaderSub: { color: '#6b9aaa', fontSize: 11, marginTop: 2 },
   sectionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  activeBadge: { backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  activeBadgeOn: { backgroundColor: '#059669' },
-  activeBadgeTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  sectionArrow: { color: '#0F172A', fontSize: 14 },
+  activeBadge: { backgroundColor: '#333', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  activeBadgeOn: { backgroundColor: '#065f46' },
+  activeBadgeTxt: { color: '#9ca3af', fontSize: 11, fontWeight: '800' },
+  sectionArrow: { color: '#6b7280', fontSize: 14 },
 
   geminiSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, marginBottom: 14,
-    borderWidth: 0, overflow: 'hidden',
+    backgroundColor: '#0a1520', borderRadius: 12, marginBottom: 14,
+    borderWidth: 1, borderColor: '#1a4a5a', overflow: 'hidden',
   },
   rotationBar: {
     flexDirection: 'row', alignItems: 'center',
