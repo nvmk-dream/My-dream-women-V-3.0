@@ -206,7 +206,7 @@ export default function LaunchHomeScreen() {
       resizeMode="cover"
     >
         <SafeAreaView style={styles.safeInner} edges={['top', 'left', 'right', 'bottom']}>
-          <StatusBar backgroundColor="#E8EEFB" barStyle="dark-content" />
+          <StatusBar backgroundColor="transparent" translucent barStyle="light-content" />
           <Stack.Screen options={{ headerShown: false }} />
       <View
         style={[styles.page, Platform.OS === 'web' && styles.webPage]}
@@ -440,10 +440,10 @@ const styles = StyleSheet.create({
   },
   logo: { width: 52, height: 52, borderRadius: 16, borderWidth: 1.5, borderColor: '#D64DFF' },
   headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { color: '#18204E', fontSize: 20, fontWeight: '800' },
+  headerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', textShadowColor: 'rgba(0, 0, 0, 0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2, minWidth: 0 },
-  headerSubtitle: { color: '#3A4566', fontSize: 10, fontWeight: '600', flexShrink: 1 },
-  headerVersion: { color: '#3A4566', fontSize: 10, fontWeight: '600', flexShrink: 0 },
+  headerSubtitle: { color: '#FFE0F0', fontSize: 10, fontWeight: '600', flexShrink: 1 },
+  headerVersion: { color: '#FFE0F0', fontSize: 10, fontWeight: '600', flexShrink: 0 },
   settingsButton: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   hero: { width: '100%', borderRadius: 24, borderWidth: 1.5, borderColor: '#35DFFF', overflow: 'hidden', backgroundColor: '#10172F', shadowColor: '#16CFFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   heroImage: { width: '100%', height: '100%' },
