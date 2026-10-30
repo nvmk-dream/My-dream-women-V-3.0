@@ -92,7 +92,8 @@
       "./plugins/withPlayProtect",
       "./plugins/withSafDocumentDelete",
       "./plugins/withOperaIntent",
-      "./plugins/withInstalledApk"
+      "./plugins/withInstalledApk",
+      "./plugins/withFaceSwapNative"
     ],
     "experiments": {
       "typedRoutes": true

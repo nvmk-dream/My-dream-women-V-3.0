@@ -42,10 +42,14 @@ jobs:
           fi
           echo "Android SDK setup complete"
 
-      - name: Install ImageMagick
+      - name: Ensure ImageMagick is available
         run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
+          if ! command -v convert >/dev/null 2>&1; then
+            timeout 300s sudo apt-get update
+            timeout 300s sudo apt-get install -y imagemagick
+          else
+            echo "Using ImageMagick already available on the runner"
+          fi
           convert --version | head -2
 
       - name: Install pnpm
