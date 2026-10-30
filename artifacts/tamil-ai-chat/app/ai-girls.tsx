@@ -1010,7 +1010,17 @@ Then write these prompts:
           </View>
 
           <View style={s.gridBottomInfo}>
-            <Text style={s.gridName} numberOfLines={1}>{p.name}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              <Text style={s.gridName} numberOfLines={1}>{p.name}</Text>
+              <TouchableOpacity
+                onPress={() => openUrlSettings(p)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open URLs for ${p.name}`}
+              >
+                <Text style={{ fontSize: 13 }}>🔗</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={s.gridSub} numberOfLines={1}>
               {p.editedRelationship ?? p.relationship}
             </Text>
@@ -1037,6 +1047,15 @@ Then write these prompts:
         <View style={s.chatMid}>
           <View style={s.chatNameRow}>
             <Text style={s.chatName} numberOfLines={1}>{p.name}</Text>
+            <TouchableOpacity
+              style={s.urlBadgeBtn}
+              onPress={() => openUrlSettings(p)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Open URLs for ${p.name}`}
+            >
+              <Text style={s.urlBadgeTxt}>🔗 URLs</Text>
+            </TouchableOpacity>
           </View>
           <Text style={s.chatSub} numberOfLines={1}>
             {p.editedRelationship ?? p.relationship} · {p.profession}
@@ -1915,6 +1934,22 @@ const s = StyleSheet.create({
   activeTxt: { color: '#15803D', fontSize: 10, fontWeight: '700' },
   urlSettingsBtn: { paddingHorizontal: 4, paddingVertical: 2 },
   urlSettingsTxt: { fontSize: 16 },
+  urlBadgeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(124, 58, 237, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(124, 58, 237, 0.35)",
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  urlBadgeTxt: {
+    color: "#6D28D9",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   timerBadge: { fontSize: 10, color: '#1E1B4B', fontWeight: '700', backgroundColor: 'rgba(255, 255, 255, 0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
   badge: { backgroundColor: '#24C980', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#A1FFD0', marginTop: 4 },
   badgeTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
