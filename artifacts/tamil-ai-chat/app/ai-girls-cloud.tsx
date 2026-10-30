@@ -1060,22 +1060,22 @@ export default function AIGirlsCloudScreen() {
       {depth === 2 ? (
         <TouchableOpacity style={s.uploadBtn} onPress={handleUpload} disabled={uploading}>
           {uploading
-            ? <ActivityIndicator color={ct.text} size="small" />
-            : <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.background} /><Text style={s.uploadBtnTxt}>Upload</Text></View>
+            ? <ActivityIndicator color="#0F172A" size="small" />
+            : <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color="#2563EB" /><Text style={s.uploadBtnTxt}>Upload</Text></View>
           }
         </TouchableOpacity>
       ) : (
         <View style={[s.uploadBtn, s.disabledButton]}>
-          <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color={ct.muted} /><Text style={[s.uploadBtnTxt, { color: ct.muted }]}>Upload</Text></View>
+          <View style={s.buttonContent}><Ionicons name="cloud-upload-outline" size={18} color="#64748B" /><Text style={[s.uploadBtnTxt, { color: '#64748B' }]}>Upload</Text></View>
         </View>
       )}
       {depth !== 2 ? (
         <TouchableOpacity style={s.newFolderBtn} onPress={handleNewFolder}>
-          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.gold} /><Text style={s.newFolderTxt}>New Folder</Text></View>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color="#D97706" /><Text style={s.newFolderTxt}>New Folder</Text></View>
         </TouchableOpacity>
       ) : (
         <View style={[s.newFolderBtn, { opacity: 0.45 }]}>
-          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color={ct.muted} /><Text style={[s.newFolderTxt, { color: ct.muted }]}>New Folder</Text></View>
+          <View style={s.buttonContent}><Ionicons name="folder-open-outline" size={18} color="#64748B" /><Text style={[s.newFolderTxt, { color: '#64748B' }]}>New Folder</Text></View>
         </View>
       )}
     </View>
@@ -1098,9 +1098,9 @@ export default function AIGirlsCloudScreen() {
                 : <Text style={s.rowIconTxt}>{item.letter}</Text>}
             </View>
             <Text style={s.rowName}>{item.name}</Text>
-            <Ionicons name="chevron-forward" size={20} color={ct.gold} style={s.rowArrow} />
+            <Ionicons name="chevron-forward" size={20} color="#D97706" style={s.rowArrow} />
             <TouchableOpacity style={s.trashBtn} onPress={() => handleDeleteFolder(item.id, item.name, 'char')}>
-              <Ionicons name="trash-outline" size={20} color={ct.cyan} />
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
             </TouchableOpacity>
           </TouchableOpacity>
         )}
@@ -1134,7 +1134,7 @@ export default function AIGirlsCloudScreen() {
                 style={s.quickUploadBtn}
                 onPress={() => selectedChar && handleQuickUpload(selectedChar, item)}
               >
-                <Ionicons name="cloud-upload-outline" size={20} color={ct.cyan} />
+                <Ionicons name="cloud-upload-outline" size={20} color="#2563EB" />
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -1397,69 +1397,88 @@ const s = StyleSheet.create({
 
   // Header
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.00)',
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 12,
-    borderBottomWidth: 0,
-    borderColor: 'transparent',
+    paddingHorizontal: 14, paddingVertical: 10,
+    marginHorizontal: 12, marginTop: 6, marginBottom: 4,
+    borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.65)',
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3,
   },
-  backBtn: { padding: 8, width: 42, alignItems: 'center' },
-  backTxt: { color: '#B45309', fontSize: 28, fontWeight: 'bold', lineHeight: 30 },
-  headerTitle: { flex: 1, color: '#1E1B4B', fontSize: 20, fontWeight: '900', marginLeft: 4, textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
-  refreshBtn: { padding: 8 },
-  refreshTxt: { color: '#B45309', fontSize: 22, fontWeight: 'bold' },
+  backBtn: { padding: 6, width: 38, alignItems: 'center' },
+  backTxt: { color: '#B45309', fontSize: 26, fontWeight: 'bold', lineHeight: 28 },
+  headerTitle: { flex: 1, color: '#0F172A', fontSize: 19, fontWeight: '900', marginLeft: 6 },
+  refreshBtn: { padding: 6 },
+  refreshTxt: { color: '#B45309', fontSize: 20, fontWeight: 'bold' },
 
   // Breadcrumb
   breadcrumb: {
-    backgroundColor: 'rgba(255, 255, 255, 0.00)', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 0, borderColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    paddingHorizontal: 14, paddingVertical: 8,
+    marginHorizontal: 12, marginVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)',
+    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2,
   },
   breadcrumbTrail: { flexDirection: 'row', alignItems: 'center', minHeight: 20 },
-  breadcrumbHome: { color: '#7C3AED', fontWeight: '800' },
-  breadcrumbLink: { color: '#B45309', fontWeight: '800' },
-  breadcrumbSep: { color: '#6B7280' },
-  breadcrumbCur: { color: '#1E1B4B', fontWeight: '900' },
+  breadcrumbHome: { color: '#7C3AED', fontWeight: '800', fontSize: 13 },
+  breadcrumbLink: { color: '#B45309', fontWeight: '800', fontSize: 13 },
+  breadcrumbSep: { color: '#64748B', fontSize: 13 },
+  breadcrumbCur: { color: '#0F172A', fontWeight: '900', fontSize: 13 },
 
   // Action bar
   actionBar: {
-    flexDirection: 'row', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    borderBottomWidth: 0, borderColor: 'transparent',
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: 'transparent',
   },
   uploadBtn: {
-    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12,
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 14,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 0,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)',
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3,
   },
-  uploadBtnTxt: { color: '#1E1B4B', fontWeight: '900', fontSize: 14 },
-  disabledButton: { backgroundColor: 'rgba(255, 255, 255, 0.00)', borderWidth: 0, opacity: 0.55 },
+  uploadBtnTxt: { color: '#0F172A', fontWeight: '800', fontSize: 14 },
+  disabledButton: { backgroundColor: 'rgba(255, 255, 255, 0.65)', opacity: 0.65 },
   newFolderBtn: {
-    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.00)', borderRadius: 12, borderWidth: 0,
-    paddingVertical: 12, alignItems: 'center',
+    flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.88)', borderRadius: 14,
+    paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)',
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3,
   },
-  newFolderTxt: { color: '#1E1B4B', fontWeight: '900', fontSize: 14 },
+  newFolderTxt: { color: '#0F172A', fontWeight: '800', fontSize: 14 },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
 
   // Section label
   sectionLabel: {
-    fontSize: 12, fontWeight: '900', color: '#1E1B4B',
-    letterSpacing: 1.5, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
+    fontSize: 12, fontWeight: '900', color: '#0F172A',
+    letterSpacing: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    alignSelf: 'flex-start',
+    marginHorizontal: 14, marginTop: 8, marginBottom: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.6)',
   },
 
   // Row (character or style)
   content: { flex: 1, backgroundColor: 'transparent' },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 14, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    borderWidth: 0, borderColor: 'transparent', borderRadius: 14,
+    marginHorizontal: 12, paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)', borderRadius: 16,
+    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4,
   },
   rowIcon: {
-    width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.00)',
-    borderWidth: 0,
+    width: 44, height: 44, borderRadius: 22, overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1, borderColor: 'rgba(217, 119, 6, 0.3)',
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
   rowIconTxt: { color: '#B45309', fontWeight: 'bold', fontSize: 16 },
   profilePhoto: { width: '100%', height: '100%' },
-  rowName: { flex: 1, fontSize: 16.5, color: '#1E1B4B', fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 2 },
+  rowName: { flex: 1, fontSize: 16, color: '#0F172A', fontWeight: '800' },
   rowArrow: { marginRight: 8 },
   trashBtn: { padding: 6 },
   trashIcon: { fontSize: 18 },
@@ -1468,23 +1487,26 @@ const s = StyleSheet.create({
 
   // Style row
   styleIcon: { fontSize: 20, marginRight: 14 },
-  styleThumb: { width: 60, height: 48, borderRadius: 8, marginRight: 13, borderWidth: 0 },
-  styleRowName: { flex: 1, fontSize: 16, color: '#1E1B4B', fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 2 },
+  styleThumb: { width: 60, height: 48, borderRadius: 10, marginRight: 13, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  styleRowName: { flex: 1, fontSize: 15.5, color: '#0F172A', fontWeight: '800' },
 
   sep: { height: 9 },
 
   // Photo grid
   centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 24, backgroundColor: 'transparent' },
-  loadingTxt: { color: '#6B7280', fontSize: 14, textAlign: 'center', marginTop: 10 },
+  loadingTxt: { color: '#0F172A', fontSize: 14, textAlign: 'center', marginTop: 10, fontWeight: '700' },
   emptyIcon: { fontSize: 60 },
   emptyArtwork: { width: Math.min(width - 56, 300), height: Math.min(width - 56, 300), borderRadius: 20, borderWidth: 0 },
-  emptyTxt: { color: '#1E1B4B', fontSize: 16, textAlign: 'center', lineHeight: 26, fontWeight: '800', textShadowColor: 'rgba(255,255,255,0.85)', textShadowRadius: 3 },
+  emptyTxt: { color: '#0F172A', fontSize: 16, textAlign: 'center', lineHeight: 26, fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
   dateHeader: {
-    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8,
-     backgroundColor: 'transparent',
+    paddingHorizontal: 14, paddingVertical: 8,
+    marginHorizontal: 12, marginTop: 8, marginBottom: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.80)',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)',
   },
-   dateHeaderTxt: { color: '#1E1B4B', fontSize: 15, fontWeight: '800' },
-   dateHeaderSub: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  dateHeaderTxt: { color: '#0F172A', fontSize: 15, fontWeight: '800' },
+  dateHeaderSub: { color: '#64748B', fontSize: 12, marginTop: 2 },
    photoList: { flex: 1, backgroundColor: 'transparent' },
    photoListContent: { paddingHorizontal: 2, paddingBottom: 24, backgroundColor: 'transparent' },
   photoRow: { justifyContent: 'space-between', marginBottom: 2 },

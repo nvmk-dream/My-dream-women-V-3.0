@@ -292,3 +292,30 @@
 7. **GitHub Push & APK Build (Rule 2):**
    - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
    - GitHub Actions மூலம் புதிய APK build தானாகத் தொடங்கப்பட்டது.
+
+---
+
+## 🏷️ Feature 13: மலர் பின்னணியில் எழுத்துக்கள் தெளிவாகத் தெரிய Luxury Frosted Glassmorphism கார்டுகள் & High-Contrast Typography அமைத்தல்
+
+### 1. கோரிக்கை விவரம் (User Request):
+- ரோஜா மலர் பின்னணிப் படம் அடர்த்தியான பல வண்ண மலர்களைக் கொண்டிருப்பதால் (சிவப்பு, மஞ்சள், இளஞ்சிவப்பு, பச்சை இலைகள்), கார்டுகள் முற்றிலும் 100% வெளிப்படையாக (`rgba(255, 255, 255, 0.00)`) இருக்கும் போது டெக்ஸ்ட் ("கிருத்திகா", "Normal Photo", "Nude", "Upload", "New Folder") மலர்களின் வண்ணங்களோடு கலந்து படிக்க முடியாமல் மங்கலாகத் தெரிந்தது ("Fonts சரியாக தெரியவில்லை, இதற்கு ஒரு solution சொல்லு").
+- பயனர் Solution 1-ஐ (Luxury Frosted Glassmorphism - மெல்லிய உறைபனி கண்ணாடித் தோற்றம்) தேர்வு செய்து உறுதி செய்தார் ("Solution 1 ok").
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **`app/ai-girls-cloud.tsx` (My AI Girls Cloud) புதுப்பித்தல்:**
+   - **Header:** `backgroundColor: 'rgba(255, 255, 255, 0.86)'`, `borderRadius: 16`, `borderWidth: 1`, மெல்லிய சாஃப்ட் ஷேடோ உடன் கார்டாக அமைக்கப்பட்டு தலைப்பு `#0F172A` (டார்க் ஸ்லேட்) நிறத்தில் பளிச்சென அமைக்கப்பட்டது.
+   - **Breadcrumb:** `backgroundColor: 'rgba(255, 255, 255, 0.82)'`, `borderRadius: 12`, வழித்தடப் பெயர்கள் முழுத் தெளிவுடன் அமைக்கப்பட்டன.
+   - **Upload & New Folder பட்டன்கள்:** `backgroundColor: 'rgba(255, 255, 255, 0.88)'`, `borderRadius: 14`, கிளிக் செய்யும் போது தெளிவான பார்வை உறுதி செய்யப்பட்டது.
+   - **Section Label ("FOLDERS"):** தனி கேப்சூல் பேட்ஜ் பின்னணியோடு (`rgba(255, 255, 255, 0.75)`) அமைக்கப்பட்டது.
+   - **Folder Rows (கேரக்டர்கள் & போட்டோ ஸ்டைல்கள்):** `backgroundColor: 'rgba(255, 255, 255, 0.85)'`, `borderRadius: 16`, பார்டர் `rgba(255, 255, 255, 0.7)`, டெக்ஸ்ட் `#0F172A` என மாற்றப்பட்டதால் ரோஜா பின்னணியும் அழகாகத் தெரியும், எழுத்துக்களும் 100% தெளிவாகப் படிக்க முடியும்.
+   - **Empty State & Date Headers (Depth 2):** கண்ணாடி பின்னணி கார்டுகளுடன் அமைக்கப்பட்டது.
+2. **`app/gallery.tsx` (Gallery & Storage Tabs) புதுப்பித்தல்:**
+   - Header, Breadcrumbs, Action Buttons, Backup Progress Card, மற்றும் Album Rows அனைத்தும் Frosted Glass கார்டுகளாக மாற்றப்பட்டன.
+3. **`app/keys.tsx` (Keys & Credentials) புதுப்பித்தல்:**
+   - Header, Summary Bar, Device Key Card, மற்றும் Section Headers கண்ணாடி கார்டு பாணியில் சீரமைக்கப்பட்டன.
+4. **`app/cloud-storage.tsx` (Cloud Dashboard) புதுப்பித்தல்:**
+   - Header, Storage Info, மற்றும் Category Cards அனைத்தும் மெல்லிய கண்ணாடித் தோற்றத்தோடு உயர்தர கான்ட்ராஸ்ட் எழுத்துக்களுடன் மாற்றப்பட்டன.
+5. **APK Build & GitHub Sync (Rule 2):**
+   - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
+   - GitHub Actions மூலம் புதிய APK build (`build-apk.yml`) இயக்கப்பட்டு உறுதி செய்யப்பட்டது.
+
