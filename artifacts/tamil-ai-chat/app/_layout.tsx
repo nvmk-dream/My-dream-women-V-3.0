@@ -232,7 +232,7 @@ export default function RootLayout() {
             <Stack.Screen name="group-chat" options={{ title: 'Group Chat' }} />
             <Stack.Screen name="face-swap" options={{ title: 'Face Swap' }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="edit-character" options={{ title: 'Edit Character' }} />
+            <Stack.Screen name="edit-character" options={{ headerShown: false }} />
             <Stack.Screen name="cloud-storage" options={{ headerShown: false }} />
             <Stack.Screen name="ai-girls-cloud" options={{ headerShown: false }} />
             <Stack.Screen name="offline-chat" options={{ title: 'Offline AI' }} />
@@ -262,8 +262,8 @@ export default function RootLayout() {
                 <View style={ob.row}>
                   <Text style={ob.rowIcon}>🖼️</Text>
                   <View style={ob.rowText}>
-                    <Text style={ob.rowTitle}>Photos & Videos</Text>
-                    <Text style={ob.rowDesc}>Gallery-ல் upload & save பண்ண</Text>
+                    <Text style={ob.rowTitle}>Photos &amp; Videos</Text>
+                    <Text style={ob.rowDesc}>Gallery-ல் upload &amp; save பண்ண</Text>
                   </View>
                 </View>
                 <View style={ob.noteBox}>
