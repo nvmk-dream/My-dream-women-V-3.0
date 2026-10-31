@@ -1,2 +1,2 @@
-Render redeploy: 2026-07-19 06:48:06 UTC
-Reason: feat - கல்லாட்டம் multi-character story engine added
+Render redeploy: 2026-10-31 00:00:00 UTC
+Reason: Fix legacy green header flash on Edit Character screen by hiding the default header for that route
