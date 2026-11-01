@@ -104,6 +104,16 @@ function withFaceSwapNative(config) {
       }
     }
 
+    if (!contents.includes('abiFilters "arm64-v8a"')) {
+      const defaultConfigBlock = /defaultConfig\s*\{/;
+      if (defaultConfigBlock.test(contents)) {
+        contents = contents.replace(
+          defaultConfigBlock,
+          (match) => `${match}\n        ndk {\n            abiFilters "arm64-v8a", "armeabi-v7a"\n        }`,
+        );
+      }
+    }
+
     const dependencyMarker = "// FaceSwap Studio native dependencies";
     if (!contents.includes(dependencyMarker)) {
       const dependencyBlock = /dependencies\s*\{/;
