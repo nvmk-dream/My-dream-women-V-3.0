@@ -36,10 +36,16 @@ router.use(storySaveRouter);
 router.use(photoStylesRouter);
 router.use(characterUrlsRouter);
 
+import fs from "fs";
+
 // Temporary backup download route
 router.get("/download/backup", (_req, res) => {
   const file = path.join(process.cwd(), "backup.zip");
-  res.download(file, "replit-my girles.zip");
+  if (fs.existsSync(file)) {
+    res.download(file, "replit-my girles.zip");
+  } else {
+    res.status(404).json({ error: "Backup archive has been cleaned up to reduce repo size" });
+  }
 });
 
 export default router;
