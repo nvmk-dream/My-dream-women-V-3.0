@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadUriToCloudinary, getPhotoStyles, createPhotoStyle, deletePhotoStyle, type PhotoStyleRecord, type GlobalStyleEntry } from '../services/api';
 import { ALL_PERSONAS } from '../constants/personas';
 import CharacterSettingsSection from '../components/CharacterSettingsSection';
+import VoiceSettingsSection from '../components/VoiceSettingsSection';
 
 const BUTTERFLY_BG = require('../assets/images/pastel_butterfly_bg.png');
 
@@ -593,6 +594,7 @@ export default function SettingsScreen() {
         <Text style={s.version}>Version {APP_VERSION}</Text>
 
         <CharacterSettingsSection />
+        <VoiceSettingsSection />
 
         <View style={s.card}>
           <View style={s.cardHeader}>

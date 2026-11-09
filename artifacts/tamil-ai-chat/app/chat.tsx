@@ -15,6 +15,7 @@ import MediaVideoPlayer from '../components/MediaVideoPlayer';
 import { requestPhotoVideoPermissionsAsync } from '../services/media-permissions';
 import { LinearGradient } from 'expo-linear-gradient';
 import { projectTwoTheme as theme } from '../constants/project-two-theme';
+import { voiceService } from '../services/voice-service';
 
 const FAB_CAMERA_IMG = require('../assets/images/chat_fab_camera.jpg');
 const FAB_CLOUD_IMG = require('../assets/images/chat_fab_cloud.jpg');
@@ -457,7 +458,12 @@ export default function ChatScreen() {
   useEffect(() => { reloadPersona(); }, [reloadPersona]);
 
   // Reload persona when returning from edit-character screen
-  useFocusEffect(useCallback(() => { reloadPersona(); }, [reloadPersona]));
+  useFocusEffect(useCallback(() => {
+    reloadPersona();
+    return () => {
+      void voiceService.stopCurrentSpeech();
+    };
+  }, [reloadPersona]));
 
   // ── Avatar Profile Analysis — server-side Gemini keys + OpenRouter fallback ──
   // Was previously client-side (app-entered multimedia_gemini_1..5 keys, often
@@ -1654,6 +1660,20 @@ export default function ChatScreen() {
         }
         return updated;
       });
+
+      if (reply) {
+        voiceService.isVoiceEnabled().then(async (enabled) => {
+          if (enabled) {
+            try {
+              const charId = persona?.id || (typeof personaId === "string" ? personaId : "default");
+              const profile = await voiceService.getVoiceForCharacter(charId);
+              await voiceService.speakText(reply, profile);
+            } catch (vErr) {
+              console.log("Voice read error:", vErr);
+            }
+          }
+        }).catch(() => {});
+      }
     } catch (err: any) {
       const errMsg: string = err?.message ?? '';
       const low = errMsg.toLowerCase();
