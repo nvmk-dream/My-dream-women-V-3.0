@@ -319,3 +319,23 @@
    - மாற்றங்கள் `origin/main`-ல் commit செய்யப்பட்டு push செய்யப்பட்டது.
    - GitHub Actions மூலம் புதிய APK build (`build-apk.yml`) இயக்கப்பட்டு உறுதி செய்யப்பட்டது.
 
+## 🏷️ Feature 15: AI4Bharat IndicF5 குரல் குளோனிங் ExoPlayer 404 எரர் வேரோடு அழித்தல் & தடையற்ற ஆடியோ இயக்கம் (Zero 404 Permanent Fix)
+
+### 1. கண்டறியப்பட்ட மூலக் காரணங்கள் (Root Causes Identified):
+- Settings பக்கத்தில் AI4Bharat IndicF5 வாய்ஸ் டெஸ்ட் கொடுக்கும் போது `com.google.android.exoplayer2.upstream.HttpDataSource$InvalidResponseCodeException: Response code: 404` ஏற்பட்டது.
+- Hugging Face Space Gradio SSE event தரும் JSON response-ல் `https://ai4bharat-indicf5.hf.space/gradio_api/gradio_api/file=/tmp/gradio/.../audio.wav` என `/gradio_api` இரண்டு முறை டூப்ளிகேட் ஆகி தவறான URL உருவானது.
+- அந்த தவறான URL-ஐ நேரிடையாக ஆண்ட்ராய்டின் ExoPlayer-ல் ஸ்ட்ரீம் செய்ய முயன்றதால் சர்வர் 404 தந்து எரர் பாப்-அப் தோன்றியது.
+- இரண்டாவது மாஸ்டர் வாய்ஸான "Bae Comfort"-க்கு சர்வர் பாத் தவறாக இருந்ததுடன் 403 எரர் தந்தது.
+
+### 2. செயல்படுத்திய விதம் (Execution):
+1. **`services/voice-service.ts` முழுமையான சீரமைப்பு:**
+   - Gradio ரெஸ்பான்ஸில் இருந்து கிளீன் URL உருவாக்கும் லாஜிக் (`${GRADIO_BASE}/gradio_api/file=${path}`) அமைக்கப்பட்டு டூப்ளிகேட் `/gradio_api/gradio_api/` பக் நிரந்தரமாக நீக்கப்பட்டது.
+   - `MASTER_VOICE_1` மற்றும் `MASTER_VOICE_2` (Bae Comfort) இரண்டிற்கும் செல்லுபடியாகும் சர்வர் பாத் அமைக்கப்பட்டு, சர்வரில் ஃபைல் காலாவதியானால் தானாக ரீ-அப்லோட் செய்யும் Auto-Recovery வழிமுறை சேர்க்கப்பட்டது.
+   - ஆன்லைன் ஸ்ட்ரீமிங் டிராப் ஆவதைத் தவிர்க்க `FileSystem.downloadAsync` மூலம் உள்ளூர் கேஷில் டவுன்லோட் செய்து, லோக்கல் ஃபைலாக ExoPlayer-ல் இயக்கும் முறை கொண்டுவரப்பட்டது.
+2. **`components/VoiceSettingsSection.tsx` பட்டன் பின்னூட்டம்:**
+   - ஒவ்வொரு வாய்ஸ் ஸ்லாட்டிலும் டெஸ்ட் பட்டன் தொடும் போது தனித்தனியாக `ActivityIndicator` தோன்றும் வகையில் `testingProfileId` இணைக்கப்பட்டது.
+3. **சரிபார்ப்பு & GitHub APK Build (Rule 2):**
+   - `compile_applet` வெற்றிகரமாக நிறைவுபெற்றது.
+   - Git-ல் மாற்றங்கள் commit செய்யப்பட்டு `origin/main`-க்கு push செய்யப்பட்டது.
+   - GitHub Actions `build-apk.yml` இயக்கப்பட்டு புதிய APK உருவாக்கம் தொடங்கப்பட்டது.
+

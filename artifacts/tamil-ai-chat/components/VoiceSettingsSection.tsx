@@ -39,6 +39,7 @@ export default function VoiceSettingsSection() {
   // Live test speech
   const [testText, setTestText] = useState('டார்லிங், இன்னைக்கு நாள் ரொம்ப நல்லா போகும், கவலைப்படாதே.');
   const [testingVoice, setTestingVoice] = useState(false);
+  const [testingProfileId, setTestingProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -155,25 +156,30 @@ export default function VoiceSettingsSection() {
   const testSpeak = async (profile?: VoiceProfile) => {
     if (testingVoice) return;
     setTestingVoice(true);
+    const targetProfile =
+      profile ||
+      (universalVoiceId === MASTER_VOICE_2.id ? MASTER_VOICE_2 : MASTER_VOICE_1);
+    setTestingProfileId(targetProfile.id);
+
     try {
-      let targetProfile = profile;
-      if (!targetProfile) {
-        if (universalVoiceId === MASTER_VOICE_2.id) {
-          targetProfile = MASTER_VOICE_2;
-        } else {
-          targetProfile = MASTER_VOICE_1;
-        }
-      }
+      const phrase =
+        testText.trim() ||
+        'வணக்கம், நான் உங்கள் AI தோழி. நீங்கள் நலமாக இருக்கிறீர்களா?';
 
       await voiceService.speakText(
-        testText,
+        phrase,
         targetProfile,
         () => {},
-        () => setTestingVoice(false)
+        () => {
+          setTestingVoice(false);
+          setTestingProfileId(null);
+        }
       );
     } catch (err: any) {
       Alert.alert('Voice Test Error', err?.message || 'குரலை இயக்க முடியவில்லை.');
+    } finally {
       setTestingVoice(false);
+      setTestingProfileId(null);
     }
   };
 
@@ -271,8 +277,14 @@ export default function VoiceSettingsSection() {
             onPress={() => testSpeak(MASTER_VOICE_1)}
             disabled={testingVoice}
           >
-            <Ionicons name="volume-high" size={16} color="#FFFFFF" />
-            <Text style={s.testMiniTxt}>Test</Text>
+            {testingProfileId === MASTER_VOICE_1.id ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="volume-high" size={16} color="#FFFFFF" />
+                <Text style={s.testMiniTxt}>Test</Text>
+              </>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
 
@@ -293,8 +305,14 @@ export default function VoiceSettingsSection() {
             onPress={() => testSpeak(MASTER_VOICE_2)}
             disabled={testingVoice}
           >
-            <Ionicons name="volume-high" size={16} color="#FFFFFF" />
-            <Text style={s.testMiniTxt}>Test</Text>
+            {testingProfileId === MASTER_VOICE_2.id ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="volume-high" size={16} color="#FFFFFF" />
+                <Text style={s.testMiniTxt}>Test</Text>
+              </>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       </View>
@@ -311,6 +329,8 @@ export default function VoiceSettingsSection() {
         {personas.map((persona) => {
           const customVoice = characterVoiceMap[persona.id];
           const hasCustom = !!customVoice;
+          const targetSlotProfile = customVoice || MASTER_VOICE_1;
+          const isSlotTesting = testingProfileId === targetSlotProfile.id;
 
           return (
             <View key={persona.id} style={s.charSlotCard}>
@@ -345,11 +365,17 @@ export default function VoiceSettingsSection() {
 
                 <TouchableOpacity
                   style={[s.actionBtn, s.actionTestBtn]}
-                  onPress={() => testSpeak(customVoice || MASTER_VOICE_1)}
+                  onPress={() => testSpeak(targetSlotProfile)}
                   disabled={testingVoice}
                 >
-                  <Ionicons name="play-circle-outline" size={16} color="#C084FC" />
-                  <Text style={[s.actionBtnTxt, { color: '#C084FC' }]}>சோதித்து பார்</Text>
+                  {isSlotTesting ? (
+                    <ActivityIndicator size="small" color="#C084FC" />
+                  ) : (
+                    <>
+                      <Ionicons name="play-circle-outline" size={16} color="#C084FC" />
+                      <Text style={[s.actionBtnTxt, { color: '#C084FC' }]}>சோதித்து பார்</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
