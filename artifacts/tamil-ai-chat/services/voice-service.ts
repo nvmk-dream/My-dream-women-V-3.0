@@ -53,9 +53,12 @@ class VoiceService {
   async isVoiceEnabled(): Promise<boolean> {
     try {
       const val = await AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENABLED);
+      if (val === null) {
+        return true; // Default to ON for seamless first-time experience
+      }
       return val === 'true';
     } catch {
-      return false;
+      return true;
     }
   }
 
@@ -139,16 +142,18 @@ class VoiceService {
   }
 
   // Gradio upload reference audio with automatic caching & FileSystem upload support
-  async uploadReferenceAudio(fileUri: string, fileName = 'ref.wav'): Promise<string> {
+  async uploadReferenceAudio(fileUri: string, fileName = 'ref.wav', forceFresh = false): Promise<string> {
     if (!fileUri) {
       throw new Error('Reference audio URI is missing');
     }
 
-    // Check cached server path
-    const cacheRaw = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_PATH_CACHE).catch(() => null);
-    const cache: Record<string, string> = cacheRaw ? JSON.parse(cacheRaw) : {};
-    if (cache[fileUri]) {
-      return cache[fileUri];
+    if (!forceFresh) {
+      // Check cached server path
+      const cacheRaw = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_PATH_CACHE).catch(() => null);
+      const cache: Record<string, string> = cacheRaw ? JSON.parse(cacheRaw) : {};
+      if (cache[fileUri]) {
+        return cache[fileUri];
+      }
     }
 
     let localUploadUri = fileUri;
@@ -216,6 +221,8 @@ class VoiceService {
     }
 
     if (serverPath) {
+      const cacheRaw = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_PATH_CACHE).catch(() => null);
+      const cache: Record<string, string> = cacheRaw ? JSON.parse(cacheRaw) : {};
       cache[fileUri] = serverPath;
       await AsyncStorage.setItem(STORAGE_KEYS.SERVER_PATH_CACHE, JSON.stringify(cache)).catch(() => {});
     }
@@ -223,32 +230,62 @@ class VoiceService {
     return serverPath;
   }
 
-  // Ensure valid server path with auto recovery
-  async ensureServerPath(profile: VoiceProfile): Promise<string> {
-    if (profile.cachedServerPath) {
+  // Ensure valid server path with auto recovery support
+  async ensureServerPath(profile: VoiceProfile, forceFresh = false): Promise<string> {
+    if (!forceFresh && profile.cachedServerPath) {
       return profile.cachedServerPath;
     }
 
     if (profile.id === MASTER_VOICE_1.id) {
-      return MASTER_VOICE_1.cachedServerPath || (await this.uploadReferenceAudio(MASTER_VOICE_1.audioUri, 'voice_bae_calms_you.wav'));
+      if (!forceFresh && MASTER_VOICE_1.cachedServerPath) {
+        return MASTER_VOICE_1.cachedServerPath;
+      }
+      return await this.uploadReferenceAudio(MASTER_VOICE_1.audioUri, 'voice_bae_calms_you.wav', forceFresh);
     }
 
     if (profile.id === MASTER_VOICE_2.id) {
-      return MASTER_VOICE_2.cachedServerPath || (await this.uploadReferenceAudio(MASTER_VOICE_2.audioUri, 'voice_bae_comfort.wav'));
+      if (!forceFresh && MASTER_VOICE_2.cachedServerPath) {
+        return MASTER_VOICE_2.cachedServerPath;
+      }
+      return await this.uploadReferenceAudio(MASTER_VOICE_2.audioUri, 'voice_bae_comfort.wav', forceFresh);
     }
 
     if (profile.audioUri) {
-      return await this.uploadReferenceAudio(profile.audioUri, `${profile.id}.wav`);
+      return await this.uploadReferenceAudio(profile.audioUri, `${profile.id}.wav`, forceFresh);
     }
 
-    return MASTER_VOICE_1.cachedServerPath!;
+    return await this.uploadReferenceAudio(MASTER_VOICE_1.audioUri, 'voice_bae_calms_you.wav', forceFresh);
   }
 
-  // IndicF5 Zero-Shot Speech Synthesis
+  // IndicF5 Zero-Shot Speech Synthesis with Zero-Failure Auto-Recovery
   async synthesizeSpeech(targetText: string, profile: VoiceProfile): Promise<string> {
-    let serverPath = await this.ensureServerPath(profile);
+    try {
+      // 1. Primary Attempt: Use existing cached path
+      return await this._doSynthesize(targetText, profile, false);
+    } catch (primaryErr) {
+      console.warn('Primary synthesis attempt failed (cache expired or invalid path). Triggering Auto-Recovery...', primaryErr);
 
-    // Call IndicF5 Gradio API
+      // Invalidate cached server path
+      try {
+        const cacheRaw = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_PATH_CACHE).catch(() => null);
+        const cache: Record<string, string> = cacheRaw ? JSON.parse(cacheRaw) : {};
+        delete cache[profile.audioUri];
+        await AsyncStorage.setItem(STORAGE_KEYS.SERVER_PATH_CACHE, JSON.stringify(cache)).catch(() => {});
+      } catch {}
+
+      // 2. Auto-Recovery: Re-upload reference audio freshly and retry
+      try {
+        return await this._doSynthesize(targetText, profile, true);
+      } catch (recoveryErr: any) {
+        console.error('Auto-recovery synthesis also failed:', recoveryErr);
+        throw new Error(recoveryErr?.message || 'Speech synthesis failed after auto-recovery');
+      }
+    }
+  }
+
+  private async _doSynthesize(targetText: string, profile: VoiceProfile, forceFreshUpload: boolean): Promise<string> {
+    const serverPath = await this.ensureServerPath(profile, forceFreshUpload);
+
     const payload = {
       data: [
         targetText,
@@ -262,7 +299,7 @@ class VoiceService {
       ],
     };
 
-    let callRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech`, {
+    const callRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -271,37 +308,13 @@ class VoiceService {
       body: JSON.stringify(payload),
     });
 
-    // Auto-recovery if cached server path expired or invalid on Gradio
-    if (!callRes.ok && (callRes.status === 404 || callRes.status === 403 || callRes.status === 500)) {
-      if (profile.audioUri) {
-        // Invalidate cache and re-upload reference audio
-        const cacheRaw = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_PATH_CACHE).catch(() => null);
-        const cache: Record<string, string> = cacheRaw ? JSON.parse(cacheRaw) : {};
-        delete cache[profile.audioUri];
-        await AsyncStorage.setItem(STORAGE_KEYS.SERVER_PATH_CACHE, JSON.stringify(cache)).catch(() => {});
-
-        serverPath = await this.uploadReferenceAudio(profile.audioUri, `${profile.id}.wav`);
-        payload.data[1].path = serverPath;
-        payload.data[1].url = `${GRADIO_BASE}/gradio_api/file=${serverPath}`;
-
-        callRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${HF_AUTH_TOKEN}`,
-          },
-          body: JSON.stringify(payload),
-        });
-      }
-    }
-
     if (!callRes.ok) {
-      throw new Error(`Synthesize call failed: ${callRes.status}`);
+      throw new Error(`Synthesize call failed with status: ${callRes.status}`);
     }
 
     const callJson = await callRes.json();
     const eventId = callJson.event_id;
-    if (!eventId) throw new Error('No event_id returned');
+    if (!eventId) throw new Error('No event_id returned from IndicF5');
 
     // Poll SSE / event endpoint for complete result
     const resultRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech/${eventId}`, {
@@ -309,7 +322,16 @@ class VoiceService {
         Authorization: `Bearer ${HF_AUTH_TOKEN}`,
       },
     });
+
+    if (!resultRes.ok) {
+      throw new Error(`Event stream failed with status ${resultRes.status}`);
+    }
+
     const text = await resultRes.text();
+
+    if (text.includes('event: error')) {
+      throw new Error('Gradio IndicF5 returned event: error (likely expired path or GPU busy)');
+    }
 
     // Parse event output to extract generated audio file url
     const lines = text.split('\n');
@@ -323,10 +345,8 @@ class VoiceService {
           if (Array.isArray(parsed) && parsed[0]) {
             const item = parsed[0];
             if (item.path) {
-              // Direct clean URL from path avoids Hugging Face duplicate gradio_api bug
               generatedAudioUrl = `${GRADIO_BASE}/gradio_api/file=${item.path}`;
             } else if (item.url) {
-              // Sanitize duplicate /gradio_api/gradio_api/ if present in url
               generatedAudioUrl = item.url.replace(/\/gradio_api\/gradio_api\//g, '/gradio_api/');
             }
           }
@@ -334,7 +354,6 @@ class VoiceService {
       }
     }
 
-    // Always ensure url doesn't have duplicate /gradio_api/gradio_api/
     if (generatedAudioUrl) {
       generatedAudioUrl = generatedAudioUrl.replace(/\/gradio_api\/gradio_api\//g, '/gradio_api/');
     }
@@ -425,12 +444,23 @@ class VoiceService {
     this.isSynthesizing = true;
     try {
       // Clean up text for natural speech (remove markdown, emojis, asterisks, brackets)
-      const clean = text
+      let clean = text
         .replace(/[*_#`~[\]()]/g, '')
         .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '')
         .trim();
 
       if (!clean) return;
+
+      // Limit to first 250 characters or first 2 sentences for natural fast response on ZeroGPU
+      if (clean.length > 250) {
+        const sentences = clean.split(/[.!?।\n]+/).filter(Boolean);
+        if (sentences.length > 0) {
+          clean = sentences.slice(0, 2).join('. ') + '.';
+        }
+        if (clean.length > 250) {
+          clean = clean.slice(0, 250);
+        }
+      }
 
       const audioUrl = await this.synthesizeSpeech(clean, profile);
       if (onStart) onStart();

@@ -153,6 +153,15 @@ export default function VoiceSettingsSection() {
     );
   };
 
+  const stopVoicePlayback = async () => {
+    try {
+      await voiceService.stopCurrentSpeech();
+    } catch {} finally {
+      setTestingVoice(false);
+      setTestingProfileId(null);
+    }
+  };
+
   const testSamplePlay = async (profile: VoiceProfile) => {
     if (testingVoice) return;
     setTestingVoice(true);
@@ -294,20 +303,31 @@ export default function VoiceSettingsSection() {
             <Text style={s.voiceName}>{MASTER_VOICE_1.name}</Text>
             <Text style={s.voiceSub}>Transcript: {MASTER_VOICE_1.referenceTranscript}</Text>
           </View>
-          <TouchableOpacity
-            style={s.testMiniBtn}
-            onPress={() => testSamplePlay(MASTER_VOICE_1)}
-            disabled={testingVoice}
-          >
-            {testingProfileId === MASTER_VOICE_1.id ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="volume-high" size={16} color="#FFFFFF" />
-                <Text style={s.testMiniTxt}>Test</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              style={s.testMiniBtn}
+              onPress={() => testSamplePlay(MASTER_VOICE_1)}
+              disabled={testingVoice}
+            >
+              {testingProfileId === MASTER_VOICE_1.id ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="volume-high" size={15} color="#FFFFFF" />
+                  <Text style={s.testMiniTxt}>Test</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.stopMiniBtn}
+              onPress={stopVoicePlayback}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="stop-circle" size={15} color="#EF4444" />
+              <Text style={s.stopMiniTxt}>Stop</Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
 
         {/* Master Voice 2 */}
@@ -322,20 +342,31 @@ export default function VoiceSettingsSection() {
             <Text style={s.voiceName}>{MASTER_VOICE_2.name}</Text>
             <Text style={s.voiceSub}>Transcript: {MASTER_VOICE_2.referenceTranscript}</Text>
           </View>
-          <TouchableOpacity
-            style={s.testMiniBtn}
-            onPress={() => testSamplePlay(MASTER_VOICE_2)}
-            disabled={testingVoice}
-          >
-            {testingProfileId === MASTER_VOICE_2.id ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="volume-high" size={16} color="#FFFFFF" />
-                <Text style={s.testMiniTxt}>Test</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              style={s.testMiniBtn}
+              onPress={() => testSamplePlay(MASTER_VOICE_2)}
+              disabled={testingVoice}
+            >
+              {testingProfileId === MASTER_VOICE_2.id ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="volume-high" size={15} color="#FFFFFF" />
+                  <Text style={s.testMiniTxt}>Test</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.stopMiniBtn}
+              onPress={stopVoicePlayback}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="stop-circle" size={15} color="#EF4444" />
+              <Text style={s.stopMiniTxt}>Stop</Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -395,9 +426,18 @@ export default function VoiceSettingsSection() {
                   ) : (
                     <>
                       <Ionicons name="play-circle-outline" size={16} color="#C084FC" />
-                      <Text style={[s.actionBtnTxt, { color: '#C084FC' }]}>சோதித்து பார்</Text>
+                      <Text style={[s.actionBtnTxt, { color: '#C084FC' }]}>சோதித்துப் பார்</Text>
                     </>
                   )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.actionBtn, s.actionStopBtn]}
+                  onPress={stopVoicePlayback}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="stop-circle-outline" size={16} color="#EF4444" />
+                  <Text style={[s.actionBtnTxt, { color: '#EF4444' }]}>நிறுத்து</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -421,20 +461,31 @@ export default function VoiceSettingsSection() {
           placeholderTextColor="#64748B"
           multiline
         />
-        <TouchableOpacity
-          style={s.testPlayBtn}
-          onPress={() => testSpeak()}
-          disabled={testingVoice}
-        >
-          {testingVoice ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <>
-              <Ionicons name="volume-high" size={18} color="#FFFFFF" />
-              <Text style={s.testPlayTxt}>குரலை இயக்கு (Speak with AI4Bharat)</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[s.testPlayBtn, { flex: 2 }]}
+            onPress={() => testSpeak()}
+            disabled={testingVoice}
+          >
+            {testingVoice ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="volume-high" size={18} color="#FFFFFF" />
+                <Text style={s.testPlayTxt}>குரலை இயக்கு (Speak)</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[s.testPlayBtn, s.testStopBtn, { flex: 1 }]}
+            onPress={stopVoicePlayback}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="stop-circle" size={18} color="#FFFFFF" />
+            <Text style={s.testPlayTxt}>Stop</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Modal for uploading custom voice ── */}
@@ -653,12 +704,28 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#7C3AED',
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
   },
   testMiniTxt: {
     color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  stopMiniBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  stopMiniTxt: {
+    color: '#EF4444',
     fontWeight: '700',
     fontSize: 11,
   },
@@ -691,14 +758,14 @@ const s = StyleSheet.create({
   },
   charSlotActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: '#7C3AED',
     paddingVertical: 7,
     borderRadius: 8,
@@ -708,10 +775,19 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C084FC',
   },
+  actionStopBtn: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    flex: 0.8,
+  },
   actionBtnTxt: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 11,
+  },
+  testStopBtn: {
+    backgroundColor: '#EF4444',
   },
   testBox: {
     backgroundColor: '#F1F5F9',

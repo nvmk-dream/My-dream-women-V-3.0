@@ -539,6 +539,57 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
+
+  // ── Chat Voice Reading State ──
+  const [chatVoiceOn, setChatVoiceOn] = useState(true);
+  const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const [isSynthesizingMsgId, setIsSynthesizingMsgId] = useState<string | null>(null);
+
+  useEffect(() => {
+    voiceService.isVoiceEnabled().then(enabled => setChatVoiceOn(enabled)).catch(() => {});
+  }, []);
+
+  const toggleHeaderVoice = async () => {
+    const next = !chatVoiceOn;
+    setChatVoiceOn(next);
+    await voiceService.setVoiceEnabled(next);
+    if (!next) {
+      await voiceService.stopCurrentSpeech();
+      setPlayingMsgId(null);
+      setIsSynthesizingMsgId(null);
+    }
+  };
+
+  const handlePlayMessageVoice = async (msg: Message) => {
+    if (playingMsgId === msg.id) {
+      await voiceService.stopCurrentSpeech();
+      setPlayingMsgId(null);
+      setIsSynthesizingMsgId(null);
+      return;
+    }
+
+    try {
+      setPlayingMsgId(msg.id);
+      setIsSynthesizingMsgId(msg.id);
+      const charId = persona?.id || (typeof personaId === 'string' ? personaId : 'default');
+      const profile = await voiceService.getVoiceForCharacter(charId);
+      await voiceService.speakText(
+        msg.content,
+        profile,
+        () => {
+          setIsSynthesizingMsgId(null);
+        },
+        () => {
+          setPlayingMsgId(null);
+          setIsSynthesizingMsgId(null);
+        }
+      );
+    } catch (err: any) {
+      Alert.alert('Voice Error', err?.message || 'குரலை இயக்க முடியவில்லை.');
+      setPlayingMsgId(null);
+      setIsSynthesizingMsgId(null);
+    }
+  };
   // ── Staging preview for photo/video before send ──
   const [stagingMedia, setStagingMedia] = useState<{
     uri: string; isVideo: boolean; b64: string; mimeType: string; fileName: string;
@@ -1649,8 +1700,9 @@ export default function ChatScreen() {
         }
       }
 
+      const newAiMsgId = (Date.now() + 1).toString();
       setMessages(prev => {
-        const aiMsg = { id: (Date.now() + 1).toString(), role: 'assistant' as const, content: reply, timestamp: new Date() };
+        const aiMsg = { id: newAiMsgId, role: 'assistant' as const, content: reply, timestamp: new Date() };
         const updated = [...prev, aiMsg];
         // Kiruthika 2-day persistent memory: save every message exchange to AsyncStorage
         if (personaId === 'kiruthika') {
@@ -1661,18 +1713,28 @@ export default function ChatScreen() {
         return updated;
       });
 
-      if (reply) {
-        voiceService.isVoiceEnabled().then(async (enabled) => {
-          if (enabled) {
-            try {
-              const charId = persona?.id || (typeof personaId === "string" ? personaId : "default");
-              const profile = await voiceService.getVoiceForCharacter(charId);
-              await voiceService.speakText(reply, profile);
-            } catch (vErr) {
-              console.log("Voice read error:", vErr);
+      if (reply && chatVoiceOn) {
+        try {
+          const charId = persona?.id || (typeof personaId === "string" ? personaId : "default");
+          const profile = await voiceService.getVoiceForCharacter(charId);
+          setPlayingMsgId(newAiMsgId);
+          setIsSynthesizingMsgId(newAiMsgId);
+          await voiceService.speakText(
+            reply,
+            profile,
+            () => {
+              setIsSynthesizingMsgId(null);
+            },
+            () => {
+              setPlayingMsgId(null);
+              setIsSynthesizingMsgId(null);
             }
-          }
-        }).catch(() => {});
+          );
+        } catch (vErr) {
+          console.warn("Auto voice read error:", vErr);
+          setPlayingMsgId(null);
+          setIsSynthesizingMsgId(null);
+        }
       }
     } catch (err: any) {
       const errMsg: string = err?.message ?? '';
@@ -2127,9 +2189,43 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           )}
-          <Text style={[styles.timeText, { color: bubbleTimeColor }]}>
-            {item.timestamp.toLocaleTimeString('ta-IN', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+            <Text style={[styles.timeText, { color: bubbleTimeColor }]}>
+              {item.timestamp.toLocaleTimeString('ta-IN', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            {!isUser && (
+              <TouchableOpacity
+                onPress={() => handlePlayMessageVoice(item)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 3,
+                  backgroundColor: playingMsgId === item.id ? '#EDE9FE' : '#F1F5F9',
+                  paddingHorizontal: 7,
+                  paddingVertical: 3,
+                  borderRadius: 12,
+                  marginLeft: 8,
+                }}
+              >
+                {playingMsgId === item.id ? (
+                  isSynthesizingMsgId === item.id ? (
+                    <ActivityIndicator size="small" color="#7C3AED" />
+                  ) : (
+                    <>
+                      <Ionicons name="stop-circle" size={13} color="#EF4444" />
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF4444' }}>Stop</Text>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <Ionicons name="volume-high" size={13} color="#64748B" />
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#64748B' }}>Listen</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </TouchableOpacity>
         {isUser && (
           <View style={styles.userAvatarWrap}>
@@ -2231,6 +2327,29 @@ export default function ChatScreen() {
           <Text style={styles.realisticBtnLabel}>Edit</Text>
         </TouchableOpacity>
       )}
+      {/* Voice Auto-Reading Toggle in Chat Header */}
+      <TouchableOpacity
+        style={styles.realisticHeaderBtn}
+        onPress={toggleHeaderVoice}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Toggle Chat Voice"
+      >
+        <LinearGradient
+          colors={chatVoiceOn ? ['#FAF5FF', '#F3E8FF'] : ['#F8FAFC', '#F1F5F9']}
+          style={[styles.realisticBtnInner, { borderColor: chatVoiceOn ? '#C084FC' : '#CBD5E1' }]}
+        >
+          <Ionicons
+            name={chatVoiceOn ? 'volume-high' : 'volume-mute'}
+            size={16}
+            color={chatVoiceOn ? '#7C3AED' : '#64748B'}
+          />
+        </LinearGradient>
+        <Text style={[styles.realisticBtnLabel, { color: chatVoiceOn ? '#7C3AED' : '#64748B' }]}>
+          {chatVoiceOn ? 'Voice ON' : 'Voice OFF'}
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.realisticHeaderBtn}
         onPress={clearChat}
