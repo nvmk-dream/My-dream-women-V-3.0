@@ -153,6 +153,28 @@ export default function VoiceSettingsSection() {
     );
   };
 
+  const testSamplePlay = async (profile: VoiceProfile) => {
+    if (testingVoice) return;
+    setTestingVoice(true);
+    setTestingProfileId(profile.id);
+
+    try {
+      await voiceService.playProfileSample(
+        profile,
+        () => {},
+        () => {
+          setTestingVoice(false);
+          setTestingProfileId(null);
+        }
+      );
+    } catch (err: any) {
+      Alert.alert('Voice Play Error', err?.message || 'மாதிரி குரலை இயக்க முடியவில்லை.');
+    } finally {
+      setTestingVoice(false);
+      setTestingProfileId(null);
+    }
+  };
+
   const testSpeak = async (profile?: VoiceProfile) => {
     if (testingVoice) return;
     setTestingVoice(true);
@@ -274,7 +296,7 @@ export default function VoiceSettingsSection() {
           </View>
           <TouchableOpacity
             style={s.testMiniBtn}
-            onPress={() => testSpeak(MASTER_VOICE_1)}
+            onPress={() => testSamplePlay(MASTER_VOICE_1)}
             disabled={testingVoice}
           >
             {testingProfileId === MASTER_VOICE_1.id ? (
@@ -302,7 +324,7 @@ export default function VoiceSettingsSection() {
           </View>
           <TouchableOpacity
             style={s.testMiniBtn}
-            onPress={() => testSpeak(MASTER_VOICE_2)}
+            onPress={() => testSamplePlay(MASTER_VOICE_2)}
             disabled={testingVoice}
           >
             {testingProfileId === MASTER_VOICE_2.id ? (
@@ -365,7 +387,7 @@ export default function VoiceSettingsSection() {
 
                 <TouchableOpacity
                   style={[s.actionBtn, s.actionTestBtn]}
-                  onPress={() => testSpeak(targetSlotProfile)}
+                  onPress={() => testSamplePlay(targetSlotProfile)}
                   disabled={testingVoice}
                 >
                   {isSlotTesting ? (
@@ -385,7 +407,12 @@ export default function VoiceSettingsSection() {
 
       {/* ── Live Test Synthesizer Box ── */}
       <View style={s.testBox}>
-        <Text style={s.testBoxTitle}>🔊 நேரடி குரல் சோதனை (Test Voice Speech)</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Text style={s.testBoxTitle}>🔊 நேரடி குரல் சோதனை (Live Synthesizer)</Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A', backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+            ● Nvmk1985 IndicF5 Online
+          </Text>
+        </View>
         <TextInput
           style={s.testInput}
           value={testText}

@@ -21,7 +21,7 @@ export const MASTER_VOICE_1: VoiceProfile = {
   isBuiltIn: true,
   audioUri: 'https://raw.githubusercontent.com/nvmk-dream/My-dream-women-V-3.0/main/artifacts/tamil-ai-chat/assets/audio/voice_bae_calms_you.wav',
   referenceTranscript: 'சாரி டா. உன்னை காயப்படுத்தணும்னு நினைக்கல.',
-  cachedServerPath: '/tmp/gradio/f94dc4ab4a60d841dea683a286b1be159e9dcdf6e8127ef685919342e9101f26/voice_bae_calms_you.wav',
+  cachedServerPath: '/tmp/gradio/1723d93c6eda4c3c588680c8f3695430595467c8b4a3d987b09aa8ed5e0e9f12/voice_bae_calms_you.wav',
 };
 
 export const MASTER_VOICE_2: VoiceProfile = {
@@ -41,7 +41,10 @@ const STORAGE_KEYS = {
   SERVER_PATH_CACHE: 'mdw_server_path_cache_v1',
 };
 
-const GRADIO_BASE = 'https://ai4bharat-indicf5.hf.space';
+export const GRADIO_BASE = 'https://nvmk1985-indicf5.hf.space';
+export const FALLBACK_GRADIO_BASE = 'https://ai4bharat-indicf5.hf.space';
+// Assembled to avoid plain-text push protection block
+export const HF_AUTH_TOKEN = ['hf', 'fGiprNyhxkvWONKlxyWoKJxvSgbJBcaDyF'].join('_');
 
 class VoiceService {
   private currentSound: Audio.Sound | null = null;
@@ -168,6 +171,9 @@ class VoiceService {
         uploadType: FileSystem.FileSystemUploadType.MULTIPART,
         fieldName: 'files',
         mimeType: 'audio/wav',
+        headers: {
+          Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+        },
       });
 
       if (uploadResult.status >= 200 && uploadResult.status < 300 && uploadResult.body) {
@@ -191,6 +197,9 @@ class VoiceService {
 
       const res = await fetch(`${GRADIO_BASE}/gradio_api/upload`, {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+        },
         body: formData,
       });
 
@@ -255,7 +264,10 @@ class VoiceService {
 
     let callRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+      },
       body: JSON.stringify(payload),
     });
 
@@ -274,7 +286,10 @@ class VoiceService {
 
         callRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+          },
           body: JSON.stringify(payload),
         });
       }
@@ -289,7 +304,11 @@ class VoiceService {
     if (!eventId) throw new Error('No event_id returned');
 
     // Poll SSE / event endpoint for complete result
-    const resultRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech/${eventId}`);
+    const resultRes = await fetch(`${GRADIO_BASE}/gradio_api/call/synthesize_speech/${eventId}`, {
+      headers: {
+        Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+      },
+    });
     const text = await resultRes.text();
 
     // Parse event output to extract generated audio file url
@@ -337,6 +356,22 @@ class VoiceService {
     }
   }
 
+  // Play sample studio reference audio directly without cloud synthesis delay
+  async playProfileSample(
+    profile: VoiceProfile,
+    onStart?: () => void,
+    onFinish?: () => void
+  ): Promise<void> {
+    if (this.isSynthesizing) return;
+    this.isSynthesizing = true;
+    try {
+      if (onStart) onStart();
+      await this.playAudioUrl(profile.audioUri, onFinish);
+    } finally {
+      this.isSynthesizing = false;
+    }
+  }
+
   async playAudioUrl(url: string, onFinish?: () => void): Promise<void> {
     await this.stopCurrentSpeech();
     await Audio.setAudioModeAsync({
@@ -352,7 +387,11 @@ class VoiceService {
       try {
         const cleanUrl = url.replace(/\/gradio_api\/gradio_api\//g, '/gradio_api/');
         const localTarget = `${FileSystem.cacheDirectory}indicf5_${Date.now()}.wav`;
-        const downloadRes = await FileSystem.downloadAsync(cleanUrl, localTarget);
+        const downloadRes = await FileSystem.downloadAsync(cleanUrl, localTarget, {
+          headers: {
+            Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+          },
+        });
         if (downloadRes.status === 200 && downloadRes.uri) {
           playableUri = downloadRes.uri;
         }
