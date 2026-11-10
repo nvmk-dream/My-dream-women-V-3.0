@@ -547,7 +547,14 @@ export default function ChatScreen() {
 
   useEffect(() => {
     voiceService.isVoiceEnabled().then(enabled => setChatVoiceOn(enabled)).catch(() => {});
-  }, []);
+    // Non-blocking background voice server warm-up as soon as user opens character chat
+    const charId = persona?.id || (typeof personaId === 'string' ? personaId : 'default');
+    voiceService.getVoiceForCharacter(charId).then((profile) => {
+      void voiceService.warmupVoiceServer(profile);
+    }).catch(() => {
+      void voiceService.warmupVoiceServer();
+    });
+  }, [persona?.id, personaId]);
 
   const toggleHeaderVoice = async () => {
     const next = !chatVoiceOn;
@@ -2210,7 +2217,10 @@ export default function ChatScreen() {
               >
                 {playingMsgId === item.id ? (
                   isSynthesizingMsgId === item.id ? (
-                    <ActivityIndicator size="small" color="#7C3AED" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <ActivityIndicator size="small" color="#7C3AED" />
+                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#7C3AED' }}>Preparing Voice...</Text>
+                    </View>
                   ) : (
                     <>
                       <Ionicons name="stop-circle" size={13} color="#EF4444" />

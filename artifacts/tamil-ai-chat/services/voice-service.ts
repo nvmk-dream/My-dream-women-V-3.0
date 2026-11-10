@@ -46,9 +46,83 @@ export const FALLBACK_GRADIO_BASE = 'https://ai4bharat-indicf5.hf.space';
 // Assembled to avoid plain-text push protection block
 export const HF_AUTH_TOKEN = ['hf', 'fGiprNyhxkvWONKlxyWoKJxvSgbJBcaDyF'].join('_');
 
+export type VoiceServerStatus = 'idle' | 'sleeping' | 'starting' | 'ready' | 'error';
+
+export interface VoiceTimingMetrics {
+  warmupStartedAt?: number;
+  serverReadyAt?: number;
+  generationStartedAt?: number;
+  audioReadyAt?: number;
+  warmupLatencyMs?: number;
+  generationLatencyMs?: number;
+}
+
 class VoiceService {
   private currentSound: Audio.Sound | null = null;
   private isSynthesizing = false;
+  private serverStatus: VoiceServerStatus = 'idle';
+  private lastWarmupTime = 0;
+  private isWarmingUp = false;
+  private metrics: VoiceTimingMetrics = {};
+
+  getServerStatus(): VoiceServerStatus {
+    return this.serverStatus;
+  }
+
+  getMetrics(): VoiceTimingMetrics {
+    return { ...this.metrics };
+  }
+
+  // 1. Non-blocking Background Voice Server Warm-up
+  async warmupVoiceServer(profile?: VoiceProfile): Promise<{ status: VoiceServerStatus; latencyMs: number }> {
+    const now = Date.now();
+    // If server was already warmed up within the last 45 seconds, avoid duplicate network calls
+    if (this.serverStatus === 'ready' && now - this.lastWarmupTime < 45000) {
+      return { status: 'ready', latencyMs: 0 };
+    }
+    if (this.isWarmingUp) {
+      return { status: this.serverStatus, latencyMs: 0 };
+    }
+
+    this.isWarmingUp = true;
+    this.serverStatus = 'starting';
+    this.metrics.warmupStartedAt = now;
+    console.log(`[VOICE_METRICS] warmup_started: ${new Date(now).toISOString()}`);
+
+    const startTime = Date.now();
+    try {
+      // Non-blocking ping to /gradio_api/info to wake up sleeping ZeroGPU
+      const res = await fetch(`${GRADIO_BASE}/gradio_api/info`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${HF_AUTH_TOKEN}`,
+        },
+      });
+
+      const latencyMs = Date.now() - startTime;
+      this.metrics.serverReadyAt = Date.now();
+      this.metrics.warmupLatencyMs = latencyMs;
+      this.lastWarmupTime = Date.now();
+      this.serverStatus = 'ready';
+      console.log(`[VOICE_METRICS] server_ready: took ${latencyMs}ms (HTTP ${res.status})`);
+
+      // Pre-cache reference audio in background so upload is not needed when user sends message
+      if (profile) {
+        this.ensureServerPath(profile, false).catch((err) => {
+          console.warn('[VOICE_WARMUP] Background reference audio pre-cache failed (will retry on demand):', err);
+        });
+      }
+
+      return { status: 'ready', latencyMs };
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      console.warn(`[VOICE_METRICS] server_warmup_error after ${latencyMs}ms:`, err?.message);
+      this.serverStatus = 'error';
+      return { status: 'error', latencyMs };
+    } finally {
+      this.isWarmingUp = false;
+    }
+  }
 
   async isVoiceEnabled(): Promise<boolean> {
     try {
@@ -462,7 +536,16 @@ class VoiceService {
         }
       }
 
+      this.metrics.generationStartedAt = Date.now();
+      console.log(`[VOICE_METRICS] generation_started: ${new Date(this.metrics.generationStartedAt).toISOString()}`);
+
       const audioUrl = await this.synthesizeSpeech(clean, profile);
+
+      this.metrics.audioReadyAt = Date.now();
+      const genLatency = this.metrics.audioReadyAt - this.metrics.generationStartedAt;
+      this.metrics.generationLatencyMs = genLatency;
+      console.log(`[VOICE_METRICS] audio_ready: took ${genLatency}ms. Playing speech now...`);
+
       if (onStart) onStart();
       await this.playAudioUrl(audioUrl, onFinish);
     } finally {
