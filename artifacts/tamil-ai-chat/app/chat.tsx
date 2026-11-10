@@ -547,14 +547,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     voiceService.isVoiceEnabled().then(enabled => setChatVoiceOn(enabled)).catch(() => {});
-    // Non-blocking background voice server warm-up as soon as user opens character chat
-    const charId = persona?.id || (typeof personaId === 'string' ? personaId : 'default');
-    voiceService.getVoiceForCharacter(charId).then((profile) => {
-      void voiceService.warmupVoiceServer(profile);
-    }).catch(() => {
-      void voiceService.warmupVoiceServer();
-    });
-  }, [persona?.id, personaId]);
+  }, []);
 
   const toggleHeaderVoice = async () => {
     const next = !chatVoiceOn;
@@ -564,6 +557,14 @@ export default function ChatScreen() {
       await voiceService.stopCurrentSpeech();
       setPlayingMsgId(null);
       setIsSynthesizingMsgId(null);
+    } else {
+      // Trigger non-blocking background voice server warm-up only when Voice switch is turned ON
+      const charId = persona?.id || (typeof personaId === 'string' ? personaId : 'default');
+      voiceService.getVoiceForCharacter(charId).then((profile) => {
+        void voiceService.warmupVoiceServer(profile);
+      }).catch(() => {
+        void voiceService.warmupVoiceServer();
+      });
     }
   };
 

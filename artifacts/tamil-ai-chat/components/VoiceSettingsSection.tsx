@@ -69,6 +69,10 @@ export default function VoiceSettingsSection() {
     const next = !voiceEnabled;
     setVoiceEnabled(next);
     await voiceService.setVoiceEnabled(next);
+    if (next) {
+      // Trigger non-blocking background voice server warm-up when master voice switch is turned ON
+      void voiceService.warmupVoiceServer();
+    }
   };
 
   const changeVoiceMode = async (mode: VoiceMode) => {
