@@ -128,11 +128,11 @@ class VoiceService {
     try {
       const val = await AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENABLED);
       if (val === null) {
-        return true; // Default to ON for seamless first-time experience
+        return false; // Default to OFF as requested by user
       }
       return val === 'true';
     } catch {
-      return true;
+      return false;
     }
   }
 
@@ -517,27 +517,28 @@ class VoiceService {
     if (this.isSynthesizing) return;
     this.isSynthesizing = true;
     try {
-      // Clean up text for natural speech (remove markdown, emojis, asterisks, brackets)
-      let clean = text
-        .replace(/[*_#`~[\]()]/g, '')
-        .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '')
-        .trim();
-
-      if (!clean) return;
-
-      // Limit to first 250 characters or first 2 sentences for natural fast response on ZeroGPU
-      if (clean.length > 250) {
-        const sentences = clean.split(/[.!?।\n]+/).filter(Boolean);
-        if (sentences.length > 0) {
-          clean = sentences.slice(0, 2).join('. ') + '.';
-        }
-        if (clean.length > 250) {
-          clean = clean.slice(0, 250);
-        }
+      // 1. Remove all *...* thoughts and actions so they are completely excluded from voice synthesis
+      const spoken = text.replace(/\*[\s\S]*?\*/g, '').trim();
+      if (!spoken) {
+        if (onFinish) onFinish();
+        return;
       }
 
+      // 2. Clean up markdown, emojis, brackets for natural speech
+      const clean = spoken
+        .replace(/[_#`~[\]()]/g, '')
+        .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!clean) {
+        if (onFinish) onFinish();
+        return;
+      }
+
+      // 3. No limit set: entire direct dialogue is synthesized cleanly without truncation
       this.metrics.generationStartedAt = Date.now();
-      console.log(`[VOICE_METRICS] generation_started: ${new Date(this.metrics.generationStartedAt).toISOString()}`);
+      console.log(`[VOICE_METRICS] generation_started: ${new Date(this.metrics.generationStartedAt).toISOString()} (${clean.length} chars)`);
 
       const audioUrl = await this.synthesizeSpeech(clean, profile);
 

@@ -541,7 +541,7 @@ export default function ChatScreen() {
   const [fileLoading, setFileLoading] = useState(false);
 
   // ── Chat Voice Reading State ──
-  const [chatVoiceOn, setChatVoiceOn] = useState(true);
+  const [chatVoiceOn, setChatVoiceOn] = useState(false);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const [isSynthesizingMsgId, setIsSynthesizingMsgId] = useState<string | null>(null);
 
